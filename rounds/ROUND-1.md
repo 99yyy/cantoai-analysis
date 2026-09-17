@@ -119,5 +119,5 @@ python scripts/run_clap_sing.py --summarize \
 - 阶段1方法审：通过（`review/ROUND-1/method.md`）
 - Cloud Agent launch：`bc-b7e6427b-e931-59bf-8912-8643a6c21ab8`（https://cursor.com/agents/bc-b7e6427b-e931-59bf-8912-8643a6c21ab8 ）；方式=CloudAgent.launch 非 @cursor
 - launch 完成是否自动唤醒 fyp：**是**（收到完成唤醒，但 status=`error`；末条为 float median self-test 修复说明）。以分支自测为准：本地 `--self-test` PASSED。
-- GitHub 例程（pr-opened / pr-merged）：PR #6 已开且本合并会 push；例程文件夹仍显示 never run → **本次未观测到例程唤醒**（待合并后再记一次）。
-- PR：https://github.com/99yyy/cantoai-analysis/pull/6 （draft；以 git merge 合入）
+- GitHub 例程（pr-opened / pr-merged）：**是**（例程「cantoai-analysis PR 事件」于 CST 2026-09-17 23:49 收到 `pr-merged` 唤醒；此前 pr-opened 未观测到例程唤醒）。
+- PR：https://github.com/99yyy/cantoai-analysis/pull/6 （merged；分支 `cursor/round1-clap-sing-1ab8`；合入 commit `fffd53797bb7a46e92f3b9e4cf4a55d3c753a15b`）
