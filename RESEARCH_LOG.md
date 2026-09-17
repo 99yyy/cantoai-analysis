@@ -36,3 +36,16 @@
 - **审稿**：通过；`review/calib-1.1-result.md`（独立重算：4911 全覆盖、var_db 最大偏差 5e-5）。工作区 commit `4804b53` ≡ 分析库 `42f5ae9`。
 - **下一题**：ROUND-1 = 一.2 CLAP `clap_sing` 与 PANNs `singing_prob` 对照。
 
+## 2026-09-18 ROUND-1 结轮（一.2 CLAP vs PANNs）
+
+- **问题**：全窗上 `clap_sing` 与 PANNs `singing_prob` 是否可互换（ρ≥0.7），且对 `flag_sing=1` 敏感。
+- **结果**：Spearman **ρ≈0.400**（n=4911）→ **H1 不成立**；`flag_sing` 中位差方向对且 MW p≈0.039（n_flag1=14）→ **H2 弱支持**；ρ&lt;0.5 → H3 部分支持。
+- **裁决**：CLAP 与 PANNs **不能互相替代**；一.3 听辨抽样必须 **双轨分层**（同时按 `clap_sing` 与 `singing_prob`）。
+- **产物**：`ROUND-1/` @ `4eab466`；审稿 `review/ROUND-1/result.md` 通过。
+- **验证**：CloudAgent.launch 完成会唤醒（含 error）；GitHub `pr-merged` 例程会唤醒；`pr-opened` 本轮未观测。
+- **下一题**：ROUND-2 = 一.3 人工听辨 200 窗 + `listening_sheet`。
+
+### 矛盾
+
+- 与旧 REPORT「唱段/C 可忽略、单一 singing_prob 阈值即可」叙事冲突：未校准的 PANNs 与 CLAP 仅中等相关，阈值与分层不能只靠一侧分数。记入矛盾，不自动停回路。
+

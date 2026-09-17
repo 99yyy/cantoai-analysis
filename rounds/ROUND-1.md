@@ -2,7 +2,7 @@
 
 ## 元数据
 
-- 阶段：4（复核 / 审稿员）
+- 阶段：5（已结轮）
 - backlog 条目：一.2 CLAP `clap_sing` 与 PANNs 对照
 - 执行角色：音频员
 - 方法审打回计数：1/2
@@ -123,3 +123,5 @@ python scripts/run_clap_sing.py --summarize \
 - launch 完成是否自动唤醒 fyp：**是**（收到完成唤醒，但 status=`error`；末条为 float median self-test 修复说明）。以分支自测为准：本地 `--self-test` PASSED。
 - GitHub 例程（pr-opened / pr-merged）：**是**（例程「cantoai-analysis PR 事件」于 CST 2026-09-17 23:49 收到 `pr-merged` 唤醒；此前 pr-opened 未观测到例程唤醒）。
 - PR：https://github.com/99yyy/cantoai-analysis/pull/6 （merged；分支 `cursor/round1-clap-sing-1ab8`；合入 commit `fffd53797bb7a46e92f3b9e4cf4a55d3c753a15b`）
+
+- 阶段4复核：通过（`review/ROUND-1/result.md`，CST 2026-09-18）
