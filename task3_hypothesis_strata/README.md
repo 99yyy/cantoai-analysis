@@ -4,14 +4,21 @@ Stratified agreement analysis comparing **film** (電影口白) vs **contemporar
 
 ## Quick Start (Sample Data)
 
+Uses the Cloud Agent fixture in `fixtures/sample.sqlite` (see `SCHEMA.md`).
+
 ```bash
 cd /workspace
-python task3_hypothesis_strata/scripts/run_hypothesis_strata.py \
+python3 task3_hypothesis_strata/scripts/run_hypothesis_strata.py \
     --db fixtures/sample.sqlite \
     --quality fixtures/sample_window_quality.csv \
     --multilabel task3_multilabel_flags/video_multilabel_flags.csv \
     --out task3_hypothesis_strata/_sample_out \
     --seed 0 --bootstrap 200
+
+python3 task3_hypothesis_strata/scripts/check_sample_outputs.py \
+    --out task3_hypothesis_strata/_sample_out
+
+python3 task3_hypothesis_strata/scripts/test_jyutping_parse.py
 ```
 
 ## Full Data Usage
