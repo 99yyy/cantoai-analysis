@@ -1,0 +1,12 @@
+{
+  "n": 20,
+  "elapsed_sec": 65,
+  "failures": 0,
+  "successes": 20,
+  "est_hours_for_4911": 4.4335,
+  "proceed_full": true,
+  "var_db_mean_trial": 18.7312,
+  "weight_bytes": 84025440,
+  "weight_mb": 80.13,
+  "weight_over_2gb": false
+}

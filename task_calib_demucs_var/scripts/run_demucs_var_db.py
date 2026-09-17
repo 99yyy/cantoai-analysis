@@ -13,6 +13,9 @@ Then computes:
 
 Output CSV columns:
   window_id, rms_vocals, rms_rest, var_db, demucs_ok, error
+
+Local patch: Separator is built once (module-level singleton) and reused
+across all windows — upstream script created a new Separator per window.
 """
 
 import argparse
@@ -35,6 +38,20 @@ logger = logging.getLogger(__name__)
 VAR_DB_INF = 999.0
 VAR_DB_NEG_INF = -999.0
 
+# Local patch: Separator singleton — created once, reused by process_window
+_SEPARATOR = None
+
+
+def get_separator():
+    """Return module-level htdemucs Separator (CPU), creating it once."""
+    global _SEPARATOR
+    if _SEPARATOR is None:
+        import demucs.api
+        logger.info("Creating Separator(model='htdemucs', device='cpu') once (local singleton patch)")
+        _SEPARATOR = demucs.api.Separator(model="htdemucs", device="cpu")
+        logger.info("Separator ready")
+    return _SEPARATOR
+
 
 def compute_rms(audio: np.ndarray) -> float:
     """Compute RMS of audio array."""
@@ -46,16 +63,14 @@ def compute_rms(audio: np.ndarray) -> float:
 def separate_with_demucs(audio_path: Path, output_dir: Path) -> dict:
     """
     Run htdemucs separation on audio file.
-    
+
     Returns dict with keys: vocals, drums, bass, other (each np.ndarray)
     or raises exception on failure.
     """
-    import demucs.api
-    
-    separator = demucs.api.Separator(model="htdemucs", device="cpu")
-    
+    separator = get_separator()
+
     origin, separated = separator.separate_audio_file(str(audio_path))
-    
+
     result = {}
     for stem_name in ["vocals", "drums", "bass", "other"]:
         if stem_name in separated:
@@ -65,18 +80,18 @@ def separate_with_demucs(audio_path: Path, output_dir: Path) -> dict:
             result[stem_name] = stem_audio
         else:
             raise ValueError(f"Missing stem: {stem_name}")
-    
+
     return result
 
 
 def process_window(audio_path: Path) -> dict:
     """
     Process a single window audio file.
-    
+
     Returns dict with: window_id, rms_vocals, rms_rest, var_db, demucs_ok, error
     """
     window_id = audio_path.stem
-    
+
     result = {
         "window_id": window_id,
         "rms_vocals": "",
@@ -85,19 +100,19 @@ def process_window(audio_path: Path) -> dict:
         "demucs_ok": 0,
         "error": "",
     }
-    
+
     try:
         stems = separate_with_demucs(audio_path, audio_path.parent)
-        
+
         vocals = stems["vocals"]
         rest = stems["drums"] + stems["bass"] + stems["other"]
-        
+
         rms_vocals = compute_rms(vocals)
         rms_rest = compute_rms(rest)
-        
+
         result["rms_vocals"] = f"{rms_vocals:.8e}"
         result["rms_rest"] = f"{rms_rest:.8e}"
-        
+
         if rms_rest == 0.0:
             if rms_vocals == 0.0:
                 var_db = 0.0
@@ -109,14 +124,14 @@ def process_window(audio_path: Path) -> dict:
             result["error"] = "vocals_rms_zero"
         else:
             var_db = 20.0 * np.log10(rms_vocals / rms_rest)
-        
+
         result["var_db"] = f"{var_db:.4f}"
         result["demucs_ok"] = 1
-        
+
     except Exception as e:
         result["error"] = str(e).replace("\n", " ")[:200]
         result["demucs_ok"] = 0
-    
+
     return result
 
 
@@ -125,17 +140,17 @@ def generate_synth_audio(output_path: Path, duration_sec: float = 5.0, sr: int =
     Generate synthetic audio for testing: sine wave (simulated vocal) + noise (simulated music bed).
     """
     import soundfile as sf
-    
+
     t = np.linspace(0, duration_sec, int(sr * duration_sec), dtype=np.float32)
-    
+
     vocal_freq = 440.0
     vocal = 0.3 * np.sin(2 * np.pi * vocal_freq * t)
-    
+
     noise = 0.1 * np.random.randn(len(t)).astype(np.float32)
-    
+
     mixed = vocal + noise
     mixed = mixed / np.max(np.abs(mixed)) * 0.9
-    
+
     sf.write(str(output_path), mixed, sr)
     logger.info(f"Generated synthetic audio: {output_path}")
 
@@ -174,7 +189,7 @@ var_db formula:
   where rest = drums + bass + other
 """
     )
-    
+
     parser.add_argument(
         "input_dir",
         nargs="?",
@@ -215,87 +230,93 @@ var_db formula:
         action="store_true",
         help="Enable verbose logging",
     )
-    
+
     args = parser.parse_args()
-    
+
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-    
+
     check_model_size()
-    
+
     audio_files = []
-    
+
     if args.dry_run_synth:
         logger.info("Running in dry-run-synth mode: generating synthetic test audio")
-        
+
         tmp_dir = Path(tempfile.mkdtemp(prefix="demucs_synth_"))
         logger.info(f"Synthetic audio directory: {tmp_dir}")
-        
+
         for i in range(args.synth_count):
             synth_path = tmp_dir / f"synth_window_{i:04d}.wav"
             generate_synth_audio(synth_path)
             audio_files.append(synth_path)
-    
+
     elif args.id_file:
         if args.id_file == Path("-"):
             ids = [line.strip() for line in sys.stdin if line.strip()]
         else:
             with open(args.id_file) as f:
                 ids = [line.strip() for line in f if line.strip()]
-        
+
         if not args.input_dir:
             parser.error("input_dir is required when using --id-file")
-        
+
         for wid in ids:
             flac_path = args.input_dir / f"{wid}.flac"
             if flac_path.exists():
                 audio_files.append(flac_path)
             else:
                 logger.warning(f"Window file not found: {flac_path}")
-    
+
     else:
         if not args.input_dir:
             parser.error("input_dir is required (or use --dry-run-synth)")
-        
+
         if not args.input_dir.is_dir():
             logger.error(f"Input directory does not exist: {args.input_dir}")
             sys.exit(1)
-        
+
         audio_files = sorted(args.input_dir.glob("*.flac"))
         if not audio_files:
             audio_files = sorted(args.input_dir.glob("*.wav"))
-        
+
         if not audio_files:
             logger.error(f"No FLAC or WAV files found in {args.input_dir}")
             sys.exit(1)
-    
+
     if args.limit and len(audio_files) > args.limit:
         audio_files = audio_files[:args.limit]
-    
+
     logger.info(f"Processing {len(audio_files)} audio files")
-    
+
+    # Local patch: warm up Separator once before the loop
+    if audio_files and not args.dry_run_synth:
+        get_separator()
+    elif audio_files and args.dry_run_synth:
+        get_separator()
+
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    
+
     fieldnames = ["window_id", "rms_vocals", "rms_rest", "var_db", "demucs_ok", "error"]
-    
+
     with open(args.output, "w", newline="") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        
+
         for i, audio_path in enumerate(audio_files, 1):
             logger.info(f"[{i}/{len(audio_files)}] Processing: {audio_path.name}")
-            
+
             result = process_window(audio_path)
             writer.writerow(result)
             csvfile.flush()
-            
+
             if result["demucs_ok"]:
                 logger.info(f"  var_db={result['var_db']} dB")
             else:
                 logger.warning(f"  FAILED: {result['error'][:80]}")
-    
+
     logger.info(f"Results written to: {args.output}")
-    
+
     if args.dry_run_synth:
         import shutil
         shutil.rmtree(tmp_dir, ignore_errors=True)
