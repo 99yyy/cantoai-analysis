@@ -1,0 +1,49 @@
+{
+  "n_videos": 567,
+  "n_windows": 4911,
+  "n_windows_with_singing_prob": 51,
+  "singing_prob_sources": [
+    "/workspace/cantoai/analysis/task2_window_quality/trial_50_quality.csv",
+    "/workspace/cantoai/analysis/task2_window_quality/trial_50_quality_with_flags.csv",
+    "/workspace/cantoai/analysis/task2_window_quality/artifacts/smoke.csv",
+    "/workspace/cantoai/analysis/task2_window_quality/artifacts/smoke_with_flags.csv"
+  ],
+  "singing_prob_threshold_for_dialogue_film": 0.2,
+  "flag_counts": [
+    {
+      "flag": "parody_flag",
+      "n_videos": 7,
+      "share_videos": 0.012345679012345678
+    },
+    {
+      "flag": "song_flag",
+      "n_videos": 12,
+      "share_videos": 0.021164021164021163
+    },
+    {
+      "flag": "recitation_flag",
+      "n_videos": 15,
+      "share_videos": 0.026455026455026454
+    },
+    {
+      "flag": "film_flag",
+      "n_videos": 131,
+      "share_videos": 0.2310405643738977
+    },
+    {
+      "flag": "film_related_core",
+      "n_videos": 119,
+      "share_videos": 0.20987654320987653
+    },
+    {
+      "flag": "contemporary_only",
+      "n_videos": 408,
+      "share_videos": 0.7195767195767195
+    },
+    {
+      "flag": "multi_content_flag_ge2",
+      "n_videos": 6,
+      "share_videos": 0.010582010582010581
+    }
+  ]
+}
