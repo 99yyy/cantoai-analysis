@@ -2,7 +2,7 @@
 
 ## 元数据
 
-- 阶段：1（方法审打回后修改中 → 待复审）
+- 阶段：2（脚本待 launch；不早于 04:20 HKT）
 - backlog 条目：一.3 人工听辨样本 200 窗抽样与 `listening_sheet`
 - 执行角色：分析员（抽样表）+ 音频员（可选导出短音频切片路径清单）；**标注由 Tom**
 - 方法审打回计数：1/2
@@ -145,3 +145,5 @@ python scripts/build_listening_sheet.py --summarize-labels \
 
 - launch 完成是否自动唤醒 fyp：
 - GitHub 例程是否触发：
+
+- 阶段1复审：通过（`review/ROUND-2/method.md`，CST 2026-09-18 ≈00:23）；预测门槛仍冻结于 `fffad051…`；Cloud Agent 不早于约 04:20 HKT launch。
