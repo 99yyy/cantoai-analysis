@@ -16,3 +16,7 @@ artifacts/*.log
 # allow Cloud Agent fixture only
 !fixtures/
 !fixtures/sample.sqlite
+
+# Task 3 hypothesis strata - keep small CSVs but ignore any large outputs
+task3_hypothesis_strata/_sample_out/*.png
+task3_hypothesis_strata/_sample_out/*.json
