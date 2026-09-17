@@ -24,10 +24,14 @@ from __future__ import annotations
 
 import argparse
 import sqlite3
+import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from jyutping import dictionary_jyutping, parse_coda, parse_initial, parse_tone  # noqa: E402
 
 
 # ============================================================================
@@ -66,118 +70,6 @@ RATE_BINS = [
     ("5-7", lambda x: (x >= 5) & (x < 7)),
     (">7", lambda x: x >= 7),
 ]
-
-
-# ============================================================================
-# Jyutping parsing utilities
-# ============================================================================
-
-def parse_initial(jp: str | None) -> str:
-    """
-    Parse the initial consonant (声母) from a jyutping string.
-    
-    Categories:
-    - n-: 泥母 (nasal n)
-    - l-: 來母 (lateral l)
-    - ng-: 疑母 (velar nasal)
-    - zero: 零声母 (no initial, starts with vowel or glide j/w)
-    - gw-/kw-: 合口見組 (labialized velars)
-    - g-/k-: 見組 (velars without labialization)
-    - other: all other initials (b, p, m, f, d, t, s, z, c, h, etc.)
-    
-    The classification follows standard Cantonese phonological categories,
-    focusing on the initials most relevant to merger phenomena.
-    """
-    if not jp or not isinstance(jp, str):
-        return "other"
-    
-    # Normalize: strip tone digit and convert to lowercase
-    jp_clean = jp.lower().rstrip("0123456")
-    
-    if not jp_clean:
-        return "other"
-    
-    # Order matters: check longer sequences first
-    if jp_clean.startswith("ng"):
-        return "ng-"
-    if jp_clean.startswith("gw"):
-        return "gw-/kw-"
-    if jp_clean.startswith("kw"):
-        return "gw-/kw-"
-    if jp_clean.startswith("n"):
-        return "n-"
-    if jp_clean.startswith("l"):
-        return "l-"
-    if jp_clean.startswith("g"):
-        return "g-/k-"
-    if jp_clean.startswith("k"):
-        return "g-/k-"
-    
-    # Zero initial: starts with vowel (a, e, i, o, u) or glide (j, w)
-    # Note: 'j' in jyutping is a palatal glide [j], 'w' is labial glide [w]
-    if jp_clean[0] in "aeiou":
-        return "zero"
-    if jp_clean.startswith("j") or jp_clean.startswith("w"):
-        return "zero"
-    
-    return "other"
-
-
-def parse_coda(jp: str | None) -> str:
-    """
-    Parse the coda (韵尾) from a jyutping string.
-    
-    Categories:
-    - -n: 鼻韵尾 n
-    - -ng: 鼻韵尾 ng
-    - -t: 入声韵尾 t
-    - -k: 入声韵尾 k
-    - -p: 入声韵尾 p
-    - -m: 鼻韵尾 m (less common)
-    - open: 开音节 (no coda)
-    
-    The classification follows standard Cantonese phonological categories.
-    """
-    if not jp or not isinstance(jp, str):
-        return "open"
-    
-    # Normalize: strip tone digit and convert to lowercase
-    jp_clean = jp.lower().rstrip("0123456")
-    
-    if not jp_clean:
-        return "open"
-    
-    # Order matters: check longer sequences first
-    if jp_clean.endswith("ng"):
-        return "-ng"
-    if jp_clean.endswith("n"):
-        return "-n"
-    if jp_clean.endswith("t"):
-        return "-t"
-    if jp_clean.endswith("k"):
-        return "-k"
-    if jp_clean.endswith("p"):
-        return "-p"
-    if jp_clean.endswith("m"):
-        return "-m"
-    
-    return "open"
-
-
-def parse_tone(jp: str | None) -> int:
-    """
-    Extract the tone number (1-6) from a jyutping string.
-    Returns 0 if no valid tone is found.
-    """
-    if not jp or not isinstance(jp, str):
-        return 0
-    
-    for c in jp[::-1]:  # Check from end
-        if c.isdigit():
-            tone = int(c)
-            if 1 <= tone <= 6:
-                return tone
-    return 0
 
 
 # ============================================================================
@@ -258,67 +150,72 @@ def video_median_agreement(syl: pd.DataFrame) -> float:
     """Compute median of per-video agreement rates."""
     if len(syl) == 0:
         return np.nan
-    
-    video_rates = (
-        syl.groupby("video_id")["jp_match"]
-        .apply(lambda x: float(is_agreement(x).mean()))
-    )
-    
-    if len(video_rates) == 0:
+    stats = per_video_agreement(syl)
+    if len(stats) == 0:
         return np.nan
-    
-    return float(video_rates.median())
+    return float(np.median(stats["rate"].to_numpy()))
+
+
+def per_video_agreement(syl: pd.DataFrame) -> pd.DataFrame:
+    """Per-video syllable counts and agreement rates."""
+    agree = is_agreement(syl["jp_match"])
+    return (
+        syl.assign(_agree=agree)
+        .groupby("video_id", sort=False)
+        .agg(n_syllables=("_agree", "size"), n_agree=("_agree", "sum"))
+        .assign(rate=lambda d: d["n_agree"] / d["n_syllables"])
+    )
 
 
 # ============================================================================
 # Bootstrap confidence intervals
 # ============================================================================
 
-def bootstrap_ci(
+def _percentile_ci(samples: np.ndarray) -> tuple[float, float]:
+    return float(np.percentile(samples, 2.5)), float(np.percentile(samples, 97.5))
+
+
+def bootstrap_agreement_ci(
     syl: pd.DataFrame,
-    metric_fn,
     n_bootstrap: int,
     seed: int,
-) -> tuple[float, float, float]:
+) -> tuple[float, float, float, float, float, float]:
     """
-    Compute bootstrap confidence interval by resampling videos.
-    
-    Returns:
-        (point_estimate, ci_low, ci_high)
+    Video-resampled bootstrap CIs for syllable-weighted and video-median rates.
+
+    Videos are drawn with replacement. Video-median uses the resampled rates
+    *with multiplicity* (a video drawn twice contributes twice).
     """
-    point_est = metric_fn(syl)
-    
-    if len(syl) == 0 or pd.isna(point_est):
-        return (np.nan, np.nan, np.nan)
-    
-    rng = np.random.default_rng(seed)
-    video_ids = syl["video_id"].unique()
-    n_videos = len(video_ids)
-    
+    nan6 = (np.nan,) * 6
+    if len(syl) == 0:
+        return nan6
+
+    stats = per_video_agreement(syl)
+    n_videos = len(stats)
     if n_videos == 0:
-        return (point_est, np.nan, np.nan)
-    
-    if n_videos == 1:
-        # Can't resample with only one video
-        return (point_est, point_est, point_est)
-    
-    boot_estimates = []
-    for _ in range(n_bootstrap):
-        # Resample videos with replacement
-        sampled_vids = rng.choice(video_ids, size=n_videos, replace=True)
-        # Get all syllables for sampled videos (may have duplicates)
-        boot_syl = pd.concat([syl[syl["video_id"] == vid] for vid in sampled_vids], ignore_index=True)
-        boot_est = metric_fn(boot_syl)
-        if not pd.isna(boot_est):
-            boot_estimates.append(boot_est)
-    
-    if len(boot_estimates) < 10:
-        return (point_est, np.nan, np.nan)
-    
-    ci_low = float(np.percentile(boot_estimates, 2.5))
-    ci_high = float(np.percentile(boot_estimates, 97.5))
-    
-    return (point_est, ci_low, ci_high)
+        return nan6
+
+    n_syl = stats["n_syllables"].to_numpy(dtype=float)
+    n_agree = stats["n_agree"].to_numpy(dtype=float)
+    rates = stats["rate"].to_numpy(dtype=float)
+
+    syl_rate = float(n_agree.sum() / n_syl.sum())
+    vid_med = float(np.median(rates))
+
+    if n_videos == 1 or n_bootstrap <= 0:
+        return (syl_rate, syl_rate, syl_rate, vid_med, vid_med, vid_med)
+
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, n_videos, size=(n_bootstrap, n_videos))
+    boot_n = n_syl[idx]
+    boot_a = n_agree[idx]
+    denom = boot_n.sum(axis=1)
+    boot_syl = np.divide(boot_a.sum(axis=1), denom, out=np.full(n_bootstrap, np.nan), where=denom > 0)
+    boot_med = np.median(rates[idx], axis=1)
+
+    syl_lo, syl_hi = _percentile_ci(boot_syl[~np.isnan(boot_syl)])
+    vid_lo, vid_hi = _percentile_ci(boot_med)
+    return (syl_rate, syl_lo, syl_hi, vid_med, vid_lo, vid_hi)
 
 
 # ============================================================================
@@ -333,17 +230,17 @@ def compute_stratum_stats(
     seed: int,
 ) -> dict:
     """Compute all statistics for a single stratum."""
-    
     n_syllables = len(syl)
     n_videos = syl["video_id"].nunique() if n_syllables > 0 else 0
-    
-    syl_rate, syl_ci_low, syl_ci_high = bootstrap_ci(
-        syl, syllable_weighted_agreement, n_bootstrap, seed
-    )
-    vid_rate, vid_ci_low, vid_ci_high = bootstrap_ci(
-        syl, video_median_agreement, n_bootstrap, seed
-    )
-    
+    (
+        syl_rate,
+        syl_ci_low,
+        syl_ci_high,
+        vid_rate,
+        vid_ci_low,
+        vid_ci_high,
+    ) = bootstrap_agreement_ci(syl, n_bootstrap, seed)
+
     return {
         "subset": subset_name,
         "bin": bin_name,
@@ -387,28 +284,22 @@ def stratify_by_axis(
 
 def get_onset_bins(syl: pd.DataFrame) -> list[tuple[str, pd.Series]]:
     """Get bins for onset (initial) stratification."""
-    syl = syl.copy()
-    syl["_onset"] = syl["jp_default"].apply(parse_initial)
-    
+    onset = dictionary_jyutping(syl).map(parse_initial)
     categories = ["n-", "l-", "ng-", "zero", "gw-/kw-", "g-/k-", "other"]
-    return [(cat, syl["_onset"] == cat) for cat in categories]
+    return [(cat, onset == cat) for cat in categories]
 
 
 def get_coda_bins(syl: pd.DataFrame) -> list[tuple[str, pd.Series]]:
     """Get bins for coda stratification."""
-    syl = syl.copy()
-    syl["_coda"] = syl["jp_default"].apply(parse_coda)
-    
+    coda = dictionary_jyutping(syl).map(parse_coda)
     categories = ["-n", "-ng", "-t", "-k", "-p", "-m", "open"]
-    return [(cat, syl["_coda"] == cat) for cat in categories]
+    return [(cat, coda == cat) for cat in categories]
 
 
 def get_tone_bins(syl: pd.DataFrame) -> list[tuple[str, pd.Series]]:
     """Get bins for tone stratification (tones 1-6)."""
-    syl = syl.copy()
-    syl["_tone"] = syl["jp_default"].apply(parse_tone)
-    
-    return [(str(t), syl["_tone"] == t) for t in range(1, 7)]
+    tone = dictionary_jyutping(syl).map(parse_tone)
+    return [(str(t), tone == t) for t in range(1, 7)]
 
 
 def get_snr_bins(syl: pd.DataFrame) -> list[tuple[str, pd.Series]]:
@@ -438,16 +329,14 @@ def analyze_tone1_confusion(
 ) -> dict:
     """
     Analyze tone 1 heard as tone 4 or 6.
-    
-    Uses jp_realized to check if dictionary tone 1 was perceived as tone 4 or 6.
+
+    Dictionary tone from jp_default/jp_ctx; realized tone from jp_realized.
     """
-    syl = syl.copy()
-    syl["_dict_tone"] = syl["jp_default"].apply(parse_tone)
-    syl["_realized_tone"] = syl["jp_realized"].apply(parse_tone)
-    
-    tone1_syl = syl[syl["_dict_tone"] == 1]
-    
-    if len(tone1_syl) == 0:
+    dict_tone = dictionary_jyutping(syl).map(parse_tone)
+    realized_tone = syl["jp_realized"].map(parse_tone)
+    tone1 = dict_tone == 1
+    n_tone1 = int(tone1.sum())
+    if n_tone1 == 0:
         return {
             "subset": subset_name,
             "n_tone1_syllables": 0,
@@ -458,32 +347,64 @@ def analyze_tone1_confusion(
             "ci_low": np.nan,
             "ci_high": np.nan,
         }
-    
-    heard_4 = (tone1_syl["_realized_tone"] == 4).mean()
-    heard_6 = (tone1_syl["_realized_tone"] == 6).mean()
-    heard_4_or_6 = ((tone1_syl["_realized_tone"] == 4) | (tone1_syl["_realized_tone"] == 6)).mean()
-    
-    # Bootstrap for combined rate
-    def confusion_rate(df):
-        df = df.copy()
-        df["_dict_tone"] = df["jp_default"].apply(parse_tone)
-        df["_realized_tone"] = df["jp_realized"].apply(parse_tone)
-        t1 = df[df["_dict_tone"] == 1]
-        if len(t1) == 0:
-            return np.nan
-        return float(((t1["_realized_tone"] == 4) | (t1["_realized_tone"] == 6)).mean())
-    
-    _, ci_low, ci_high = bootstrap_ci(syl, confusion_rate, n_bootstrap, seed)
-    
+
+    heard_4 = (tone1 & (realized_tone == 4)).sum() / n_tone1
+    heard_6 = (tone1 & (realized_tone == 6)).sum() / n_tone1
+    heard_4_or_6 = (tone1 & realized_tone.isin([4, 6])).sum() / n_tone1
+
+    work = syl.assign(
+        _n_t1=tone1.astype(int),
+        _n_conf=(tone1 & realized_tone.isin([4, 6])).astype(int),
+    )
+    stats = (
+        work.groupby("video_id", sort=False)
+        .agg(n_t1=("_n_t1", "sum"), n_conf=("_n_conf", "sum"))
+    )
+    stats = stats[stats["n_t1"] > 0]
+    n_videos = len(stats)
+    n_t1 = stats["n_t1"].to_numpy(dtype=float)
+    n_conf = stats["n_conf"].to_numpy(dtype=float)
+    point = float(heard_4_or_6)
+
+    if n_videos <= 1 or n_bootstrap <= 0:
+        ci_low = ci_high = point
+    else:
+        rng = np.random.default_rng(seed)
+        idx = rng.integers(0, n_videos, size=(n_bootstrap, n_videos))
+        denom = n_t1[idx].sum(axis=1)
+        boot = np.divide(
+            n_conf[idx].sum(axis=1),
+            denom,
+            out=np.full(n_bootstrap, np.nan),
+            where=denom > 0,
+        )
+        ci_low, ci_high = _percentile_ci(boot[~np.isnan(boot)])
+
     return {
         "subset": subset_name,
-        "n_tone1_syllables": int(len(tone1_syl)),
-        "n_videos": int(tone1_syl["video_id"].nunique()),
+        "n_tone1_syllables": n_tone1,
+        "n_videos": int(n_videos),
         "heard_as_4_rate": float(heard_4),
         "heard_as_6_rate": float(heard_6),
-        "heard_as_4_or_6_rate": float(heard_4_or_6),
-        "ci_low": float(ci_low) if not pd.isna(ci_low) else np.nan,
-        "ci_high": float(ci_high) if not pd.isna(ci_high) else np.nan,
+        "heard_as_4_or_6_rate": point,
+        "ci_low": ci_low,
+        "ci_high": ci_high,
+    }
+
+
+def _contrast_row(name: str, description: str, df: pd.DataFrame, n_bootstrap: int, seed: int) -> dict:
+    rate, lo, hi, vid, vid_lo, vid_hi = bootstrap_agreement_ci(df, n_bootstrap, seed)
+    return {
+        "contrast": name,
+        "description": description,
+        "n_syllables": len(df),
+        "n_videos": df["video_id"].nunique() if len(df) > 0 else 0,
+        "agree_syl": rate,
+        "agree_syl_ci_low": lo,
+        "agree_syl_ci_high": hi,
+        "agree_video_median": vid,
+        "agree_video_median_ci_low": vid_lo,
+        "agree_video_median_ci_high": vid_hi,
     }
 
 
@@ -500,138 +421,78 @@ def compute_summary_contrasts(
 ) -> pd.DataFrame:
     """
     Compute summary contrast tables for hypothesis testing.
-    
+
     1. Agreement recovery after removing singing_prob > 0.5 windows (film subset)
     2. High-SNR film dialogue vs contemporary comparison for n-/ng-/gw- initials
     3. Overall comparison for hypothesis A/B/C
     """
     rows = []
-    
-    # ========================================================================
-    # 1. Film agreement with vs without high-singing windows
-    # ========================================================================
-    
-    # Full film
-    full_rate, full_ci_low, full_ci_high = bootstrap_ci(
-        syl_film, syllable_weighted_agreement, n_bootstrap, seed
-    )
-    full_vid_rate, full_vid_ci_low, full_vid_ci_high = bootstrap_ci(
-        syl_film, video_median_agreement, n_bootstrap, seed
-    )
-    
-    rows.append({
-        "contrast": "film_all",
-        "description": "Film subset (all windows)",
-        "n_syllables": len(syl_film),
-        "n_videos": syl_film["video_id"].nunique() if len(syl_film) > 0 else 0,
-        "agree_syl": full_rate,
-        "agree_syl_ci_low": full_ci_low,
-        "agree_syl_ci_high": full_ci_high,
-        "agree_video_median": full_vid_rate,
-        "agree_video_median_ci_low": full_vid_ci_low,
-        "agree_video_median_ci_high": full_vid_ci_high,
-    })
-    
-    # Film without high-singing (singing_prob <= 0.5)
+
+    full = _contrast_row("film_all", "Film subset (all windows)", syl_film, n_bootstrap, seed)
+    rows.append(full)
+
     syl_film_no_sing = syl_film[syl_film["singing_prob"] <= 0.5]
-    ns_rate, ns_ci_low, ns_ci_high = bootstrap_ci(
-        syl_film_no_sing, syllable_weighted_agreement, n_bootstrap, seed
+    ns = _contrast_row(
+        "film_no_high_singing",
+        "Film subset (singing_prob <= 0.5)",
+        syl_film_no_sing,
+        n_bootstrap,
+        seed,
     )
-    ns_vid_rate, ns_vid_ci_low, ns_vid_ci_high = bootstrap_ci(
-        syl_film_no_sing, video_median_agreement, n_bootstrap, seed
-    )
-    
-    rows.append({
-        "contrast": "film_no_high_singing",
-        "description": "Film subset (singing_prob <= 0.5)",
-        "n_syllables": len(syl_film_no_sing),
-        "n_videos": syl_film_no_sing["video_id"].nunique() if len(syl_film_no_sing) > 0 else 0,
-        "agree_syl": ns_rate,
-        "agree_syl_ci_low": ns_ci_low,
-        "agree_syl_ci_high": ns_ci_high,
-        "agree_video_median": ns_vid_rate,
-        "agree_video_median_ci_low": ns_vid_ci_low,
-        "agree_video_median_ci_high": ns_vid_ci_high,
-    })
-    
-    # Delta
+    rows.append(ns)
+
+    full_rate, ns_rate = full["agree_syl"], ns["agree_syl"]
+    full_vid, ns_vid = full["agree_video_median"], ns["agree_video_median"]
     rows.append({
         "contrast": "film_singing_removal_delta",
         "description": "Agreement recovery (delta) after removing singing_prob>0.5",
         "n_syllables": len(syl_film) - len(syl_film_no_sing),
         "n_videos": np.nan,
-        "agree_syl": ns_rate - full_rate if not (pd.isna(ns_rate) or pd.isna(full_rate)) else np.nan,
+        "agree_syl": (ns_rate - full_rate) if not (pd.isna(ns_rate) or pd.isna(full_rate)) else np.nan,
         "agree_syl_ci_low": np.nan,
         "agree_syl_ci_high": np.nan,
-        "agree_video_median": ns_vid_rate - full_vid_rate if not (pd.isna(ns_vid_rate) or pd.isna(full_vid_rate)) else np.nan,
+        "agree_video_median": (ns_vid - full_vid) if not (pd.isna(ns_vid) or pd.isna(full_vid)) else np.nan,
         "agree_video_median_ci_low": np.nan,
         "agree_video_median_ci_high": np.nan,
     })
-    
-    # ========================================================================
-    # 2. High-SNR film dialogue: n-/ng-/gw- comparison with contemporary
-    # ========================================================================
-    
-    # Film dialogue = film_flag=1 AND singing_prob < 0.2
-    # High SNR = snr_db > 15
-    
-    syl_film_dialogue = syl_film[syl_film["singing_prob"] < SINGING_THRESHOLD]
-    syl_film_dialogue_highsnr = syl_film_dialogue[syl_film_dialogue["snr_db"] > 15]
-    
+
+    # Film dialogue = film_flag=1 AND singing_prob < 0.2; high SNR = snr_db > 15
+    syl_film_dialogue_highsnr = syl_film[
+        (syl_film["singing_prob"] < SINGING_THRESHOLD) & (syl_film["snr_db"] > 15)
+    ]
     syl_contemp_highsnr = syl_contemp[syl_contemp["snr_db"] > 15]
-    
-    # Filter for n-/ng-/gw- initials
     target_initials = {"n-", "ng-", "gw-/kw-"}
-    
+
     def filter_target_initials(df):
         if len(df) == 0:
             return df
-        df = df.copy()
-        df["_onset"] = df["jp_default"].apply(parse_initial)
-        return df[df["_onset"].isin(target_initials)]
-    
+        onset = dictionary_jyutping(df).map(parse_initial)
+        return df[onset.isin(target_initials)]
+
     film_target = filter_target_initials(syl_film_dialogue_highsnr)
     contemp_target = filter_target_initials(syl_contemp_highsnr)
-    
-    for name, df in [("film_dialogue_highsnr_n_ng_gw", film_target), 
-                      ("contemporary_highsnr_n_ng_gw", contemp_target)]:
-        rate, ci_low, ci_high = bootstrap_ci(df, syllable_weighted_agreement, n_bootstrap, seed)
-        vid_rate, vid_ci_low, vid_ci_high = bootstrap_ci(df, video_median_agreement, n_bootstrap, seed)
-        
-        rows.append({
-            "contrast": name,
-            "description": f"{name.replace('_', ' ')} (snr_db>15, n-/ng-/gw- initials)",
-            "n_syllables": len(df),
-            "n_videos": df["video_id"].nunique() if len(df) > 0 else 0,
-            "agree_syl": rate,
-            "agree_syl_ci_low": ci_low,
-            "agree_syl_ci_high": ci_high,
-            "agree_video_median": vid_rate,
-            "agree_video_median_ci_low": vid_ci_low,
-            "agree_video_median_ci_high": vid_ci_high,
-        })
-    
-    # ========================================================================
-    # 3. Overall film vs contemporary comparison
-    # ========================================================================
-    
+
+    for name, df in [
+        ("film_dialogue_highsnr_n_ng_gw", film_target),
+        ("contemporary_highsnr_n_ng_gw", contemp_target),
+    ]:
+        rows.append(_contrast_row(
+            name,
+            f"{name.replace('_', ' ')} (snr_db>15, n-/ng-/gw- initials)",
+            df,
+            n_bootstrap,
+            seed,
+        ))
+
     for name, df in [("film_overall", syl_film), ("contemporary_overall", syl_contemp)]:
-        rate, ci_low, ci_high = bootstrap_ci(df, syllable_weighted_agreement, n_bootstrap, seed)
-        vid_rate, vid_ci_low, vid_ci_high = bootstrap_ci(df, video_median_agreement, n_bootstrap, seed)
-        
-        rows.append({
-            "contrast": name,
-            "description": f"{name.replace('_', ' ')} agreement",
-            "n_syllables": len(df),
-            "n_videos": df["video_id"].nunique() if len(df) > 0 else 0,
-            "agree_syl": rate,
-            "agree_syl_ci_low": ci_low,
-            "agree_syl_ci_high": ci_high,
-            "agree_video_median": vid_rate,
-            "agree_video_median_ci_low": vid_ci_low,
-            "agree_video_median_ci_high": vid_ci_high,
-        })
-    
+        rows.append(_contrast_row(
+            name,
+            f"{name.replace('_', ' ')} agreement",
+            df,
+            n_bootstrap,
+            seed,
+        ))
+
     return pd.DataFrame(rows)
 
 

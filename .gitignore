@@ -7,20 +7,16 @@
 **/*.pth
 **/*.pt
 **/*.onnx
-# SQLite databases (except fixtures/sample.sqlite which is needed for testing)
 **/*.sqlite
-!fixtures/sample.sqlite
 **/*.sqlite3
 **/pip-cache/
 **/.cache/
 artifacts/*.log
 
-<<<<<<< HEAD
 # allow Cloud Agent fixture only
 !fixtures/
 !fixtures/sample.sqlite
-=======
+
 # Task 3 hypothesis strata - keep small CSVs but ignore any large outputs
 task3_hypothesis_strata/_sample_out/*.png
 task3_hypothesis_strata/_sample_out/*.json
->>>>>>> bb44e63 (feat(task3): add stratified hypothesis analysis scripts)
