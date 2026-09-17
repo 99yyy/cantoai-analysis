@@ -27,7 +27,12 @@
   "singing_prob_lt_0.2_share": 0.9718998167379352,
   "flag_sing_n": 14,
   "flag_sing_singing_prob_mean": 0.0799758817260486,
+  "flag_sing_singing_prob_median": 0.0620287368074059,
   "flag_sing0_singing_prob_mean": 0.01917578725385782,
+  "flag_sing0_singing_prob_median": 0.003045413410291,
   "unmarked_singing_prob_ge_0.5": 13,
-  "marked_singing_prob_lt_0.2": 12
+  "marked_singing_prob_lt_0.2": 12,
+  "singing_prob_median_ratio_marked_over_unmarked": 20.367920032728442,
+  "mw_singing_prob_marked_gt_unmarked_pvalue": 0.011047265922731354,
+  "mw_singing_prob_two_sided_pvalue": 0.022094531845462707
 }
