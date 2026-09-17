@@ -5,7 +5,7 @@
 1. **全量完成**：对 4911 个窗口 FLAC 写出四列质量特征，失败 0；未改 sqlite / `work/` 音频。
 2. **墙钟**：全量三工具合计约 **1.38 h**（PANNs 0.17 h + Brouhaha 0.23 h + DNSMOS 0.97 h）。50 窗试跑外推 `est_hours=1.57`，与实跑接近。
 3. **分布要点**：`music_prob` 双峰（近 0 与近 0.85）；`singing_prob` 极度右偏（中位 0.003）；`snr_db` 主峰约 5–20 dB，另有高 SNR 尾；`dnsmos_ovrl` 均值约 2.16（1–3.5）。
-4. **与库内 `flag_sing` 对照**：分组仍有分离——标记窗 singing_prob **中位 0.062 / 均值 0.080**，未标记 **中位 0.003 / 均值 0.019**（中位比约 **20×**）。但绝对刻度偏弱：12/14 标记窗仍 <0.2，另有 **13** 窗未标记却 ≥0.5。故不宜用固定 0.2/0.5 阈值**直接替换**人工旗标；阈值需抽听校准，而非断言「完全不对齐」。
+4. **与库内 `flag_sing` 对照**：分组仍有分离——标记窗 singing_prob **中位 0.062 / 均值 0.080**，未标记 **中位 0.003 / 均值 0.019**（中位比约 **20×**；Mann–Whitney 单侧 marked>unmarked **p≈0.011**）。但绝对刻度偏弱：12/14 标记窗仍 <0.2，另有 **13** 窗未标记却 ≥0.5。故不宜用固定 0.2/0.5 阈值**直接替换**人工旗标；阈值需抽听校准，而非断言「完全不对齐」。
 
 ## 支撑数字（可脚本重算）
 
@@ -15,7 +15,7 @@
 .venv/bin/python scripts/analyze_window_quality.py
 ```
 
-该脚本从 `window_quality_with_flags.csv` 重写：`summary_stats.json`、`singing_flag_contrast_by_threshold.csv`、`singing_flag_marked_scores.csv`、`singing_miss_suspect_unmarked_ge0.5.csv`、`dist_histograms.png`、`dist_boxplots.png`、`singing_prob_vs_flag_sing.png`。
+该脚本从 `window_quality_with_flags.csv` 重写：`summary_stats.json`（含 `mw_singing_prob_*_pvalue`）、`singing_flag_contrast_by_threshold.csv`、`singing_flag_marked_scores.csv`、`singing_miss_suspect_unmarked_ge0.5.csv`、`dist_histograms.png`、`dist_boxplots.png`、`singing_prob_vs_flag_sing.png`。
 
 手工抽检:
 
@@ -48,7 +48,7 @@ PY
 | 现象 | 数量 | 产物 |
 |---|---:|---|
 | 库内 `flag_sing=1` | 14 | `singing_flag_marked_scores.csv` |
-| 标记 vs 未标记中位 | 0.062 vs 0.003（约 20×） | `summary_stats.json` |
+| 标记 vs 未标记中位 | 0.062 vs 0.003（约 20×；MW p≈0.011） | `summary_stats.json` |
 | 已标记但 singing_prob<0.2（阈值未校准） | 12/14 | 同上 |
 | 未标记但 singing_prob≥0.5（漏检嫌疑） | 13 | `singing_miss_suspect_unmarked_ge0.5.csv` |
 | 阈值扫描 | — | `singing_flag_contrast_by_threshold.csv` |
