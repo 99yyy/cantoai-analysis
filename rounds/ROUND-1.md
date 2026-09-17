@@ -117,5 +117,6 @@ python scripts/run_clap_sing.py --summarize \
   - 输出：`03a05f782ba131cf841cfe3cc749f8bb6e0dfb8b`
   - 退出码：0
 - 阶段1方法审：通过（`review/ROUND-1/method.md`）
+- Cloud Agent launch：`bc-b7e6427b-e931-59bf-8912-8643a6c21ab8`（https://cursor.com/agents/bc-b7e6427b-e931-59bf-8912-8643a6c21ab8 ）；方式=CloudAgent.launch 非 @cursor
 - launch 完成是否自动唤醒 fyp：（待阶段2结束后填写）
 - GitHub 例程（pr-opened / pr-merged）是否触发：（待 PR 事件后填写）
