@@ -1,0 +1,5 @@
+threshold,unmarked_ge_thr,marked_lt_thr,marked_n,unmarked_n
+0.1,246,9,14,4897
+0.2,136,12,14,4897
+0.3,64,14,14,4897
+0.5,13,14,14,4897
