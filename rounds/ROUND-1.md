@@ -2,12 +2,12 @@
 
 ## 元数据
 
-- 阶段：1（方法审打回后修改中 → 待复审）
+- 阶段：2（脚本 / Cloud Agent launch）
 - backlog 条目：一.2 CLAP `clap_sing` 与 PANNs 对照
 - 执行角色：音频员
 - 方法审打回计数：1/2
 - 复核打回计数：0/2
-- Cloud Agent launch 次数：0/2
+- Cloud Agent launch 次数：1/2（进行中）
 - **预测仓库**：`https://github.com/99yyy/cantoai-analysis`（分析库；**不是** `/workspace/cantoai` 工作区 git）
 - 预测 commit：`03a05f782ba131cf841cfe3cc749f8bb6e0dfb8b`（该 commit 首次写入本轮「假设/预测」段；方法审通过后冻结预测段正文，仅允许改契约路径类字段）
 - 核验：`git -C <cantoai-analysis-clone> rev-parse --verify 03a05f782ba131cf841cfe3cc749f8bb6e0dfb8b^{commit}` 退出码 0
@@ -110,7 +110,12 @@ python scripts/run_clap_sing.py --summarize \
 - 本轮不启动一.3 听辨
 - 冒烟未通过不得全量
 
-## 验证记录（可选）
+## 验证记录
 
-- launch 完成是否自动唤醒 fyp：
-- GitHub 例程（pr-opened / pr-merged）是否触发：
+- 预测 commit 核验（分析库 clone `/tmp/cantoai-analysis-push`，CST 2026-09-17 22:46）：
+  - 命令：`git rev-parse --verify 03a05f782ba131cf841cfe3cc749f8bb6e0dfb8b^{commit}`
+  - 输出：`03a05f782ba131cf841cfe3cc749f8bb6e0dfb8b`
+  - 退出码：0
+- 阶段1方法审：通过（`review/ROUND-1/method.md`）
+- launch 完成是否自动唤醒 fyp：（待阶段2结束后填写）
+- GitHub 例程（pr-opened / pr-merged）是否触发：（待 PR 事件后填写）
