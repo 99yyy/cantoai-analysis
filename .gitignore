@@ -12,3 +12,7 @@
 **/pip-cache/
 **/.cache/
 artifacts/*.log
+
+# allow Cloud Agent fixture only
+!fixtures/
+!fixtures/sample.sqlite
