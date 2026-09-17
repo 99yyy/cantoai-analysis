@@ -77,7 +77,7 @@ def json_safe(value: Any) -> Any:
         x = float(value)
         if math.isnan(x) or math.isinf(x):
             return None
-        return x
+        return float(format(x, ".12g"))
     if isinstance(value, np.bool_):
         return bool(value)
     return value
@@ -490,6 +490,10 @@ def _assert(cond: bool, msg: str) -> None:
         raise SystemExit(f"SELF-TEST FAILED: {msg}")
 
 
+def _assert_close(a: Any, b: float, msg: str, tol: float = 1e-9) -> None:
+    _assert(a is not None and abs(float(a) - b) < tol, f"{msg}: {a} vs {b}")
+
+
 def run_self_test() -> None:
     with tempfile.TemporaryDirectory(prefix="clap_selftest_") as tmp:
         tmp_path = Path(tmp)
@@ -516,12 +520,12 @@ def run_self_test() -> None:
         )
         _assert(contrast["n_flag1"] == 2, f"n_flag1={contrast['n_flag1']}")
         _assert(contrast["n_flag0"] == 5, f"n_flag0={contrast['n_flag0']}")
-        _assert(contrast["median_clap_flag1"] == 0.90, "median flag1")
-        _assert(contrast["median_clap_flag0"] == 0.30, "median flag0")
+        _assert_close(contrast["median_clap_flag1"], 0.90, "median flag1")
+        _assert_close(contrast["median_clap_flag0"], 0.30, "median flag0")
         _assert("mw_pvalue" not in contrast, "tiny set must use bootstrap, not MW")
         _assert("bootstrap_ci_low" in contrast, "missing bootstrap_ci_low")
         _assert("bootstrap_ci_high" in contrast, "missing bootstrap_ci_high")
-        _assert(contrast["median_diff"] == 0.60, "median_diff")
+        _assert_close(contrast["median_diff"], 0.60, "median_diff")
         status = json.loads(status_path.read_text(encoding="utf-8"))
         _assert(status.get("smoke_ok") is True, "smoke_ok")
 
