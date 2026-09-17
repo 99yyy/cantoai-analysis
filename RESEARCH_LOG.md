@@ -33,6 +33,6 @@
 - **结果**：htdemucs → `var_db` 全量 4911/4911，失败 0；墙钟 ≈4.5h；权重 ≈80MB。
 - **关键数字**：`var_db` 均值 ≈17.98，中位 ≈12.72（见 `task_calib_demucs_var/artifacts/full_stats.json`）。
 - **仓库**：结果 commit `42f5ae9`（含 Separator 单例本地补丁说明）。
-- **审稿**：审稿员 1:1 判定通过（独立重算对齐）；`review/calib-1.1-result.md` 补档中。
+- **审稿**：通过；`review/calib-1.1-result.md`（独立重算：4911 全覆盖、var_db 最大偏差 5e-5）。工作区 commit `4804b53` ≡ 分析库 `42f5ae9`。
 - **下一题**：ROUND-1 = 一.2 CLAP `clap_sing` 与 PANNs `singing_prob` 对照。
 
