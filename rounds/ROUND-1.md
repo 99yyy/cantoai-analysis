@@ -2,16 +2,16 @@
 
 ## 元数据
 
-- 阶段：2（脚本 / Cloud Agent launch）
+- 阶段：3（执行 / 音频员）
 - backlog 条目：一.2 CLAP `clap_sing` 与 PANNs 对照
 - 执行角色：音频员
 - 方法审打回计数：1/2
 - 复核打回计数：0/2
-- Cloud Agent launch 次数：1/2（进行中）
+- Cloud Agent launch 次数：1/2（会话 status=error；分支已合入）
 - **预测仓库**：`https://github.com/99yyy/cantoai-analysis`（分析库；**不是** `/workspace/cantoai` 工作区 git）
 - 预测 commit：`03a05f782ba131cf841cfe3cc749f8bb6e0dfb8b`（该 commit 首次写入本轮「假设/预测」段；方法审通过后冻结预测段正文，仅允许改契约路径类字段）
 - 核验：`git -C <cantoai-analysis-clone> rev-parse --verify 03a05f782ba131cf841cfe3cc749f8bb6e0dfb8b^{commit}` 退出码 0
-- 结果 commit：
+- 脚本合入 commit：`fffd53797bb7a46e92f3b9e4cf4a55d3c753a15b`（含 PR #6 分支；本地 self-test PASSED）
 - 执行 commit：
 - 合并目标 commit：
 
@@ -118,5 +118,6 @@ python scripts/run_clap_sing.py --summarize \
   - 退出码：0
 - 阶段1方法审：通过（`review/ROUND-1/method.md`）
 - Cloud Agent launch：`bc-b7e6427b-e931-59bf-8912-8643a6c21ab8`（https://cursor.com/agents/bc-b7e6427b-e931-59bf-8912-8643a6c21ab8 ）；方式=CloudAgent.launch 非 @cursor
-- launch 完成是否自动唤醒 fyp：（待阶段2结束后填写）
-- GitHub 例程（pr-opened / pr-merged）是否触发：（待 PR 事件后填写）
+- launch 完成是否自动唤醒 fyp：**是**（收到完成唤醒，但 status=`error`；末条为 float median self-test 修复说明）。以分支自测为准：本地 `--self-test` PASSED。
+- GitHub 例程（pr-opened / pr-merged）：PR #6 已开且本合并会 push；例程文件夹仍显示 never run → **本次未观测到例程唤醒**（待合并后再记一次）。
+- PR：https://github.com/99yyy/cantoai-analysis/pull/6 （draft；以 git merge 合入）
