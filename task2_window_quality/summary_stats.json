@@ -1,0 +1,33 @@
+{
+  "n": 4911,
+  "means": {
+    "music_prob": 0.6199454807351521,
+    "singing_prob": 0.019349112711526457,
+    "snr_db": 22.481502237960424,
+    "dnsmos_ovrl": 2.160605960210014
+  },
+  "medians": {
+    "music_prob": 0.8333853483200073,
+    "singing_prob": 0.003055666340515,
+    "snr_db": 12.815152168273926,
+    "dnsmos_ovrl": 2.222261486612036
+  },
+  "p25": {
+    "music_prob": 0.07595095410943026,
+    "singing_prob": 0.0010998545913025,
+    "snr_db": 6.951531410217285,
+    "dnsmos_ovrl": 1.4352260038676548
+  },
+  "p75": {
+    "music_prob": 0.8900285959243774,
+    "singing_prob": 0.008864425588399151,
+    "snr_db": 28.086421012878418,
+    "dnsmos_ovrl": 2.7810716058643616
+  },
+  "singing_prob_lt_0.2_share": 0.9718998167379352,
+  "flag_sing_n": 14,
+  "flag_sing_singing_prob_mean": 0.0799758817260486,
+  "flag_sing0_singing_prob_mean": 0.01917578725385782,
+  "unmarked_singing_prob_ge_0.5": 13,
+  "marked_singing_prob_lt_0.2": 12
+}
