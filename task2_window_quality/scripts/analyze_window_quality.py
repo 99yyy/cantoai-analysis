@@ -16,6 +16,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+from scipy.stats import mannwhitneyu
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CSV = ROOT / "window_quality_with_flags.csv"
@@ -66,6 +67,19 @@ def write_summary(df: pd.DataFrame, out: Path) -> dict:
     stats["singing_prob_median_ratio_marked_over_unmarked"] = (
         float(med1 / med0) if med0 else None
     )
+    marked = df.loc[df["flag_sing"] == 1, "singing_prob"]
+    unmarked = df.loc[df["flag_sing"] == 0, "singing_prob"]
+    if len(marked) and len(unmarked):
+        stats["mw_singing_prob_marked_gt_unmarked_pvalue"] = float(
+            mannwhitneyu(marked, unmarked, alternative="greater").pvalue
+        )
+        stats["mw_singing_prob_two_sided_pvalue"] = float(
+            mannwhitneyu(marked, unmarked, alternative="two-sided").pvalue
+        )
+    else:
+        stats["mw_singing_prob_marked_gt_unmarked_pvalue"] = None
+        stats["mw_singing_prob_two_sided_pvalue"] = None
+
     out.write_text(json.dumps(stats, indent=2), encoding="utf-8")
     return stats
 
