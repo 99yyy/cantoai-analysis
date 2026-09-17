@@ -2,7 +2,7 @@
 
 ## 元数据
 
-- 阶段：3（执行 / 音频员）
+- 阶段：4（复核 / 审稿员）
 - backlog 条目：一.2 CLAP `clap_sing` 与 PANNs 对照
 - 执行角色：音频员
 - 方法审打回计数：1/2
@@ -12,6 +12,7 @@
 - 预测 commit：`03a05f782ba131cf841cfe3cc749f8bb6e0dfb8b`（该 commit 首次写入本轮「假设/预测」段；方法审通过后冻结预测段正文，仅允许改契约路径类字段）
 - 核验：`git -C <cantoai-analysis-clone> rev-parse --verify 03a05f782ba131cf841cfe3cc749f8bb6e0dfb8b^{commit}` 退出码 0
 - 脚本合入 commit：`fffd53797bb7a46e92f3b9e4cf4a55d3c753a15b`（含 PR #6 分支；本地 self-test PASSED）
+- 工作区执行 commit：`ccd89ba`
 - 执行 commit：
 - 合并目标 commit：
 
