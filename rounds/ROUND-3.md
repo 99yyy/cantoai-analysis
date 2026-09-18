@@ -2,7 +2,7 @@
 
 ## 元数据
 
-- 阶段：2（脚手架；Cloud Agent）
+- 阶段：3（执行；分析员）
 - backlog 条目：审计后复算；唱段旗标结论撤回；抽样框显式声明
 - 执行角色：Cloud Agent（阶段 2 脚手架）+ 分析员（阶段 3 复算）+ 审稿员（方法审）；**音频员本轮不执行任何模型推断**
 - 方法审打回计数：2/2
@@ -120,3 +120,4 @@ python -m src.round3 \
 
 -
 - 2026-09-18 阶段1终审 **通过**：硬条件5 rev-parse 在 `/workspace/repos/cantoai-analysis` 与 `/tmp/cantoai-analysis-push` 均为 0；可进阶段2。
+- 2026-09-18 阶段2脚手架合入 main（PR #10，merge 含 `2929cec`）：无统计数字；预测 commit 仍为 `d6f1132`。
