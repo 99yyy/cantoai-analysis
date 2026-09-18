@@ -1,0 +1,12 @@
+{
+  "n_videos": 4,
+  "n_windows": 7,
+  "n_syllables": 8,
+  "n_windows_A": 3,
+  "n_windows_B": 2,
+  "n_windows_C": 2,
+  "n_syllables_A": 5,
+  "n_syllables_B": 2,
+  "n_syllables_C": 1,
+  "speech_h": 0.02
+}
