@@ -1,0 +1,21 @@
+# kills: unweighted mean across strata is forbidden
+--- a/src/weights.py
++++ b/src/weights.py
+@@ -6,16 +6,7 @@
+ 
+ 
+ def stratum_weights(N_h: list[float], n_h_judgeable: list[float]) -> list[float]:
+-    if len(N_h) != len(n_h_judgeable) or not N_h:
+-        raise ValueError(UNWEIGHTED_MEAN)
+-    weights: list[float] = []
+-    for n_pop, n_judge in zip(N_h, n_h_judgeable):
+-        if n_judge == 0:
+-            raise ValueError(UNWEIGHTED_MEAN)
+-        weights.append(n_pop / n_judge)
+-    if all(w == 1 for w in weights) and list(N_h) != list(n_h_judgeable):
+-        raise ValueError(UNWEIGHTED_MEAN)
+-    return weights
++    return [1 for _ in N_h]
+ 
+ 
+ def weighted_rate(

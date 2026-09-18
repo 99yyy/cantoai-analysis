@@ -1,0 +1,18 @@
+{
+  "jp_match": "exact_default",
+  "jp_realized": "aa1",
+  "dur": 0.12,
+  "syllable_dur": 0.12,
+  "singing_prob": 0.1,
+  "snr_db": 20.0,
+  "syl_id": "s1",
+  "uid": "w1",
+  "video_id": "v1",
+  "jp_default": "naa4",
+  "tier": "A",
+  "text_clean": "hello",
+  "upload_date": "20240221",
+  "t0_s": 0.0,
+  "t1_s": 8.0,
+  "window_dur": 8.0
+}
