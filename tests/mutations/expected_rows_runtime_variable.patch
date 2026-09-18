@@ -1,0 +1,13 @@
+# kills: checked_merge expected_rows does not match frame.yaml joins
+--- a/src/merge.py
++++ b/src/merge.py
+@@ -38,7 +38,8 @@
+         if right_key not in right_work.columns:
+             raise ValueError(JOIN_KEYS_MISMATCH)
+         right_work = right_work.rename(columns={right_key: keys[0]})
+-    merge_keys = keys
++    merge_keys = keys
++    spec["expected_rows"] = len(left)
+     if merge_keys != list(spec["keys"]):
+         raise ValueError(JOIN_KEYS_MISMATCH)
+     overlap = (set(left.columns) & set(right_work.columns)) - set(merge_keys)
