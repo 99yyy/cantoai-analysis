@@ -1,0 +1,17 @@
+# kills: measure sentinel written with status ok
+--- a/src/measures.py
++++ b/src/measures.py
+@@ -43,11 +43,8 @@ def attach_agreement(df: pd.DataFrame) -> pd.DataFrame:
+     ensure_unique_columns(out, "agreement_status")
+     n_j = out["n_judgeable"]
+     n_m = out["n_match"]
+-    values = pd.Series(pd.NA, index=out.index, dtype="Float64")
+-    ok_rows = n_j > 0
+-    values.loc[ok_rows] = (n_m.loc[ok_rows] / n_j.loc[ok_rows]).astype(float)
+-    status = pd.Series("missing", index=out.index)
+-    status.loc[ok_rows] = "ok"
++    values = pd.Series(0.0, index=out.index, dtype="Float64")
++    status = pd.Series("ok", index=out.index)
+     assert_status_matches_values(values, status)
+     assert_no_measure_sentinel(values, status, n_j)
+     out["agreement"] = values

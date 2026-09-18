@@ -1,0 +1,12 @@
+# kills: published A+B syllable count is outside the declared interval
+--- a/src/frame.py
++++ b/src/frame.py
+@@ -42,7 +42,7 @@ def assert_published_count(n: int) -> None:
+ 
+ 
+ def apply_tier_whitelist(df: pd.DataFrame) -> pd.DataFrame:
+-    return df.loc[df["window_tier"].isin(("A", "B"))].copy()
++    return df.copy()
+ 
+ 
+ def assert_tier_matches_window(df: pd.DataFrame) -> None:

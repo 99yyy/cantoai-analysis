@@ -1,0 +1,12 @@
+# kills: bootstrap stratum seeds are not pairwise distinct
+--- a/src/bootstrap.py
++++ b/src/bootstrap.py
+@@ -12,7 +12,7 @@ STRATA = ("film_pre", "film_post", "other_pre", "other_post")
+ 
+ def stratum_seed(master_seed: int, h: str) -> int:
+     payload = f"{master_seed}:{h}".encode("utf-8")
+-    return int(hashlib.sha256(payload).hexdigest()[:8], 16)
++    return int(master_seed)
+ 
+ 
+ def make_stratum_seeds(master_seed: int, strata: tuple[str, ...] | list[str]) -> dict[str, int]:
