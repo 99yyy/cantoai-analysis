@@ -1,0 +1,4 @@
+window_id,video_id,film_flag,clap_sing,singing_prob,var_db,stratum,human_label,annotator_note,forced_flag_sing
+vCC_000,vCC,1,5.0,0.9,1.0,both_high,unset,,0
+vAA_000,vAA,0,-3.0,0.001,1.0,both_low,unset,,0
+vCC_001,vCC,1,1.0,0.2,1.0,mid,unset,,1
