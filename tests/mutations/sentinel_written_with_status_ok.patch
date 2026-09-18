@@ -1,0 +1,18 @@
+# kills: status ok requires non-null measure computed from data
+--- a/src/agreement.py
++++ b/src/agreement.py
+@@ -44,13 +44,7 @@
+ 
+ 
+ def status_for_measure(value: Any, *, computed_from_data: bool) -> str:
+-    if computed_from_data and not is_null(value):
+-        return "ok"
+-    if not is_null(value) and value in SENTINELS:
+-        raise ValueError(STATUS_OK_REQUIRES_DATA)
+-    if not is_null(value) and not computed_from_data:
+-        raise ValueError(STATUS_OK_REQUIRES_DATA)
+-    return "missing"
++    return "ok"
+ 
+ 
+ def _null_measures() -> dict[str, Any]:
