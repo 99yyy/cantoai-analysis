@@ -2,7 +2,7 @@
 
 ## 元数据
 
-- 阶段：1（方法审中）
+- 阶段：1（方法审通过，待合入后进阶段2）
 - backlog 条目：ROUND-3 后记 — 删 enforce_expected / left_attach 字面量 / contract_check 四条新规则
 - 执行角色：Cloud Agent（阶段 2 盲配对 impl+tests；阶段 4 review）；**音频员本轮不跑推断**
 - 方法审打回计数：1/2
@@ -51,14 +51,14 @@
 
 ## 脚本契约
 
-- impl 只写 `src/`、`sql/`、`frame.yaml`。
+- `impl_a` / `impl_b` 只写 `src/`、`sql/`、`frame.yaml`（二选一合入）。
 - tests 只写 `tests/`，不得读/改 `src/`。
 - review（阶段 4）只写 `review/ROUND-4/`，禁止 `import src`。
 
 ## 阶段顺序
 
 - 阶段 1：审稿员方法审（write_scopes 不相交、预测写死、四条规则可测）。
-- 阶段 2 第 1 波：同时 launch impl + tests（分支前缀 `cursor/r4-impl-` / `cursor/r4-tests-`）；tests 先合，impl rebase 后合。
+- 阶段 2 第 1 波（LOOP v2.1）：同时 launch `impl_a` + `impl_b` + `tests`（分支前缀 `cursor/r4-impl_a-` / `cursor/r4-impl_b-` / `cursor/r4-tests-`）；tests 先合；两份 impl Update branch 后先绿者合、另一关闭。
 - 本轮无 comparison 波（不重跑 ROUND-3）。
 - 阶段 4：review agent 核四条规则与 sha256；阶段 5 fyp 裁决。
 
@@ -79,3 +79,7 @@
 - 阶段1 方法审打回 #1（审稿员）：预测第2条误写「当前 main 四条红、impl 后转绿」；contract-green 合入后四条已为 PASS。已按硬条件改写。
 
 - 2026-09-18 进入阶段1方法审（#16/#13/#14 已合入 main）。
+
+## 验证记录
+
+- GitHub 例程是否触发：**是**（pr-merged PR #19，https://github.com/99yyy/cantoai-analysis/pull/19 ，分支 `chore/r4-pred2-baseline`，标题 docs(round-4): fix pred#2 baseline (PASS) + method reject 1/2；merge `8ede859`；CST 2026-09-18 ≈16:44）
