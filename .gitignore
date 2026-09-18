@@ -22,3 +22,7 @@ artifacts/*.log
 # Task 3 hypothesis strata - keep small CSVs but ignore any large outputs
 task3_hypothesis_strata/_sample_out/*.png
 task3_hypothesis_strata/_sample_out/*.json
+
+# keep empty schema fixture for SQL EXPLAIN CI (contract §19)
+!fixtures/
+!fixtures/schema.sqlite
