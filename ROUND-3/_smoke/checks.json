@@ -1,0 +1,42 @@
+[
+  {
+    "expected": 4439,
+    "expected_source": "frame.yaml:expected_rows",
+    "missing": null,
+    "name": "frame_expected_rows_ab",
+    "observed": 55,
+    "status": "PASS"
+  },
+  {
+    "expected": 3,
+    "expected_source": "rounds/ROUND-3.yaml:comparisons",
+    "missing": null,
+    "name": "comparisons_m",
+    "observed": 3,
+    "status": "PASS"
+  },
+  {
+    "expected": "task2_window_quality/window_quality_with_flags.csv",
+    "expected_source": "rounds/ROUND-3.yaml:singing_prob_source.path",
+    "missing": null,
+    "name": "c2_singing_prob_source",
+    "observed": "task2_window_quality/window_quality_with_flags.csv",
+    "status": "PASS"
+  },
+  {
+    "expected": "task2_window_quality/window_quality_with_flags.csv",
+    "expected_source": "rounds/ROUND-3.yaml:singing_prob_source.path",
+    "missing": null,
+    "name": "c3_singing_prob_source",
+    "observed": "task2_window_quality/window_quality_with_flags.csv",
+    "status": "PASS"
+  },
+  {
+    "expected": "\u5982\u679c\u89ba\u5f97\u5167\u5bb9\u5571\u7747\u5605subscribe",
+    "expected_source": "frame.yaml:predicates",
+    "missing": null,
+    "name": "boiler_text_constant",
+    "observed": "\u5982\u679c\u89ba\u5f97\u5167\u5bb9\u5571\u7747\u5605subscribe",
+    "status": "PASS"
+  }
+]
