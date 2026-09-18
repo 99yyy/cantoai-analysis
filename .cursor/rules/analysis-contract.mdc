@@ -11,7 +11,7 @@ If a clause cannot be satisfied, stop and write `BLOCKED: <one line>` in the pul
 
 Four checks run on every pull request: `scope-check`, `history-audit`, `output-check`, `tests`. The first three are required. Everything they do not cover is enforced by the reviewer reading the diff and by the evidence the pull-request body is required to show. When a rule is later implemented as an automated check, that check may be extended but never weakened or deleted.
 
-Do not modify `.cursor/`, `.github/`, `data/` or `tasks/`. Do not modify an assertion that already exists, except in the pull request that changes the code it guards; list each such pair in the body.
+Do not modify `.cursor/`, `.github/`, `data/`, or any task brief `tasks/TASK-N.md`. Your own outputs live under `tasks/TASK-N/`, and writing those is required of you, not forbidden to you. Do not modify an assertion that already exists, except in the pull request that changes the code it guards; list each such pair in the body.
 
 # 1. The input is pinned
 
@@ -19,15 +19,15 @@ Do not modify `.cursor/`, `.github/`, `data/` or `tasks/`. Do not modify an asse
 
 # 2. What a run hands in
 
-2. Every number your task declares goes in `tasks/TASK-N/results.json` as `{name, value, n, query}`. The name set must equal the `numbers` block of `tasks/TASK-N.md` exactly. `query` names the `sql/` file that produced the value, so that anyone can replay it. A number with no replayable query is not a result.
+2. Every number your task declares goes in one file: `tasks/TASK-N/results.json` if you are the worker, `tasks/TASK-N/mine.json` if you are the verifier. The two have the same shape, `[{name, value, n, query}]`, and neither carries a comparison field: you do not judge your own numbers, and you do not judge anyone else's. The name set must equal the `numbers` block of `tasks/TASK-N.md` exactly. `n` is the number of corpus rows the number was computed over, as the brief defines it for that family of numbers. `query` is the route by which CI replays the number, and it is one of exactly two things: a path `tasks/TASK-N/<...>.sql` holding one `SELECT` or `WITH` statement that returns exactly one row and one column, or `derived:<expr>`, an arithmetic expression over other declared names using only `+ - * /` and parentheses. A number whose own route does not reproduce it is not a result. One `.sql` file may not back two numbers, and the worker and the verifier may not name the same `.sql` file.
 
-3. **The agent that produced a number never checks that number.** A verifier recomputes it from the corpus by its own route, having read the task brief and nothing the worker wrote — not its code, not its conversation, not its pull request. A verifier that shares context with the worker is the same agent grading its own homework. It writes `tasks/TASK-N/verify.json` as `{name, worker, mine, abs_diff, match}`, where `abs_diff` is computed, not asserted.
+3. **The agent that produced a number never checks that number, and no agent writes the verdict.** The worker and the verifier are launched from one starting ref and answer the brief separately: the verifier reads the brief and the corpus and nothing the worker wrote — not its code, not its conversation, not its pull request. A verifier that shares context with the worker is the same agent grading its own homework. `output-check` pairs the two files, computes every difference and decides every match, so neither agent can assert agreement; it also fails when the commit that introduced your file already held the other agent's file in its tree. If your branch cannot be cut before the other answer exists, write `BLOCKED` rather than starting from it.
 
 4. A check that cannot locate the input it claims to read — a script, a SQL file, a column, a table — reports SKIP and names the missing thing. Never substitute a built-in default, a reimplementation of the rule, or a value recovered by regex from prose. A result derived from a substitute is SKIP: neither pass nor fail.
 
 5. A constant, a self-comparison, an algebraic identity or a file-existence test is not a check. A field such as `smoke_ok` must come from comparing two independently obtained values.
 
-6. A bar may not move in the change that moves what it measures. A declared expected value, a tolerance, a threshold, a mutation patch and a counterexample pattern are bars. A pull request that changes a bar may not also change `src/`, `sql/` or `data/`, and its body carries one line beginning `BAR-CHANGE:` naming each bar it moves and why. Adding a bar for new code is not moving one.
+6. A bar may not move in the change that moves what it measures. A declared expected value, a tolerance, a threshold, a mutation patch and a counterexample pattern are bars. A pull request that changes a bar may not also change `src/`, any `.sql` file, or `data/`, and its body carries one line beginning `BAR-CHANGE:` naming each bar it moves and why. Adding a bar for new code is not moving one.
 
 # 3. If your run writes code
 
@@ -41,7 +41,7 @@ Do not modify `.cursor/`, `.github/`, `data/` or `tasks/`. Do not modify an asse
 
 # 4. If your run uses SQL
 
-11. All SQL lives in `sql/*.sql` and is loaded by reading the file, never as a string literal in `src/`. A string literal containing both `SELECT` and `FROM` as whole uppercase words is a violation. Run `EXPLAIN` on each `sql/` file against `data/corpus_v2.sqlite`; a parse error, or a `sql/` file nothing references, is a violation.
+11. All SQL lives in `.sql` files under `tasks/TASK-N/` and is loaded by reading the file, never as a string literal in `src/`. A string literal containing both `SELECT` and `FROM` as whole uppercase words is a violation. Run `EXPLAIN` on each of your `.sql` files against `data/corpus_v2.sqlite`; a parse error, or a `.sql` file that no `query` names, is a violation.
 
 # 5. If your run selects rows
 
@@ -77,7 +77,7 @@ Do not modify `.cursor/`, `.github/`, `data/` or `tasks/`. Do not modify an asse
 
 23. The published set is tier A+B. Any statistic about it filters on tier explicitly and records the rows removed. Every recording comes from a single YouTube channel, so clustering stops at `video_id`, and the population is stated as "the 567 videos of this channel" — never as "Cantonese".
 
-24. Agreement is `n_match / n_judgeable`, where `n_match` counts syllables whose `jp_match` is `exact_default` or `exact_alt`, and `n_judgeable = n_total - n_empty_realized - n_dur_le_0`. All four counts appear in the output. A NULL `jp_match` on a judgeable row raises. The word is agreement, never accuracy: neither the acoustic model nor the dictionary is ground truth.
+24. Agreement is `n_match / n_judgeable`. A syllable is judgeable when its `jp_realized` is non-empty and its `dur` is greater than zero. `n_judgeable` counts the judgeable syllables and `n_match` counts **the judgeable ones** whose `jp_match` is `exact_default` or `exact_alt`. Counting `n_match` over rows the denominator excludes is not a rate: on the published set it lands just under 1. The two exclusions overlap, so `n_judgeable` is a count of the judgeable set and not `n_total` minus the two exclusion counts, which double-subtracts the rows that are both; a run that reports those two counts reports the overlap with them. `n_total`, `n_match`, `n_judgeable`, `n_empty_realized`, `n_dur_le_0` and their overlap all appear in the output. A NULL `jp_match` on a judgeable row raises. The word is agreement, never accuracy: neither the acoustic model nor the dictionary is ground truth.
 
 25. Syllable onsets are reliable; syllable durations are not. 14.4% of syllables have `dur <= 0` — a known property of the forced aligner, not a defect to repair. A filter on `dur > 0` silently removes 14.5% of the published set, so no sampling frame and no denominator may use it without declaring the removed count.
 
