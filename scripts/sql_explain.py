@@ -35,6 +35,7 @@ SKIP_DIR_NAMES = {
 SKIP_FILE_NAMES = {
     "sql_explain.py",
     "git_commit_pytest_hook.py",
+    "contract_check.py",  # checker, not analysis code; its SQL is a parameter
 }
 SQL_HEAD = re.compile(
     r"^\s*(SELECT|INSERT|UPDATE|DELETE|WITH|CREATE|DROP|EXPLAIN|PRAGMA|REPLACE|ALTER)\b",
@@ -113,6 +114,11 @@ def looks_like_sql(text: str) -> bool:
     if kind == "CREATE" and not re.search(
         r"\b(TABLE|INDEX|VIEW|TRIGGER)\b", s, re.I
     ):
+        return False
+    if kind == "DROP" and not re.search(
+        r"\b(TABLE|INDEX|VIEW|TRIGGER)\b", s, re.I
+    ):
+        # a prose string such as "drop singing_prob>0.5 on film" is not SQL
         return False
     return True
 
