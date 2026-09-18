@@ -1,5 +1,0 @@
-# Dependencies for task3_hypothesis_strata
-# Compatible with repository root requirements.txt
-
-pandas>=2.2.3
-numpy>=2.1.3
