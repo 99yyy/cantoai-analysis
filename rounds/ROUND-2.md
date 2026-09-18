@@ -2,7 +2,7 @@
 
 ## 元数据
 
-- 阶段：3（执行 / 分析员抽样）
+- 阶段：3（抽样完成；待 Tom 标注）
 - backlog 条目：一.3 人工听辨样本 200 窗抽样与 `listening_sheet`
 - 执行角色：分析员（抽样表）+ 音频员（可选导出短音频切片路径清单）；**标注由 Tom**
 - 方法审打回计数：1/2
@@ -11,6 +11,7 @@
 - **预测仓库**：`https://github.com/99yyy/cantoai-analysis`
 - 预测 commit：`fffad05152daaf603bef1d99f9e931831b04e0a6`（假设/预测数值门槛冻结于该 commit；本修订只改契约路径、可重算定义与抽样规则）
 - 脚本合入 commit：
+- 工作区执行 commit：`decfb76`
 - 结果 commit：
 - 执行 commit：
 - 合并目标 commit：
