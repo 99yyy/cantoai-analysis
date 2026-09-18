@@ -77,7 +77,9 @@
 
 ## 裁决（阶段5）
 
-- **结论**：H1–H3 成立；问题答案为**是**（三检查全绿；语料 sha256 与 `frame.yaml: inputs` 一致；`enforce_expected` 已删；`pd.merge(` 一处；`left_attach` 读 joins 字面量）。
+> 2026-09-18 更正：原裁决写「H1–H3 成立 / sha256 钉死」过度；见下方结论。
+
+- **结论（已更正）**：旁路已堵属实——H1/H2 成立（`enforce_expected` 已删；`pd.merge(` 一处；`left_attach` 读 joins 字面量）；三检查全绿。**H3 的 sha256 半句不成立**：`scripts/contract_check.py` 中 `corpus` 命中为 0，39 条检查无一读取 `data/corpus_v2.sqlite`；sha256 仅写在 `frame.yaml: inputs`，**没有任何 CI 检查校验它**（审稿 `recompute` 手工对过一次，不等于契约强制）。问题原句「且 sha256 与 inputs 一致」在契约层**未获验证**。已列入 backlog；由 ROUND-5 把声明对真语料落地。
 - **合入**：tests #25 → impl_a #27（先绿）；impl_b #26 关闭；review #28 PASS。
 - **预测** `d50e2da` 早于结果 `8533d3c`。
 - **审稿 advisory**：四条规则名落在 `tests/test_round4_gates.py` 而非 `contract_check` 字面量；不计入打回。
