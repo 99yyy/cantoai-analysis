@@ -3,8 +3,8 @@
 
 Four classes, and nothing else:
 
-    cursor/r<N>-<scope>-...          a Cloud Agent working on task N
-    box/r<N>-<scope>-...             the same, on the shared machine
+    cursor/t<N>-<scope>-...          a Cloud Agent working on task N
+    box/t<N>-<scope>-...             the same, on the shared machine
     chore/...                        declarations and top-level documents
     repair/... | cursor/repair-...   a tool fix asked for by the repository owner
 
@@ -16,7 +16,8 @@ branch, and nothing looked at it because the branch name matched no pattern.
 What each class may touch:
 
     agent   anything except DENY
-    chore   only CHORE_ALLOW, and nothing in DENY
+    chore   only CHORE_ALLOW, which already excludes everything in DENY but the
+            task briefs, which are the owner's to write
     repair  anything, but the prefix makes it visible in the history
 
 Per-scope path lists are not checked here. They belong to a task declaration,
@@ -33,17 +34,20 @@ import re
 import subprocess
 import sys
 
-AGENT_RE = re.compile(r"^(?:cursor|box)/r(?P<task>\d+)-(?P<scope>[a-z0-9_]+)-")
+AGENT_RE = re.compile(r"^(?:cursor|box)/[rt](?P<task>\d+)-(?P<scope>[a-z0-9_]+)-")
 REPAIR_RE = re.compile(r"^(?:repair/|cursor/repair-)")
 CHORE_RE = re.compile(r"^chore/")
 
-# Only the owner, on a repair/ branch, changes the rules, the corpus, or the CI
-# that enforces them. An agent that needs one of these writes BLOCKED instead.
-DENY = [".cursor/*", ".cursor/**", ".github/*", ".github/**", "data/*", "data/**"]
+# Only the owner changes the rules, the corpus, the CI that enforces them, or the
+# task brief. An agent may not edit the brief that grades it: the numbers it must
+# produce, and the tolerance each one gets, are not its to move. An agent that
+# needs one of these changed writes BLOCKED instead.
+DENY = [".cursor/*", ".cursor/**", ".github/*", ".github/**",
+        "data/*", "data/**", "tasks/*", "tasks/**"]
 
 CHORE_ALLOW = [
     "README.md", "SCHEMA.md", "PIPELINE.md", "REPORT.md", "RESEARCH_LOG.md",
-    "backlog.md", "STOP", "tasks/*", "tasks/**", "docs/*", "docs/**",
+    "backlog.md", "LOOP.md", "STOP", "tasks/*", "tasks/**", "docs/*", "docs/**",
 ]
 
 
@@ -69,12 +73,12 @@ def main() -> int:
     if REPAIR_RE.match(branch):
         cls, allow, deny = "repair", None, []
     elif CHORE_RE.match(branch):
-        cls, allow, deny = "chore", CHORE_ALLOW, DENY
+        cls, allow, deny = "chore", CHORE_ALLOW, []
     elif AGENT_RE.match(branch):
         cls, allow, deny = "agent", None, DENY
     else:
         print(f"scope_check: FAIL branch {branch!r} matches no branch class")
-        print("  allowed prefixes: cursor/r<N>-<scope>-, box/r<N>-<scope>-, chore/, repair/")
+        print("  allowed prefixes: cursor/t<N>-<scope>-, box/t<N>-<scope>-, chore/, repair/")
         return 1
 
     files = changed(args.base)
