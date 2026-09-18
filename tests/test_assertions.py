@@ -24,6 +24,7 @@ from src.manifest import assert_git_clean, parse_upload_date
 from src.merge import checked_merge
 from src.onset import parse_onset
 from src.paths import load_complete_output, refuse_inference, require_path
+from src.round3 import _counts, _prepare_base, require_stratum_count
 from src.seeds import assert_stratum_seeds, stratum_seed
 from src.sql_loader import load_sql
 from src.weights import stratum_weights
@@ -244,3 +245,42 @@ def test_weights_happy():
 
 def test_status_ok_from_data():
     assert status_for_measure(0.5, computed_from_data=True) == "ok"
+
+
+def test_n_judgeable_identity_failed():
+    df = pd.DataFrame(
+        {
+            "_empty": [False],
+            "_dur_le_0": [False],
+            "_judgeable": [False],
+            "_match": [False],
+        }
+    )
+    with pytest.raises(ValueError, match=r"^n_judgeable identity failed"):
+        _counts(df)
+
+
+def test_window_quality_required():
+    df = pd.DataFrame(
+        {
+            "syllable_dur": [0.2],
+            "jp_realized": ["aa1"],
+            "jp_match": ["exact_default"],
+            "video_id": ["v1"],
+            "upload_date": ["20240101"],
+        }
+    )
+    flags = pd.DataFrame(
+        {
+            "video_id": ["v1"],
+            "film_flag": [1],
+            "contemporary_only": [0],
+        }
+    )
+    with pytest.raises(ValueError, match=r"^window quality required"):
+        _prepare_base(df, flags, None, need_quality=True, row_accounting=[])
+
+
+def test_manifest_stratum_count_none():
+    with pytest.raises(ValueError, match=r"^manifest stratum count is None"):
+        require_stratum_count(None)

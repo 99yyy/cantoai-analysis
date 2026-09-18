@@ -40,6 +40,7 @@ COMPARISON_SQL = {
 SINGING_PROB_SOURCE = "task2_window_quality/window_quality_with_flags.csv"
 POST_CUTOFF = "2025-01-01"
 ONSET_TARGET = frozenset({"n", "ng", "gw"})
+MANIFEST_STRATUM_COUNT_NONE = "manifest stratum count is None"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -125,7 +126,7 @@ def _counts(df: pd.DataFrame) -> dict[str, Any]:
     n_judgeable = int(df["_judgeable"].sum()) if n_total else 0
     n_match = int(df["_match"].sum()) if n_total else 0
     if n_judgeable != n_total - n_empty - n_dur:
-        raise RuntimeError("n_judgeable identity failed")
+        raise ValueError("n_judgeable identity failed")
     agreement = (n_match / n_judgeable) if n_judgeable > 0 else None
     return {
         "n_total": n_total,
@@ -135,6 +136,12 @@ def _counts(df: pd.DataFrame) -> dict[str, Any]:
         "n_match": n_match,
         "agreement": agreement,
     }
+
+
+def require_stratum_count(value: Any) -> int:
+    if value is None:
+        raise ValueError(MANIFEST_STRATUM_COUNT_NONE)
+    return int(value)
 
 
 def _agreement_rate(n_match: float, n_judgeable: float) -> float | None:
@@ -811,15 +818,9 @@ def run(argv: list[str] | None = None) -> Path:
         )
 
         # Window-level quality join check (A+B windows)
-        con = sqlite3.connect(str(corpus_PATH))
-        try:
-            windows_ab = pd.read_sql_query(
-                "SELECT uid, video_id, tier, text_clean FROM windows "
-                "WHERE tier IN ('A', 'B')",
-                con,
-            )
-        finally:
-            con.close()
+        windows_ab = _load_sql_df(
+            corpus_PATH, load_sql("windows_ab", str(sql_DIR))
+        )
         n_ab = len(windows_ab)
         expected = int(frame["expected_rows"])
         tol = int(frame["expected_rows_tol"])
@@ -925,17 +926,17 @@ def run(argv: list[str] | None = None) -> Path:
             ("c2_highsnr_onset_residual", c2_row),
             ("c3_singing_removal", c3_row),
         ):
-            n_j = int(row["n_h_judgeable"] or 0)
+            n_j = require_stratum_count(row["n_h_judgeable"])
             N_h = n_j
             w_h = (N_h / n_j) if n_j > 0 else None
             strata.append(
                 {
                     "h": cid,
                     "N_h": N_h,
-                    "n_h_sampled": int(row["n_total"] or 0),
+                    "n_h_sampled": require_stratum_count(row["n_total"]),
                     "n_h_judgeable": n_j,
                     "w_h": w_h,
-                    "G_h": int(row["G_h"] or 0),
+                    "G_h": require_stratum_count(row["G_h"]),
                 }
             )
 
@@ -955,7 +956,11 @@ def run(argv: list[str] | None = None) -> Path:
             elif p.suffix.lower() in {".sqlite", ".db"}:
                 con = sqlite3.connect(str(p))
                 try:
-                    rc = int(con.execute("SELECT COUNT(*) FROM syllables").fetchone()[0])
+                    rc = int(
+                        _load_sql_df(
+                            p, load_sql("count_syllables", str(sql_DIR))
+                        ).iloc[0, 0]
+                    )
                     cols = [
                         r[1] for r in con.execute("PRAGMA table_info(syllables)").fetchall()
                     ]
