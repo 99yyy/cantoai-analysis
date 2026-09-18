@@ -7,6 +7,7 @@ Scripts and tables for investigating post-2025 low agreement scores.
 This is model–dictionary consistency, not human accuracy (see PIPELINE.md).
 
 ## Key files
+- `scripts/audit.py` — read-only process audit (`docs/AUDIT-SPEC.md`; how to run: `scripts/README-audit.md`)
 - `analyze_scores_by_year.py` — main reproducible analysis
 - `agreement_by_year.csv` / `agreement_by_period.csv`
 - `effect_size_period.json`
