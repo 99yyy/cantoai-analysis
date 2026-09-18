@@ -1,82 +1,42 @@
-# ROUND-3 阶段1 · 方法审
+# ROUND-3 阶段1 · 方法审（复审）
 
-- 输入：`rounds/ROUND-3.md` + `rounds/ROUND-3.yaml`（方法审打回计数 1/2）
+- 输入：`rounds/ROUND-3.md` + `rounds/ROUND-3.yaml`（打回后修订；计数将记 2/2）
 - 判定：**改**
-- 对照：工具适用 / 判据可重算 / 预测写死 / 脚本契约；以及派单硬约束（不重跑推断、阶段2仅脚手架、阶段3等合入、不碰 dataset、契约 sha256）
+- 对照：首版硬条件 1–5
 
-## 已核对（可保留）
+## 硬条件逐条复核
 
-- 问题可证伪；H1–H3 有数值门槛；预测三不等式已写；冻结规则明确。
-- **不重跑模型推断**、阶段2仅脚手架且禁止统计数字、阶段3等阶段2合入、不动 dataset repo：正文已钉死，符合派单硬约束。
-- 五条「已核实事实」本机抽查：
-  - `windows` 28 列无 `music_prob/singing_prob/snr_db/dnsmos_ovrl`：是。
-  - `flag_sing=1` 仅 14 且全 tier C：是。
-  - PANNs `singing_prob≥0.5 ∧ flag_sing=0`：13 条，A6/C7，6 视频，其中 dur>10 为 8：与文一致。
-  - dur>10：2142（A+B 2006）；中位 dur≈7.93：一致。
-  - 基数 4911/567、tier A/B/C：一致。
-- `ROUND-3.yaml` 声明 `baseline_model`、`comparisons`（m=3）、`pairable_span_predicate`、`audio_span_provenance`、`barred_stratifiers`：方向正确。
+| # | 条件 | 复核 | 结果 |
+|---|------|------|------|
+| 1 | 契约文件可核验 | `.cursor/rules/analysis-contract.mdc` 存在；`sha256sum` = `461e8928597b1269be05088f3296663b896f1a5c4d264c2d7be3cf41ad5db3e5`；元数据 commit 更正为 `228c78a`（clone 内可 `rev-parse`） | **满足** |
+| 2 | H2/H3 `singing_prob` 钉死 PANNs 整窗 | md/yaml 写明仅 `task2_window_quality/window_quality_with_flags.csv`；`singing_prob_source` 块；禁止与 CLAP 同表 | **满足** |
+| 3 | H3 阈值统一 | md 预测与 yaml 均为 `abs(delta_pp) ≤ 0.5` | **满足** |
+| 4 | 脚本契约钉死输入 + 禁推理 | 列出 corpus / window_quality / clap（本轮不读）/ frame / ROUND-3.yaml；禁止 `run_clap*` 等推理入口 | **满足** |
+| 5 | 预测 commit 可 `rev-parse` | 元数据写 `d6f1132a1fdfddffb36d6855e322580b22e9dc9c`，但在 `/tmp/cantoai-analysis-push`（及可及远端 fetch）上 **`git rev-parse --verify d6f1132a1fdfddffb36d6855e322580b22e9dc9c^{commit}` 失败**（bad object）。工作区 ROUND 已含冻结文，但该 hash **不是**分析库中的真实 commit | **不满足** |
 
-## 硬条件（必须全部满足才复审通过）
+## 仍须满足的硬条件（仅第 5 条）
 
-### 1. 契约文件可核验
+### 5. 预测 commit 必须是真实 git 对象
 
-**现状**：工作区无 `.cursor/rules/analysis-contract.mdc`；`git` 无对象 `226c78a`；无法对 sha256 `461e8928597b1269be05088f3296663b896f1a5c4d264c2d7be3cf41ad5db3e5` 做 `sha256sum` 核对。
-
-**通过条件**：
+**通过条件**（在分析库 clone 上）：
 
 ```bash
-test -f /workspace/cantoai/analysis/.cursor/rules/analysis-contract.mdc
-sha256sum /workspace/cantoai/analysis/.cursor/rules/analysis-contract.mdc \
-  | awk '{exit !($1=="461e8928597b1269be05088f3296663b896f1a5c4d264c2d7be3cf41ad5db3e5")}'
+git -C <cantoai-analysis-clone> rev-parse --verify d6f1132a1fdfddffb36d6855e322580b22e9dc9c^{commit}
+# 或若改用新 hash：先把含冻结预测三不等式的 ROUND-3.md/.yaml 提交并 push，
+# 再把元数据「预测 commit」改为该真实 hash，且下行退出码 0：
+git -C <cantoai-analysis-clone> rev-parse --verify <新预测commit>^{commit}
 ```
 
-（若路径/hash 变更，ROUND 元数据与上式同步改到可核验值。）
+且该 commit 的树中 `rounds/ROUND-3.md` 预测段已含 H1/H2/H3 冻结不等式（含 `abs(delta_pp) ≤ 0.5` 与 PANNs 来源）。
 
-### 2. 钉死 H2/H3 的 `singing_prob` 来源（禁止与事实4矛盾）
+> 说明：方法审「通过」不得早于预测 commit 落库；仅在文件里写一个尚不存在的 hash 不算冻结。
 
-事实4已声明 CLAP 前10s 与 PANNs 整窗**不得同列比较**，但 H2/H3 仍写裸名 `singing_prob`。
+## advisory
 
-**通过条件**：`ROUND-3.md` + `ROUND-3.yaml` 对 H2/H3 **显式写死其一**（推荐）：
-
-- 使用 `analysis/task2_window_quality/window_quality_with_flags.csv` 的 `singing_prob`（整窗 PANNs），并写明 H2/H3 **不**与 CLAP `clap_sing` 同表；或
-- 使用 `analysis/ROUND-1/window_clap_sing.csv` 的 `clap_sing`，且子集强制 `windows.dur <= 10`。
-
-禁止继续使用未限定来源的裸名 `singing_prob`。
-
-### 3. 统一 H3 阈值符号
-
-**现状**：`ROUND-3.md` 预测为 `delta_pp ≤ 0.5`（单向）；`ROUND-3.yaml` 为 `abs(delta_pp) <= 0.5`。
-
-**通过条件**：两处改为同一不等式（选定单向或绝对值），且与 `metrics/singing_removal.json` 键语义一致。
-
-### 4. 脚本契约钉死复用输入路径
-
-**通过条件**：`ROUND-3.md` 脚本契约列出只读输入（CLI 无默认值亦可，但须有名字），至少：
-
-- corpus sqlite
-- `window_quality_with_flags.csv`（含 `singing_prob`,`snr_db`）
-- `window_clap_sing.csv`（若 H2/H3 不用可标「本轮不读」）
-- syllables / jp_match 来源表
-- `ROUND-3.yaml`、`frame.yaml`
-
-并写明：**禁止**调用任何推理入口（无 `run_clap*` / `run_*panns*` / demucs 推理）。
-
-### 5. 预测 commit 在阶段2 launch 前可 `rev-parse`
-
-**通过条件**：元数据 `预测 commit` 非空，且
-
-```bash
-git -C <analysis-clone> rev-parse --verify <预测commit>^{commit}
-```
-
-退出码 0；该 commit 含冻结后的预测三不等式；早于任何结果 commit。
-
-## advisory（不阻塞）
-
-- 阶段2冒烟：建议 `python -m src.round3 --check-frame`（或等价）只校验 schema/`checks.json`，不写 metrics 数字；可在复修时一并写入契约。
-- 事实3的 13 条作抽听清单：与「不据 singing_prob 下阈值」一致，保持即可。
-- 音频员仅补 `t0_s/t1_s`：已写清，保留。
+- 条件 1–4 已齐，复审只卡预测 commit 落库。
+- 本机无法 `git fetch` GitHub（无凭证）；以 clone 内对象为准。若 hash 仅在未推送的本地，请 push 后派复审。
+- 通过前仍 **不** launch 阶段2。
 
 ## 结论
 
-**改。** 满足硬条件 1–5 后改 ROUND 并再派阶段1复审；计数 1/2。在此之前不得 launch 阶段2。
+**改**（计数 **2/2**）。仅硬条件 5 未过：把真实预测 commit 写入元数据并确保 `rev-parse` 退出码 0 后再派阶段1终审。满额后再改则按 LOOP 升级 Tom。
