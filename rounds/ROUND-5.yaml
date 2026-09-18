@@ -1,0 +1,31 @@
+# ROUND-5: replace expected/ tautology with checks against live corpus.
+# Impl wave tasks: to be filled by Tom in ROUND-5.md before stage 1.
+round: 5
+
+baseline_model: none
+baseline_predicate: "1=1"
+
+comparisons: []
+
+write_scopes:
+  impl_a: ["src/*", "src/**", "sql/*", "frame.yaml"]
+  impl_b: ["src/*", "src/**", "sql/*", "frame.yaml"]
+  tests: ["tests/*", "tests/**"]
+  review: ["review/ROUND-5/result.md", "review/ROUND-5/recompute/*", "review/ROUND-5/recompute/**"]
+
+waves:
+  - name: wave1
+    scopes: [impl_a, impl_b, tests]
+    start_commit: null
+  - name: review
+    scopes: [review]
+    start_commit: null
+
+max_concurrent: 6
+launch_budget: 8
+
+singing_prob_source:
+  column: singing_prob
+  path: task2_window_quality/window_quality_with_flags.csv
+  span: whole_window
+  paired_with_clap: false

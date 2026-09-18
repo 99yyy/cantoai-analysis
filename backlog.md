@@ -19,3 +19,4 @@
 | 10 | `review_prior`：`jp_match=none` 勿与完全一致同归 low | 待办 | 单开一轮；勿夹审计 PR |
 | 11 | 审计后复算（声明抽样框后重测 H1–H3） | 完成 | **ROUND-3** 结轮；H1/H2 否、H3 是；`7fe0ccf` + `review/ROUND-3/result.md` |
 | 12 | ROUND-4：删 enforce_expected / left_attach 字面量 / contract_check 四条 | 完成 | #25+#27+#28；`review/ROUND-4/result.md` PASS |
+| 13 | 契约强制校验 corpus sha256；拆 expected/ 同义反复 | 进行中 | **ROUND-5**；impl 任务待 Tom 写入 rounds/ROUND-5.md |
