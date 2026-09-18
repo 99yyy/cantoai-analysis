@@ -1,0 +1,15 @@
+{
+  "comparisons": [
+    "c1_period_drop",
+    "c2_highsnr_onset_residual",
+    "c3_singing_removal"
+  ],
+  "metrics_sha256": {
+    "did_highsnr_onset": "5fa3731efb0379627ed7dac56a84932141dca3cd89730898f8b6091ca0636a26",
+    "did_period": "905186a7478258cbebc7f69c23a4f6a525158db50325d3ad0092923a1ddc438d",
+    "singing_removal": "5d505443336bbae599daa7d3e296a1a7e09a4ee26cc7265d1bf43495bde298e0"
+  },
+  "sha256": "a2b193638dbd41340580ee3b0a15a05d10dd6ae366792e3000ea17f182bdc0b7",
+  "smoke": true,
+  "status": "smoke_ok"
+}

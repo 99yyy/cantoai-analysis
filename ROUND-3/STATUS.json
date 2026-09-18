@@ -1,7 +1,37 @@
 {
+  "comparisons": [
+    "c1_period_drop",
+    "c2_highsnr_onset_residual",
+    "c3_singing_removal"
+  ],
+  "metrics_sha256": {
+    "did_highsnr_onset": "dbc305fd63893aa6de9ca4963347da9d4d25c06da5a0b83f284752ca7093807f",
+    "did_period": "135ac4c7794a4706113ca91fa0203653233afeac48dd64c825817c9e752d82ef",
+    "singing_removal": "33f26c43674d10bd141bdb2617b935cd44034163b5a22922f41a49c7e31a9c39"
+  },
+  "sha256": "b3affc3f1f9b1fdce5e349cbd5df19e2b4da4fe6b6ad3b8ea921f3e04c3a066a",
+  "smoke": false,
+  "status": "complete",
   "round": 3,
-  "phase": 1,
-  "status": "method_review",
-  "updated_at": "2026-09-18T14:12:00+08:00",
-  "note": "stage 0 done; awaiting method review"
+  "phase": 3,
+  "updated_at": "2026-09-18T14:55:25+08:00",
+  "prediction_commit": "d6f1132a1fdfddffb36d6855e322580b22e9dc9c",
+  "smoke_ok": true,
+  "analyst": {
+    "status": "complete",
+    "metrics": [
+      "metrics/did_period.json",
+      "metrics/did_highsnr_onset.json",
+      "metrics/singing_removal.json"
+    ]
+  },
+  "audio_span": {
+    "status": "complete",
+    "span_summary": "metrics/span_provenance_summary.json",
+    "outputs": [
+      "ROUND-3/panns_brouhaha_dnsmos_with_span.csv",
+      "ROUND-3/clap_with_span.csv",
+      "ROUND-3/metrics/span_provenance_summary.json"
+    ]
+  }
 }
