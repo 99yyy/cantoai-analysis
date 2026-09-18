@@ -21,7 +21,7 @@ from src.compare import (
 from src.flatten import SEP, flatten
 from src.frame import apply_boiler_exclusion, apply_tier_whitelist, assert_stratum_column, assign_group
 from src.manifest import assert_git_clean, parse_upload_date
-from src.merge import checked_merge
+from src.merge import checked_merge, left_attach
 from src.onset import parse_onset
 from src.paths import load_complete_output, refuse_inference, require_path
 from src.round3 import _counts, _prepare_base, require_stratum_count
@@ -284,3 +284,17 @@ def test_window_quality_required():
 def test_manifest_stratum_count_none():
     with pytest.raises(ValueError, match=r"^manifest stratum count is None"):
         require_stratum_count(None)
+
+
+# ROUND-4 mutants are applied against this file; re-export the gate tests.
+from tests.test_round4_gates import (  # noqa: E402
+    test_checked_merge_expected_rows_mismatch,
+    test_checked_merge_expected_rows_non_int_literal,
+    test_checked_merge_has_no_enforce_expected_parameter,
+    test_left_attach_expected_rows_mismatch,
+    test_left_attach_expected_rows_non_int_literal,
+    test_left_attach_has_no_enforce_expected_parameter,
+    test_left_attach_join_name_missing,
+    test_merge_module_pd_merge_exactly_once,
+    test_no_boolean_gate_bypass_parameter,
+)
