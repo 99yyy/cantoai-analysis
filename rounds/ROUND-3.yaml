@@ -1,0 +1,64 @@
+# Machine-readable declarations for ROUND-3. Required by analysis-contract.mdc
+# clauses 13 (baseline_model) and 15 (comparisons, m, comparison_id).
+round: 3
+
+# Clause 13: the baseline against which every reported gap is differenced.
+baseline_model: agreement_pre2025
+baseline_predicate: "videos.upload_date < '2025-01-01'"
+
+# Clause 15: m == len(comparisons). Every output row carries its comparison_id.
+# A comparison absent from this list is exploratory=1, carries no p-value, and
+# may not be cited in the README or a PR body.
+comparisons:
+  - id: c1_period_drop
+    hypothesis: H1
+    question: "Does the film/contemporary agreement gap survive differencing against the pre-2025 gap?"
+    unit: syllable
+    cluster: video_id
+    threshold: "p_bh < 0.05, sign unchanged"
+  - id: c2_highsnr_onset_residual
+    hypothesis: H2
+    question: "On snr_db>15 and PANNs singing_prob<0.2 (window_quality_with_flags.csv), does the n-/ng-/gw- onset gap remain at or below -15pp after differencing?"
+    unit: syllable
+    subset: "snr_db > 15 AND singing_prob < 0.2 AND onset IN ('n','ng','gw','kw')"  # singing_prob = PANNs whole-window from window_quality_with_flags.csv; never CLAP
+    cluster: video_id
+    threshold: "did <= -0.15"
+  - id: c3_singing_removal
+    hypothesis: H3
+    question: "Does removing PANNs singing_prob>0.5 windows (window_quality_with_flags.csv) move film agreement by abs(delta_pp)<=0.5?"
+    unit: syllable
+    cluster: video_id
+    threshold: "abs(delta_pp) <= 0.5"
+
+# Windows whose two singing_prob measurements share a span (clause 6). Outside
+# this subset the CLAP (first 10 s) and PANNs (whole window) columns must not
+# appear in one row or one comparison.
+pairable_span_predicate: "windows.dur <= 10"
+
+# Reuse of existing audio scores: spans recovered from the scripts, not guessed
+# (clause 2). No model inference runs in this round.
+audio_span_provenance:
+  panns_brouhaha_dnsmos:
+    t0_s: "windows.start"
+    t1_s: "windows.end"
+    source: "task2_window_quality/scripts/run_window_quality.py (load_mono, no truncation)"
+  clap:
+    t0_s: "windows.start"
+    t1_s: "windows.start + min(10, windows.dur)"
+    source: "task_round1_clap_sing/scripts/run_clap_sing.py:37 CLAP_MAX_SECONDS=10; :350 audio[:max_n]"
+
+# Variables barred from use as a stratifier or group definition this round.
+# H2/H3 singing_prob: PANNs whole-window only; do not join CLAP clap_sing in the same comparison.
+singing_prob_source:
+  column: singing_prob
+  path: task2_window_quality/window_quality_with_flags.csv
+  span: whole_window
+  paired_with_clap: false
+
+barred_stratifiers:
+  - column: flag_sing
+    reason: "identically 0 on tier A+B; all 14 positives are tier C, so it is collinear with tier"
+  - column: review_prior
+    reason: "conflates jp_match='none' with agreement"
+  - column: coverage
+    reason: "a span ratio that exceeds 1; not a 0-1 proportion"

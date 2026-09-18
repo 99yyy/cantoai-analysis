@@ -1,0 +1,12 @@
+# kills: tier whitelist predicate missing from published-set filter
+--- a/src/frame.py
++++ b/src/frame.py
+@@ -36,7 +36,7 @@
+         raise ValueError(TIER_WHITELIST_MISSING)
+     before = len(df)
+     mask = df["tier"].isin(allowed)
+-    out = df.loc[mask].copy()
++    out = df.copy()
+     after = len(out)
+     row_accounting.append(
+         {

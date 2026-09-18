@@ -1,4 +1,5 @@
-"""Smoke + falsifiable tests for the SQL EXPLAIN harness (contract §9 / §19)."""
+"""Smoke + falsifiable tests for the SQL EXPLAIN harness (contract §9 / §19),
+plus an EXPLAIN of every sql/*.sql file against fixtures/schema.sqlite (clause 17)."""
 from __future__ import annotations
 
 import sqlite3
@@ -79,3 +80,16 @@ def test_repo_sql_explains_against_schema_fixture() -> None:
         print(report.unresolved)
     report_or_raise(report)
     assert report.explained, "EXPLAIN harness must not be a no-op"
+
+
+def test_sql_files_explain_against_schema() -> None:
+    """EXPLAIN every sql/*.sql file against fixtures/schema.sqlite."""
+    con = sqlite3.connect(SCHEMA)
+    try:
+        files = sorted((ROOT / "sql").glob("*.sql"))
+        assert files
+        for path in files:
+            sql = path.read_text(encoding="utf-8")
+            con.execute("EXPLAIN " + sql)
+    finally:
+        con.close()

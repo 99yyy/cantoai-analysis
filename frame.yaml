@@ -1,0 +1,112 @@
+# ROUND-3 sampling frame. Predicates only; no computed research metrics.
+# expected_rows is the declared published-set window count from rounds/ROUND-3.md
+# (tier A+B whitelist), not a number produced by a script in this repository.
+
+round: 3
+min_judgeable: 200
+master_seed: 20260918
+B: 1000
+
+# Clause 19: published set is this whitelist. Population statements quote
+# video_counts, never a language name.
+tier_whitelist:
+  - A
+  - B
+
+video_counts:
+  n_videos: 567
+  n_videos_source: expected/n_videos.count
+
+expected_rows: 4439
+expected_rows_tol: 88
+expected_rows_source: sql/count_windows_ab.sql
+
+measure_columns:
+  - n_total
+  - n_match
+  - n_judgeable
+  - n_empty_realized
+  - n_dur_le_0
+  - agreement
+  - did
+  - delta_pp
+  - singing_prob
+  - snr_db
+
+status_codes:
+  - ok
+  - missing
+  - empty_realized
+  - dur_le_0
+  - excluded
+  - inconclusive
+
+# One filter predicate per line (clause 8), including the tier whitelist
+# and each known-failure exclusion from rounds/ROUND-3.md.
+predicates:
+  - "windows.tier IN ('A', 'B')"
+  - "windows.text_clean != '如果覺得內容啱睇嘅subscribe'"
+  - "syllables.dur > 0"
+  - "flag_sing MUST NOT be used as stratifier or group definition"
+  - "review_prior MUST NOT be used; agreement is computed from jp_match only"
+  - "coverage MUST NOT be used as a 0-1 proportion or stratifier"
+
+# Clause 11: both groups are explicit predicates, not complements.
+groups:
+  treatment:
+    predicate: "film_flag = 1"
+  control:
+    predicate: "contemporary_only = 1"
+
+# H2/H3 singing_prob pin (must match rounds/ROUND-3.yaml). Never join clap_sing.
+singing_prob_source:
+  column: singing_prob
+  path: task2_window_quality/window_quality_with_flags.csv
+  span: whole_window
+  paired_with_clap: false
+
+barred_stratifiers:
+  - flag_sing
+  - review_prior
+  - coverage
+
+pairable_span_predicate: "windows.dur <= 10"
+
+# Clause 9: every SQL JOIN file is listed. expected_rows is a literal.
+# Window-level join literals equal the declared A+B whitelist size.
+# Syllable-level join literals equal the empty schema.sqlite row count (0);
+# they are not a corpus statistic.
+joins:
+  syllables_windows:
+    sql: sql/join_syllables_windows.sql
+    expected_rows: 0
+    keys:
+      - uid
+  windows_videos:
+    sql: sql/join_windows_videos.sql
+    expected_rows: 4439
+    keys:
+      - video_id
+  c1_period_drop:
+    sql: sql/c1_period_drop.sql
+    expected_rows: 0
+    keys:
+      - uid
+      - video_id
+  c2_highsnr_onset:
+    sql: sql/c2_highsnr_onset.sql
+    expected_rows: 0
+    keys:
+      - uid
+      - video_id
+  c3_singing_removal:
+    sql: sql/c3_singing_removal.sql
+    expected_rows: 0
+    keys:
+      - uid
+      - video_id
+  windows_quality:
+    expected_rows: 4439
+    keys:
+      - uid
+    right_key: window_id

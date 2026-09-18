@@ -1,52 +1,52 @@
 ---
-description: 数据分析脚本的强制契约
+description: Mandatory contract for data-analysis scripts in this repository
 alwaysApply: true
 ---
 
-本文件优先于任何任务说明。违反任一条即不合并。
+This file overrides any task brief. A PR violating any clause is not merged.
 
-无法在不违反约束的前提下完成任务时，停止工作，在 PR 正文写 `BLOCKED: <一句话原因>`。不得放宽阈值、修改测试、或对输入特例化。
+If a clause cannot be satisfied, stop and write `BLOCKED: <one line>` in the PR body. Do not relax a threshold, edit an assertion, or special-case an input.
 
-不得修改 `.cursor/`、CI 配置、`fixtures/`、以及 `tests/` 中已存在的断言。需要改动这些时写 `BLOCKED`。
+"CI fails on X" means: the rule is implemented as a check in `scripts/contract_check.py`, which the CI workflow invokes. Add rules to that script; never weaken or delete a rule already in it. The CI workflow file itself, and `.cursor/`, you do not modify.
 
-# 一 总体与抽样框
+Do not modify any assertion already present in `tests/`, except in the PR that deletes or rewords the `src/` assertion it matches — list each such pair in the PR body. Counterexample fixtures belong in `tests/fixtures/`, which you may add to freely. `fixtures/schema.sqlite` and `fixtures/manifest.schema.json` change only in a PR whose title begins `schema:` and which touches nothing else; CI on a `schema:` PR runs only the schema-validity and `EXPLAIN` steps.
 
-1. 抽样框写在 `frame.yaml`：每个过滤谓词一行（含 tier 白名单），外加 `expected_rows` 与 `expected_rows_tol`。脚本加载后立即断言实际行数落在区间内，不符则退出非零并打印两个数。禁止把「恰好能 join 上的行」当作总体。
-2. 每次 join 之后断言结果行数等于声明值；未匹配行数计数、打印、写入 manifest。行数变化未被断言覆盖的 join 不得合并。
-3. 每次运行写 manifest，必含：每个输入的 sha256、行数、列集合；过滤前后行数；每层 N_h 与 n_h；master seed 与各层派生子种子；写入时的 git sha。只记文件路径不算 manifest。
-4. 分层抽样必须落盘每层总体规模 N_h。总体级比率用 w_h = N_h / n_h 加权，不得对各层取无权平均。
+A file this contract names that does not yet exist is created in the same PR. A missing artifact is never a reason to write `BLOCKED`.
 
-# 二 缺失值与哨兵
+# 1. Checks must be able to fail
 
-5. 任何会减少行数的操作（`dropna`、条件过滤、join 丢弃）必须打印被丢弃的行数。禁用 `fillna`、`errors="coerce"`、`or 0`、`.get(col, default)` 处理缺失。
-6. 缺失只能显式分支：写 NULL 并附 `<col>_missing_reason` 列，或退出非零。
-7. 禁止哨兵数值（999、-1、9999 等）。不可计算的量写 NULL，原因写进 `<col>_status` 列。禁止哨兵值与 `ok=1` 同时出现在同一行。
-8. 任何截断、降采样、时间窗限制必须在输出中占一列（如 `window_s`、`truncated`）。同一张报告内不得混用两种窗口配置，除非窗口本身是分组键。
+1. Every check appends one row to `checks.json`: `{name, status, expected, expected_source, observed, missing}`, `status` in `PASS|FAIL|SKIP`. `expected_source` is `<path>:<key>` naming `frame.yaml`, `rounds/ROUND-N.yaml`, or a file under `expected/` that no script opens for writing. CI rejects the run if the schema is violated, if `expected_source` names a file absent from the commit or written by a script, or if a check reports SKIP on the unmutated fixtures run — except a SKIP whose `missing` names a table or column absent from `fixtures/schema.sqlite`, which passes and is listed in the PR body under `SCHEMA-NEEDED:`.
+2. A check that cannot locate the input it claims to read — script, SQL file, column, table — reports SKIP and names the missing thing in `missing`. Never substitute a built-in default, a reimplementation of the rule, or a value recovered by regex from prose. A result derived from a substitute is SKIP: neither PASS nor FAIL.
+3. Every assertion carries a message unique in the repository, and a test that trips it with `pytest.raises(<its exception type>, match=r"^<that message>")`. `raise` of any type and `sys.exit("<message>")` count as assertions; an early `return` guarding a data invariant is forbidden and must become a `raise`. CI matches sets, not counts: every assertion message in `src/` must appear as a `^`-anchored `match=` pattern in `tests/`, and every such pattern must resolve to a message in `src/`. The body of a `pytest.raises` must call a function imported from `src/`, unmocked, and may not itself `raise`. A constant, a self-comparison, an algebraic identity, or a file-existence test is not a check: a field such as `smoke_ok` must come from comparing two independently obtained values.
+4. `tests/mutations/` holds one patch per defect class whose code path exists in this repository — tier filter removed, stratum weights set to 1, join key swapped, per-stratum seed replaced by the master seed, sentinel written with status `ok`. Each patch touches only `src/`, applies cleanly, and carries a header line `# kills: <assertion message>`. A mutant is killed when the suite fails at that assertion, or when a `checks.json` row that was PASS on the unmutated run becomes FAIL or SKIP; CI fails on a surviving mutant, on a patch for an absent code path, and on an existing code path no patch names. Prose in the PR body is not evidence, and the verdict of a code-review skill is advisory only.
 
-# 三 自检必须可证伪
+# 2. Missing values
 
-9. 每条断言配一个会让它失败的反例 fixture，测试用 `pytest.raises` 证明它在反例上确实失败。写不出反例的断言删掉。
-10. 禁止把常量、代数恒等式、或「文件是否存在」当作检查通过的证据。`smoke_ok` 一类字段必须由实际比对产生。
-11. PR 正文贴出两样：反例测试的输出；以及故意改坏一处实现后测试确实失败的证据。
-12. 代码审查技能（`/open-code-review-delegate`）的结论只作参考，不构成正确性证据，不得替代第 9 至 11 条。
+5. Every numeric measure column `c` listed at `frame.yaml: measure_columns` has a companion `c_status` drawn from the enum at `frame.yaml: status_codes`; `unknown` and `other` are not members. CI asserts on every output that `(c_status == "ok")` holds exactly when `c` is non-NULL. `tests/test_null_propagation.py` enumerates its columns from `frame.yaml: measure_columns` and every raw input column named in `sql/*.sql` — never a hand-picked list — nulls one fixture row per column, and asserts every derived value in that row is NULL with `_status` not `ok`. A sentinel number (0, -1, 999, 9999) standing in for a missing value, or any value alongside `c_status == "ok"` not computed from data, fails; `fillna`, `mask`, `where`, `nan_to_num`, `replace`, `COALESCE`, `errors="coerce"`, `or 0`, and `.get(col, default)` are forbidden on a measure column.
+6. Any truncation, downsampling, or analysis window occupies an output column (`t0_s`, `t1_s`). Two measurements may share a row or a comparison only when their `(t0_s, t1_s)` are identical for the same `video_id`; CI asserts this on every table declared as a comparison.
 
-# 四 统计口径
+# 3. Population, joins, provenance
 
-13. 组间比较报的是与基线差距的差分。报告中每个差分必须同时列出两组各自的原始值与基线值，使读者可独立重算。
-14. bootstrap 按 video_id 整簇重抽，每层用独立派生种子。每层必须报告视频数 G_h；G_h < 10 时在该行输出 `ci_unreliable=1`（本项目约定，非统计定理）。
-15. 检验族大小 m 等于 `rounds/ROUND-N.md` 中声明的比较条数，写入输出；p 值同时给原始值与 BH 校正值。未在 ROUND-N.md 中声明的比较一律标 `exploratory=1`。
-16. 可判样本不足以支撑结论时写 `inconclusive` 并给出实际可判数，不得写「不支持」。
-17. 分层变量不得取自被检验的同一批分数；来源写进 README。
-18. 纳入与排除规则对两组同样施加，输出「规则 → 各组剔除行数」对照表。
+7. Every run writes `manifest.json`, validated against `fixtures/manifest.schema.json`: per input a sha256, row count and column set, with hashes recomputed and compared in CI; `N_h`, `n_h_sampled`, `n_h_judgeable` and the weight used per stratum; the master seed, every derived per-stratum seed, and `B`; the git sha, `git_dirty`, and the `git hash-object` blob sha of `frame.yaml` as read. It also carries `row_accounting`: one entry per row-count change as `{step, rule, group, rows_before, rows_after}`. A printed number is not a record, and paths alone are not a manifest.
+8. `frame.yaml` declares the sampling frame as one filter predicate per line, including the tier whitelist, plus `expected_rows`, `expected_rows_tol` and `expected_rows_source`. `expected_rows_source` names a `sql/*.sql` file counting a raw input table, or a committed count file; it may not read the output of any script here, and `expected_rows_tol` may not exceed 2% of `expected_rows`. CI recomputes `frame.yaml`'s blob sha from the checked-out commit, and fails on mismatch with the manifest or when `git_dirty` is true. The set of rows that happen to join is not a population.
+9. Every DataFrame join goes through one helper, `checked_merge(left, right, join_name)`; CI fails on `pd.merge(`, `.merge(`, or `.join(` whose receiver is a DataFrame or Series outside it, and on SQL `JOIN` in a `sql/*.sql` file not listed at `frame.yaml: joins.<join_name>.sql`. The expected row count is a literal at `frame.yaml: joins.<join_name>.expected_rows` — an expected operand referencing a runtime variable is a violation — and unmatched rows are counted into `row_accounting` under that `join_name`.
+10. Stratified sampling persists `N_h`. Population-level rates use `w_h = N_h / n_h_judgeable`. Never take an unweighted mean across strata.
+11. `frame.yaml: groups.treatment` and `groups.control` are each an explicit predicate. A group defined as the complement of another is a violation. Rows matching neither are counted as `unassigned` in the manifest; a row matching both raises. Inclusion and exclusion rules apply identically to both groups, and rows dropped per rule per group appear in `row_accounting`.
+12. Every output table and JSON file except `manifest.json` has a schema under `fixtures/schemas/<name>.json`, validated in CI; `manifest.json` is validated against `fixtures/manifest.schema.json` alone. A writer that would emit a duplicate column or key raises, and a flattened key uses a separator that cannot occur inside a key segment.
 
-# 五 可执行与可复现
+# 4. Statistics
 
-19. 仓库内维护 `fixtures/schema.sqlite`（只有 schema、零数据）。所有 SQL 在 CI 里对它做 `EXPLAIN` dry-run；解析失败或从未被执行的查询路径判失败。
-20. 禁止硬编码绝对路径，全部从 CLI 参数或环境变量取。
-21. 长任务必须可续跑：写临时文件后 rename，产出同时写 `STATUS.json`；中断留下的产物必须能被下游识别为不完整。
+13. Report the difference between the group gap and the baseline gap, never the raw group gap. The baseline is the column named at `rounds/ROUND-N.yaml: baseline_model`. Every reported difference lists each group's own value and its baseline value so a reader can recompute it. This governs any row carrying a p-value or interval; a purely descriptive row carries `descriptive=1` and no inferential statistic.
+14. Bootstrap by resampling whole `video_id` clusters, with `B >= 1000`. The seed for stratum `h` is `int(sha256(f"{master_seed}:{h}").hexdigest()[:8], 16)`; CI asserts the manifest's per-stratum seeds are pairwise distinct and match that construction. Report `G_h`, the number of videos per stratum, and emit `ci_unreliable=1` where `G_h < 10` — a convention of this project, not a theorem. A row with `ci_unreliable=1`, or with `n_h_judgeable` below `frame.yaml: min_judgeable`, carries `conclusion=inconclusive` and its actual judgeable count. The phrase "not supported" fails CI.
+15. Comparisons are declared as a list of ids at `rounds/ROUND-N.yaml: comparisons`. Every output row carries its `comparison_id`; CI asserts `m == len(comparisons)` and one row per id. Report raw and BH-corrected p-values with `m`. A row marked `exploratory=1` carries no p-value and may not be cited in the README or the PR body.
+16. A stratifying column must come from a manifest input that is not the output of any script here, and must not appear as a dependent variable in any declared comparison.
 
-# 六 本语料的固定事实
+# 5. Executability and reproducibility
 
-22. 发布集 = tier A+B。面向发布集的统计必须显式过滤 tier，并打印被过滤掉的行数。
-23. 全部素材来自单一 YouTube 频道，聚类只能做到 video 层。结论中的总体写作「该频道的 567 个视频」，不得写作「粤语」。
-24. 一致率 = jp_match ∈ {exact_default, exact_alt} 的占比。分母中 `jp_realized` 为空、`dur <= 0` 的音节必须单独报数，不得默认计入「不一致」。
+17. All SQL lives in `sql/*.sql`, loaded only through `load_sql(name)`. CI runs `EXPLAIN` on each file against `fixtures/schema.sqlite` and fails on a parse error, on a `sql/` file referenced neither by a `load_sql` call nor from `frame.yaml`, and — in `src/` outside the module defining `load_sql` — on any string literal containing both `SELECT` and `FROM` as whole uppercase words.
+18. Path-bearing arguments and variables carry the suffix `_PATH`, `_DIR`, `_FILE` or `_ROOT` and have no default: CI fails on `environ.get(`/`getenv(` with a second argument, on `environ.get(...) or`, on argparse `default=` for such a name, and on a string literal in `src/` beginning with `/` other than `/dev/null`. A script writing more than one output, or running over 60 s on fixtures, writes to a temporary name and renames, and writes `STATUS.json` as `running` before work and as `complete` with the output sha256 only after the rename; the shared loader refuses any output whose `STATUS.json` is not `complete` or whose sha256 does not match.
+
+# 6. Fixed facts about this corpus
+
+19. The published set is the tier whitelist in `frame.yaml`; any statistic about it filters on tier explicitly and records the rows removed in `row_accounting`. Every recording comes from one YouTube channel, so clustering stops at `video_id`, and the population statement quotes the video counts in `frame.yaml` — never the word "Cantonese".
+20. Agreement is `n_match / n_judgeable`, where `n_match` counts syllables whose `jp_match` is `exact_default` or `exact_alt`, and `n_judgeable = n_total - n_empty_realized - n_dur_le_0`. All four counts appear in the output. A NULL `jp_match` on a judgeable row raises.
