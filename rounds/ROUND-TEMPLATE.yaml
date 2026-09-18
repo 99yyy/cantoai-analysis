@@ -14,27 +14,42 @@ comparisons:
     cluster: video_id
     threshold: "<inequality>"
 
-# Every scope below is disjoint from every other. Branch names are
-# cursor/r<N>-<scope_id>-... (Cloud Agent) or box/r<N>-audio-... (shared machine).
+# Scope id == branch prefix segment == the only paths that branch may touch.
+# Branch names are cursor/r<N>-<scope_id>-... (Cloud Agent) or box/r<N>-<scope_id>-...
+# (shared machine). impl_a and impl_b share one scope on purpose: only one of them merges.
+# Output scopes list exact file names, not **, so an agent cannot add stray files.
 write_scopes:
-  impl:   ["src/*", "src/**", "sql/*", "frame.yaml"]
+  mr_falsify: ["review/ROUND-N/method/falsify.md"]
+  mr_tools:   ["review/ROUND-N/method/tools.md"]
+  mr_stats:   ["review/ROUND-N/method/stats.md"]
+  impl_a: ["src/*", "src/**", "sql/*", "frame.yaml"]
+  impl_b: ["src/*", "src/**", "sql/*", "frame.yaml"]
   tests:  ["tests/*", "tests/**"]
-  <c1_id>: ["ROUND-N/<c1_id>/*", "ROUND-N/<c1_id>/**"]
-  review: ["review/ROUND-N/*", "review/ROUND-N/**"]
+  <c1_id>:
+    - "ROUND-N/<c1_id>/metrics/*.json"
+    - "ROUND-N/<c1_id>/manifest.json"
+    - "ROUND-N/<c1_id>/STATUS.json"
+    - "ROUND-N/<c1_id>/checks.json"
+    - "ROUND-N/<c1_id>/README.md"
+  review: ["review/ROUND-N/result.md", "review/ROUND-N/recompute/*", "review/ROUND-N/recompute/**"]
   audio:  ["ROUND-N/audio/*", "ROUND-N/audio/**"]
 
-# Wave 2 starts only after every wave-1 PR is merged; review starts only after
-# every comparison PR is merged. start_commit is filled in by fyp at launch time.
+# Each wave starts only after every PR of the previous wave is merged or closed.
+# start_commit is filled in by fyp at launch time. At most one round may be in
+# wave0 or wave1 at a time; rounds in wave2 or later do not block a new round.
 waves:
+  - name: wave0
+    scopes: [mr_falsify, mr_tools, mr_stats]
+    start_commit: null
   - name: wave1
-    scopes: [impl, tests]
+    scopes: [impl_a, impl_b, tests]
     start_commit: null
   - name: wave2
     scopes: [<c1_id>]
     start_commit: null
-  - name: review
+  - name: wave3
     scopes: [review]
     start_commit: null
 
-max_concurrent: 6
-launch_budget: 5   # 2 + m + 1, plus 2 retries recorded separately
+max_concurrent: 8
+launch_budget: 8   # 3 + 3 + m + 1 with m = 1 here; plus 2 retries recorded separately
