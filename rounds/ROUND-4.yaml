@@ -22,3 +22,11 @@ waves:
 
 max_concurrent: 6
 launch_budget: 5
+
+# Keep frame.yaml singing_prob pin in sync for contract_check (ROUND-3 metrics retained).
+singing_prob_source:
+  column: singing_prob
+  path: task2_window_quality/window_quality_with_flags.csv
+  span: whole_window
+  paired_with_clap: false
+
