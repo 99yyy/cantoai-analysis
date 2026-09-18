@@ -16,3 +16,8 @@
 
 | 9 | BOILER 列表补片尾句 + 重建发布集 | 待办 | `06_normalise_text.py`；单开一轮；勿夹审计 PR |
 | 10 | `review_prior`：`jp_match=none` 勿与完全一致同归 low | 待办 | 单开一轮；勿夹审计 PR |
+
+## TASK-6 收口
+
+- 审计：`review/TASK-6/audit.md` @ `6530f02` — **FINDINGS: 4**（worker 写了根目录 `pytest.ini`；开放结论把剩余差距归因到 tone/segment 过强；film/other 四格缺 contract-24 六计数进 manifest；`src/` 有 SQL 字符串字面量）。结论只记在此，不直接变成下一题。
+- keep rate：产出 39 个数字，留下 39 个（`output-check` 39/39 agree）→ **39/39**。
