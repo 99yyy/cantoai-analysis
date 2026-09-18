@@ -83,3 +83,4 @@
 ## 验证记录
 
 - GitHub 例程是否触发：**是**（pr-merged PR #19，https://github.com/99yyy/cantoai-analysis/pull/19 ，分支 `chore/r4-pred2-baseline`，标题 docs(round-4): fix pred#2 baseline (PASS) + method reject 1/2；merge `8ede859`；CST 2026-09-18 ≈16:44）
+- GitHub 例程是否触发：**是**（pr-merged PR #21，https://github.com/99yyy/cantoai-analysis/pull/21 ，分支 `chore/r4-method-pass`，标题 chore(round-4): method review — 通过 (re-review after #19)；merge `d50e2da`；CST 2026-09-18 ≈16:53）
