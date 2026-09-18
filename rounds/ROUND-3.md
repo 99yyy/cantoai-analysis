@@ -5,7 +5,7 @@
 - 阶段：1（方法审中）
 - backlog 条目：审计后复算；唱段旗标结论撤回；抽样框显式声明
 - 执行角色：Cloud Agent（阶段 2 脚手架）+ 分析员（阶段 3 复算）+ 审稿员（方法审）；**音频员本轮不执行任何模型推断**
-- 方法审打回计数：0/2
+- 方法审打回计数：1/2
 - 复核打回计数：0/2
 - Cloud Agent launch 次数：0/2
 - 预测仓库：`https://github.com/99yyy/cantoai-analysis`
@@ -13,7 +13,7 @@
 - 结果 commit：
 - 执行 commit：
 - 合并目标 commit：
-- 契约：`.cursor/rules/analysis-contract.mdc` 英文 v3，20 条，sha256 `461e8928597b1269be05088f3296663b896f1a5c4d264c2d7be3cf41ad5db3e5`，commit `226c78a`。旧中文版（`7865e108…`）作废。
+- 契约：`.cursor/rules/analysis-contract.mdc` 英文 v3，20 条，sha256 `461e8928597b1269be05088f3296663b896f1a5c4d264c2d7be3cf41ad5db3e5`，commit `228c78a`。旧中文版（`7865e108…`）作废。
 
 ## 本轮为何存在（五条已核实事实）
 
@@ -32,14 +32,14 @@
 ## 假设
 
 1. **H1（期间下降稳健）**：声明抽样框后，film 与 contemporary 的一致率差**减去基线期同一差值**，BH 校正后 `p < 0.05` 且方向不变。
-2. **H2（SNR 不能解释）**：在 `snr_db > 15` 且 `singing_prob < 0.2` 的子集上，声母 n-/ng-/gw- 的组间差减去基线差 `≤ −15pp`。
-3. **H3（唱段影响可忽略稳健）**：剔除 `singing_prob > 0.5` 的窗后，film 一致率变化 `≤ +0.5pp`。
+2. **H2（SNR 不能解释）**：在 `snr_db > 15` 且 PANNs 整窗 `singing_prob < 0.2` 的子集上，声母 n-/ng-/gw- 的组间差减去基线差 `≤ −15pp`。此处 `singing_prob` **仅**来自 `task2_window_quality/window_quality_with_flags.csv`（PANNs 整窗）；**不**与 CLAP `clap_sing` 同表或同比较。
+3. **H3（唱段影响可忽略稳健）**：剔除 PANNs 整窗 `singing_prob > 0.5` 的窗后，film 一致率变化满足 `abs(delta_pp) ≤ 0.5`。`singing_prob` 来源同 H2；**不**与 CLAP `clap_sing` 同表。
 
 ## 预测（每条假设成立时数据呈现的模式）
 
 1. 若 H1：`analysis/ROUND-3/metrics/did_period.json` 中 `did` 与 `p_bh` 满足上式，且该行同时列出两组各自的值与其基线值。
 2. 若 H2：`analysis/ROUND-3/metrics/did_highsnr_onset.json` 中 `did ≤ −0.15`。
-3. 若 H3：`analysis/ROUND-3/metrics/singing_removal.json` 中 `delta_pp ≤ 0.5`。
+3. 若 H3：`analysis/ROUND-3/metrics/singing_removal.json` 中 `abs(delta_pp) ≤ 0.5`（键 `delta_pp` 为剔除前后 film 一致率之差，单位百分点）。
 
 **预测冻结规则**：上述三个不等式所在 commit 必须早于任何结果 commit。方法审通过后不得修改。
 
@@ -65,16 +65,27 @@
 
 - **不重跑任何模型推断**。PANNs / Brouhaha / DNSMOS / CLAP / demucs 的既有分数原样复用。
 - 复用的前提是补跨度列，且跨度**必须从脚本恢复、不得猜测**（契约第 2 条）：task2 三工具为整窗，`t0_s = windows.start`、`t1_s = windows.end`（由 `flac_path(video_id, idx)` 反推）；CLAP 为 `t0_s = windows.start`、`t1_s = start + min(10, dur)`。
-- `singing_prob` 的绝对刻度**未校准**，本轮不据其下阈值结论。
+- H2/H3 所用 `singing_prob` **钉死为** `task2_window_quality/window_quality_with_flags.csv` 的 PANNs 整窗列；绝对刻度**未校准**，本轮不据其下阈值结论，且不与 CLAP `clap_sing` 同表。
 
 ## 脚本契约
 
-- 输入路径：全部来自 CLI 参数或无默认值的环境变量（契约第 18 条）。只读打开 sqlite。
+- 输入路径（CLI 或无默认值环境变量；契约第 18 条）。全部只读：
+  - `--corpus-path` / `CORPUS_PATH`：`corpus.sqlite`（含 `videos` / `windows` / `syllables`；一致率从 `syllables.jp_match` 计算）
+  - `--window-quality` / `WINDOW_QUALITY_CSV`：`task2_window_quality/window_quality_with_flags.csv`（本轮 H2/H3 的 `singing_prob`、`snr_db` 唯一来源；PANNs / Brouhaha / DNSMOS 整窗）
+  - `--clap-sing` / `CLAP_SING_CSV`：`ROUND-1/window_clap_sing.csv`（**本轮 H2/H3 不读**；仅若日后配对跨度且 `dur<=10` 才允许与 PANNs 同表）
+  - `--frame-file` / `FRAME_FILE`：`frame.yaml`
+  - `--round-yaml` / `ROUND_YAML`：`rounds/ROUND-3.yaml`
+- **禁止**调用任何推理入口：无 `run_clap*`、`run_*panns*`、demucs / Brouhaha / DNSMOS 推理脚本；只复用既有 CSV 分数。
 - 输出：`checks.json`、`manifest.json`、上列三个 metrics JSON，各带 `fixtures/schemas/` 下的 schema。
 - 一条命令可重跑：
 
 ```bash
-python -m src.round3 --corpus-path "$CORPUS_PATH" --frame-file "$FRAME_FILE" --out-dir "$OUT_DIR"
+python -m src.round3 \
+  --corpus-path "$CORPUS_PATH" \
+  --window-quality "$WINDOW_QUALITY_CSV" \
+  --frame-file "$FRAME_FILE" \
+  --round-yaml "$ROUND_YAML" \
+  --out-dir "$OUT_DIR"
 ```
 
 ## 阶段顺序（本轮为硬顺序，不得合并）
@@ -102,5 +113,7 @@ python -m src.round3 --corpus-path "$CORPUS_PATH" --frame-file "$FRAME_FILE" --o
 - 阶段 2 的 PR 出现任何统计数字。
 
 ## 争议记录
+
+- 2026-09-18 阶段1方法审 **改**（1/2）：见 `review/ROUND-3/method.md` 硬条件 1–5。
 
 -

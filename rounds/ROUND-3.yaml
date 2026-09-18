@@ -18,14 +18,14 @@ comparisons:
     threshold: "p_bh < 0.05, sign unchanged"
   - id: c2_highsnr_onset_residual
     hypothesis: H2
-    question: "On snr_db>15 and singing_prob<0.2, does the n-/ng-/gw- onset gap remain at or below -15pp after differencing?"
+    question: "On snr_db>15 and PANNs singing_prob<0.2 (window_quality_with_flags.csv), does the n-/ng-/gw- onset gap remain at or below -15pp after differencing?"
     unit: syllable
-    subset: "snr_db > 15 AND singing_prob < 0.2 AND onset IN ('n','ng','gw','kw')"
+    subset: "snr_db > 15 AND singing_prob < 0.2 AND onset IN ('n','ng','gw','kw')"  # singing_prob = PANNs whole-window from window_quality_with_flags.csv; never CLAP
     cluster: video_id
     threshold: "did <= -0.15"
   - id: c3_singing_removal
     hypothesis: H3
-    question: "Does removing singing_prob>0.5 windows move the film agreement rate by at most 0.5pp?"
+    question: "Does removing PANNs singing_prob>0.5 windows (window_quality_with_flags.csv) move film agreement by abs(delta_pp)<=0.5?"
     unit: syllable
     cluster: video_id
     threshold: "abs(delta_pp) <= 0.5"
@@ -48,6 +48,13 @@ audio_span_provenance:
     source: "task_round1_clap_sing/scripts/run_clap_sing.py:37 CLAP_MAX_SECONDS=10; :350 audio[:max_n]"
 
 # Variables barred from use as a stratifier or group definition this round.
+# H2/H3 singing_prob: PANNs whole-window only; do not join CLAP clap_sing in the same comparison.
+singing_prob_source:
+  column: singing_prob
+  path: task2_window_quality/window_quality_with_flags.csv
+  span: whole_window
+  paired_with_clap: false
+
 barred_stratifiers:
   - column: flag_sing
     reason: "identically 0 on tier A+B; all 14 positives are tier C, so it is collinear with tier"
