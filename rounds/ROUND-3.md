@@ -2,7 +2,7 @@
 
 ## 元数据
 
-- 阶段：3（执行；分析员）
+- 阶段：4（复核；审稿员）
 - backlog 条目：审计后复算；唱段旗标结论撤回；抽样框显式声明
 - 执行角色：Cloud Agent（阶段 2 脚手架）+ 分析员（阶段 3 复算）+ 审稿员（方法审）；**音频员本轮不执行任何模型推断**
 - 方法审打回计数：2/2
@@ -11,7 +11,7 @@
 - 预测仓库：`https://github.com/99yyy/cantoai-analysis`
 - 预测 commit：`d6f1132a1fdfddffb36d6855e322580b22e9dc9c`（含冻结后的预测三不等式；必须早于任何结果 commit）
 - 预测 commit 核验路径（clone 内已含对象，无需 fetch）：`/workspace/repos/cantoai-analysis` 与 `/tmp/cantoai-analysis-push`；命令：`git -C /workspace/repos/cantoai-analysis rev-parse --verify d6f1132a1fdfddffb36d6855e322580b22e9dc9c^{commit}`
-- 结果 commit：`7fe0ccffa15d7f0cc8bdb0f9fdff04547f64bcdb`
+- 结果 commit：`7fe0ccffa15d7f0cc8bdb0f9fdff04547f64bcdb`（晚于预测 `d6f1132`；merge-base --is-ancestor 通过）
 - 执行 commit：`7fe0ccffa15d7f0cc8bdb0f9fdff04547f64bcdb`
 - 合并目标 commit：
 - 契约：`.cursor/rules/analysis-contract.mdc` 英文 v3，20 条，sha256 `461e8928597b1269be05088f3296663b896f1a5c4d264c2d7be3cf41ad5db3e5`，commit `228c78a`。旧中文版（`7865e108…`）作废。
@@ -125,3 +125,4 @@ python -m src.round3 \
 ## 验证记录
 
 - GitHub 例程是否触发：**是**（pr-merged PR #10，https://github.com/99yyy/cantoai-analysis/pull/10 ，分支 `cursor/round3-stage2-scaffold-8178`，标题 ROUND-3 stage 2: analysis-contract scaffolding (no stats)；merge `9f9928b` / scaffold `2929cec`；CST 2026-09-18 ≈14:48）
+- 2026-09-18 阶段3完成：c1 rejects_H1（did≈−0.004 p_bh≈0.857）；c2 rejects_H2（did≈−0.065，未达 −0.15）；c3 supports_H3（delta_pp≈+0.05）；结果 commit `7fe0ccf`。进阶段4复核。
