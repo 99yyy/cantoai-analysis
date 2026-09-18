@@ -1,5 +1,6 @@
 # ROUND-4: close expected_rows bypasses; pin corpus sha256.
 # No comparison wave — ROUND-3 metrics retained (see LOOP.md postscript).
+# write_scopes aligned to LOOP v2.1 (impl_a/impl_b best-of-two + tests).
 round: 4
 
 baseline_model: none
@@ -8,20 +9,21 @@ baseline_predicate: "1=1"
 comparisons: []
 
 write_scopes:
-  impl: ["src/*", "src/**", "sql/*", "frame.yaml"]
+  impl_a: ["src/*", "src/**", "sql/*", "frame.yaml"]
+  impl_b: ["src/*", "src/**", "sql/*", "frame.yaml"]
   tests: ["tests/*", "tests/**"]
   review: ["review/ROUND-4/*", "review/ROUND-4/**"]
 
 waves:
   - name: wave1
-    scopes: [impl, tests]
+    scopes: [impl_a, impl_b, tests]
     start_commit: null
   - name: review
     scopes: [review]
     start_commit: null
 
 max_concurrent: 6
-launch_budget: 5
+launch_budget: 8
 
 # Keep frame.yaml singing_prob pin in sync for contract_check (ROUND-3 metrics retained).
 singing_prob_source:
@@ -29,4 +31,3 @@ singing_prob_source:
   path: task2_window_quality/window_quality_with_flags.csv
   span: whole_window
   paired_with_clap: false
-
