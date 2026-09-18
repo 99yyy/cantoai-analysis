@@ -1,6 +1,6 @@
-# CantoAI 自主研究回路（LOOP，v2：Cloud Agent 并发版）
+# CantoAI 自主研究回路（LOOP，v2.1：Cloud Agent 并发版）
 
-状态以本仓库文件为准；聊天与文件冲突时以文件为准。小 jerry 不入群。
+状态以本仓库文件为准；聊天与文件冲突时以文件为准。小 jerry 不入群。仓库布局与写入者见 `LAYOUT.md`。
 
 v2 改了什么、为什么：ROUND-3 暴露了三个 v1 结构性缺口。（1）Cloud Agent 的机器里没有语料，所有碰数据的契约检查都退化成同义反复（`expected/` 是 `frame.yaml` 的镜像）。（2）分析员从共享机器直接推 main，没有任何机器闸门，结果 7fe0ccf 在产出正确数字的同一个 commit 里给 `checked_merge` 加了 `enforce_expected=False` 和一个「无 expected_rows 门」的 `left_attach`——契约第 9 条被掏空，无人察觉。（3）一轮里 Cloud Agent 只被允许启动两次、只写脚本，而它恰恰是唯一一个**由机器隔离保证独立性**的执行者。v2 的原则：语料进仓库；除 Tom 外没人直接推 main；独立性靠隔离的 VM 而不是靠约定；并发只在共享声明合入之后展开。
 
@@ -9,26 +9,29 @@ v2 改了什么、为什么：ROUND-3 暴露了三个 v1 结构性缺口。（1�
 | 阶段 | 谁 | 做什么 |
 |------|-----|--------|
 | 0 立题 | fyp | 写 `rounds/ROUND-N.md` + `rounds/ROUND-N.yaml`（comparisons、write_scopes、waves）；经 PR 合入 |
-| 1 方法审 | 审稿员 | 跑之前审：工具是否适用、判据能否重算、预测是否已写死、write_scopes 是否两两不相交；写 `review/ROUND-N/method.md`，经 PR 合入 |
-| 2 代码 | Cloud Agent ×2，**盲配对** | `impl` 只写 `src/ sql/ frame.yaml`；`tests` 只写 `tests/`，且**看不到** impl 的分支，只看规格。两者并发，各自开 PR。tests 的 PR 先合，impl 的 PR 必须在 tests 合入后 rebase 通过 CI 才能合 |
+| 1 方法审 | Cloud Agent ×3，各审一个维度 | 跑之前审。`mr_falsify`：预测是否已写死、每条假设是否有能否定它的数据模式、阈值有无依据；`mr_tools`：工具在这批数据上是否适用、已知失效情形是否都写成了谓词、跨度是否一致；`mr_stats`：单位、聚类、基线、m、min_judgeable、组定义的来源。各写 `review/ROUND-N/method/<mandate>.md`，结论只有 PASS 或 RETURN + 可验证条件；三份全 PASS 才进阶段 2 |
+| 2 代码 | Cloud Agent ×3，**盲配对 + 二选一** | `impl_a`、`impl_b` 同一 prompt 各写一份，只写 `src/ sql/ frame.yaml`；`tests` 只写 `tests/`，且**看不到** impl 的分支，只看规格。三者并发，各自开 PR。tests 的 PR 先合；两个 impl 都必须在 tests 合入后 Update branch 过 CI，**先绿的合，另一个关闭**；两个都红 → 规格有歧义，回阶段 0 |
 | 3 执行 | Cloud Agent ×m（非音频）/ 音频员（音频） | 阶段 2 全部合入后，**每个 `comparison_id` 一个 agent**，从同一个 main commit 出发，只写 `ROUND-N/<comparison_id>/`；音频推断留在共享机器，走 `box/rN-audio-…` 分支开 PR |
 | 4 复核 | Cloud Agent ×1 | 独立重算：只写 `review/ROUND-N/`，禁止 `import src`；从 `data/` 和 `ROUND-N/*/metrics` 用自己的最小 SQL/pandas 重算每个关键数字；写 `review/ROUND-N/result.md`，结论只有「通过」或「打回 + 可验证条件」 |
 | 5 裁决 | fyp | 只读 CI 状态与 `review/ROUND-N/result.md`；写 `RESEARCH_LOG.md`，取下一题；经 PR 合入 |
 
 一轮只回答 ROUND-N.md 里的那一个问题。顺便发现的东西只进 `backlog.md`。
 
-## 两波启动（硬顺序）
+## 分波启动（硬顺序）
 
-- **第 1 波**（阶段 2）：同时启动 `impl` 和 `tests` 两个 agent。两个 prompt 只含规格路径，不含对方的分支。tests 的 PR 合入后，impl 的分支必须包含 tests 的提交并通过 CI；CI 里 `mutations_killed` 用的是 tests 写的测试，所以 impl 无法给自己写「恰好通过」的测试。
-- **第 2 波**（阶段 3 + 4）：第 1 波全部合入 main 后才启动。m 个 comparison agent 与 1 个复核 agent 同时启动，prompt 里写死出发 commit（`git rev-parse HEAD` 必须等于该值，否则先 `git checkout`）。复核 agent 只有在 m 个 comparison PR 全部合入后才启动——它读的是合入后的 `ROUND-N/*/metrics`。
-- 并发上限 **6**（Pro 档实测 8；Pro+ 官方只说「明显更高」，未公布数字）。超过 6 个 comparison 就分两批。
-- 每轮 launch 预算：2 + m + 1，另加 **2** 次重试。任何 scope 只允许重启一次；第二次失败写进 ROUND 争议记录并升级 Tom。
+- **第 0 波**（阶段 1）：三个方法审 agent 同时启动，各自只写一个 markdown。任何一份 RETURN，fyp 把三份的条件并集写回 `rounds/ROUND-N.md` 再来一次；两次仍 RETURN 升级 Tom。
+- **第 1 波**（阶段 2）：同时启动 `impl_a`、`impl_b` 和 `tests` 三个 agent。三个 prompt 只含规格路径，不含彼此的分支。tests 的 PR 合入后，impl 的分支必须包含 tests 的提交并通过 CI；CI 里 `mutations_killed` 用的是 tests 写的测试，所以 impl 无法给自己写「恰好通过」的测试。
+- **第 2 波**（阶段 3）与**第 3 波**（阶段 4）：第 1 波全部合入 main 后才启动。m 个 comparison agent 同时启动；复核 agent 只有在 m 个 comparison PR 全部合入后才启动——它读的是合入后的 `ROUND-N/*/metrics`。出发 commit 用 launch 工具的 `starting_ref` 钉死（fyp 把该 sha 写进 `rounds/ROUND-N.yaml: waves[].start_commit`），不靠 prompt 里让 agent 自己 checkout。
+- **跨轮流水**：同一时刻最多**一轮**处于第 0 波或第 1 波（它们改 `src/`、`tests/`、`rounds/`），处于第 2 波及以后的轮数不限——第 2 波的 agent 从钉死的 commit 出发、复核 agent 不 import src，后续对 src 的改动碰不到它们。所以 ROUND-N 一进第 2 波，fyp 就可以开 ROUND-N+1 的第 0 波。
+- 并发上限 **8**（Pro 档官方口径；Pro+ 只说「明显更高」，未公布数字，撞到上限的报错记进 ROUND 文件，之后按实测调）。超过就分批。
+- 每轮 launch 预算：3 + 3 + m + 1，另加 **2** 次重试。任何 scope 只允许重启一次；第二次失败写进 ROUND 争议记录并升级 Tom。
+- 审稿员 bot 退出常规流程，只在 Cloud Agent 用量耗尽时顶替第 0 波；分析员只在 Cloud Agent 无法访问的输入（音频）上工作。
 
 ## 写入范围（机器隔离，不靠自觉）
 
-- 每个 agent 的分支必须命名为 `cursor/r<N>-<scope_id>-…`；共享机器上的音频分支为 `box/r<N>-audio-…`。
+- 每个 agent 的分支必须命名为 `cursor/r<N>-<scope_id>-…`；共享机器上的音频分支为 `box/r<N>-audio-…`；fyp 自己的声明与文档 PR 用 `chore/…`（不做 scope 检查，但 CI 照样要绿）。其他前缀不用。
 - `rounds/ROUND-N.yaml: write_scopes.<scope_id>` 列出该 scope 允许改动的 glob；CI 的 `scope-check` 对比 PR 的改动文件，越界即红。
-- `impl`、`tests`、各 `comparison_id`、`review` 的 write_scopes **两两不相交**；方法审在阶段 1 检查这一点。
+- `impl_a` 与 `impl_b` 共用同一 scope（二选一，只合一个）；其余 scope——`tests`、各 `comparison_id`、`review`、三个 `mr_*`——**两两不相交**；`mr_stats` 在阶段 1 检查这一点。方法审 agent 每个只准写一个文件 `review/ROUND-N/method/<mandate>.md`。
 - 没有任何 scope 包含 `.cursor/`、`.github/`、`fixtures/schema.sqlite`、`fixtures/manifest.schema.json`、`data/`、`rounds/`。这些只由 Tom 改，或由 fyp 在阶段 0/5 经 PR 改 `rounds/`。
 
 ## 合并闸门（fyp 不读 diff，不读 PR 正文）
@@ -47,7 +50,7 @@ v2 改了什么、为什么：ROUND-3 暴露了三个 v1 结构性缺口。（1�
 ## 派单与消息
 
 - 派单 **1:1**，只发路径 + 阶段号。群「CantoAI 研究」每轮 ≤ 3 条里程碑。
-- 每轮 bot 间消息上限 **12**。v2 把阶段 3（非音频）和阶段 4 搬到了 Cloud Agent，所以正常一轮的 bot 消息应当只剩：阶段 1 派单与回稿（2）、里程碑（≤3）。
+- 每轮 bot 间消息上限 **12**。v2 把阶段 1、3（非音频）、4 都搬到了 Cloud Agent，所以正常一轮的 bot 消息应当只剩里程碑（≤3）。
 - `CloudAgent.launch` 完成后会唤醒 fyp（ROUND-1、ROUND-2 已各验证一次）。90 分钟没有唤醒也没有 PR，视为该 launch 失败，按预算重启一次。不建轮询例程。
 - 每次醒来先查仓库根目录 `STOP`。
 
@@ -59,11 +62,16 @@ v2 改了什么、为什么：ROUND-3 暴露了三个 v1 结构性缺口。（1�
 
 ## launch prompt 模板（fyp 只填空，不改句子）
 
-每个模板的第一行都是分支名要求，最后一行都是退出条件。`<…>` 为填空。
+每个模板的第一行都是分支名要求，最后一行都是退出条件。`<…>` 为填空。launch 工具（`CloudAgent`，action=launch）没有分支名参数，分支靠 prompt 第一句约束；有 `starting_ref`（出发 commit）、`title`（写 scope id）、`model` / `model_params`（默认不传）；同一回合可连续调用多次以并发启动。PR 由 agent 自己在结束时打开。
 
-**impl**
+**method review**（三个 mandate 各一份，`<mandate>` 取 falsify / tools / stats）
 ```
-Branch name must begin with cursor/r<N>-impl-. Read rounds/ROUND-<N>.md, rounds/ROUND-<N>.yaml, frame.yaml and .cursor/rules/analysis-contract.mdc. Implement the analysis for every comparison_id declared in rounds/ROUND-<N>.yaml. Write only under src/, sql/, and frame.yaml. Do not write tests. Do not run the analysis on data/; run only the fixtures. Open a PR whose body is exactly the output of: python scripts/contract_check.py --repo-root . --schema-sqlite fixtures/schema.sqlite --checks-file checks.json --frame-file frame.yaml --round-yaml rounds/ROUND-<N>.yaml
+Branch name must begin with cursor/r<N>-mr_<mandate>-. Read rounds/ROUND-<N>.md, rounds/ROUND-<N>.yaml, frame.yaml, LAYOUT.md and .cursor/rules/analysis-contract.mdc. Do not read src/ or tests/. Review the round from one angle only, <mandate>: falsify = are the predictions frozen, does each hypothesis name a data pattern that would refute it, is every threshold justified; tools = is each tool applicable to this corpus, is every known failure mode written as a predicate, do measurement spans match; stats = unit, clustering, baseline, m, min_judgeable, and where each group definition comes from. Write exactly one file, review/ROUND-<N>/method/<mandate>.md, and nothing else. Verdict is PASS or RETURN; under RETURN list conditions each of which is a path plus a command, or a file key that must equal a value. Never write "not supported". Open a PR whose body is exactly the verdict line.
+```
+
+**impl**（`impl_a` 与 `impl_b` 各发一次，只有分支前缀不同）
+```
+Branch name must begin with cursor/r<N>-impl_<a|b>-. Read rounds/ROUND-<N>.md, rounds/ROUND-<N>.yaml, frame.yaml and .cursor/rules/analysis-contract.mdc. Implement the analysis for every comparison_id declared in rounds/ROUND-<N>.yaml. Write only under src/, sql/, and frame.yaml. Do not write tests. Do not run the analysis on data/; run only the fixtures. Open a PR whose body is exactly the output of: python scripts/contract_check.py --repo-root . --schema-sqlite fixtures/schema.sqlite --checks-file checks.json --frame-file frame.yaml --round-yaml rounds/ROUND-<N>.yaml
 ```
 
 **tests**
@@ -73,12 +81,12 @@ Branch name must begin with cursor/r<N>-tests-. Read rounds/ROUND-<N>.md, rounds
 
 **comparison**（每个 comparison_id 一个）
 ```
-Branch name must begin with cursor/r<N>-<comparison_id>-. Start from commit <sha>: run git rev-parse HEAD and check out <sha> if it differs. Run the analysis for comparison_id <comparison_id> only, with --corpus-path data/corpus_v2.sqlite and --out-dir ROUND-<N>/<comparison_id>/. Write only under ROUND-<N>/<comparison_id>/. Do not modify src/, sql/, frame.yaml or tests/. If the code cannot run, write BLOCKED in the PR body and stop; do not patch the code. Open a PR whose body is exactly the contents of ROUND-<N>/<comparison_id>/STATUS.json
+Branch name must begin with cursor/r<N>-<comparison_id>-. Run the analysis for comparison_id <comparison_id> only, with --corpus-path data/corpus_v2.sqlite and --out-dir ROUND-<N>/<comparison_id>/. Write only under ROUND-<N>/<comparison_id>/. Do not modify src/, sql/, frame.yaml or tests/. If the code cannot run, write BLOCKED in the PR body and stop; do not patch the code. Write only the five files LAYOUT.md allows under that directory. Open a PR whose body is exactly the contents of ROUND-<N>/<comparison_id>/STATUS.json
 ```
 
 **review**
 ```
-Branch name must begin with cursor/r<N>-review-. Start from commit <sha>. Recompute every number in ROUND-<N>/*/metrics/*.json from data/corpus_v2.sqlite with your own minimal SQL or pandas. You may not import anything under src/. Write only under review/ROUND-<N>/. For each number write: the value you got, the value in metrics, and the command that reproduces yours. Verdict is either PASS or RETURN with one verifiable pass condition per item (path plus command, or file key equals value). Never write "not supported". Open a PR whose body is exactly the verdict line.
+Branch name must begin with cursor/r<N>-review-. Recompute every number in ROUND-<N>/*/metrics/*.json from data/corpus_v2.sqlite with your own minimal SQL or pandas. You may not import anything under src/. Write only under review/ROUND-<N>/. For each number write: the value you got, the value in metrics, and the command that reproduces yours. Verdict is either PASS or RETURN with one verifiable pass condition per item (path plus command, or file key equals value). Never write "not supported". Open a PR whose body is exactly the verdict line.
 ```
 
 ## ROUND-3 的后记（记录，不重跑）
