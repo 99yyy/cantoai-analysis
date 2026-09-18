@@ -2,15 +2,15 @@
 
 ## 元数据
 
-- 阶段：2（wave1 进行中）
+- 阶段：5（已结轮）
 - backlog 条目：ROUND-3 后记 — 删 enforce_expected / left_attach 字面量 / contract_check 四条新规则
 - 执行角色：Cloud Agent（阶段 2 盲配对 impl+tests；阶段 4 review）；**音频员本轮不跑推断**
 - 方法审打回计数：1/2
 - 复核打回计数：0/2
-- Cloud Agent launch 次数：3（wave1 impl_a+impl_b+tests；预算见 yaml）
+- Cloud Agent launch 次数：4（wave1×3 + review×1；预算见 yaml）
 - 预测仓库：`https://github.com/99yyy/cantoai-analysis`
 - 预测 commit：`d50e2dac57f39677fb98367ec600ea51c6600806`（方法审通过后冻结；必须早于任何结果 commit）
-- 结果 commit：
+- 结果 commit：`8533d3ca020de84754b117612f9212dc6aaf12b6`（impl_a #27）；复核 `4e2614b6a1d60870dd487c76d0761062d7f15126`（#28）
 - 契约：`.cursor/rules/analysis-contract.mdc` 英文 v3，sha256 `461e8928597b1269be05088f3296663b896f1a5c4d264c2d7be3cf41ad5db3e5`，commit `228c78a`
 
 ## 问题（一句话，可被数据/CI 否定）
@@ -73,6 +73,15 @@
 - 仓库根 `STOP`
 - 方法审两次打回
 - 任一 scope 第二次 launch 仍失败
+
+
+## 裁决（阶段5）
+
+- **结论**：H1–H3 成立；问题答案为**是**（三检查全绿；语料 sha256 与 `frame.yaml: inputs` 一致；`enforce_expected` 已删；`pd.merge(` 一处；`left_attach` 读 joins 字面量）。
+- **合入**：tests #25 → impl_a #27（先绿）；impl_b #26 关闭；review #28 PASS。
+- **预测** `d50e2da` 早于结果 `8533d3c`。
+- **审稿 advisory**：四条规则名落在 `tests/test_round4_gates.py` 而非 `contract_check` 字面量；不计入打回。
+- **下一题**：不新开轮打断 ROUND-2 听辨；backlog #12 完成。
 
 ## 争议记录
 
