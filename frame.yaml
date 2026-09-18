@@ -115,3 +115,7 @@ joins:
     keys:
       - uid
     right_key: window_id
+  video_flags:
+    expected_rows: 567
+    keys:
+      - video_id
