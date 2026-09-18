@@ -2,12 +2,12 @@
 
 ## 元数据
 
-- 阶段：1（方法审中）
+- 阶段：2（脚手架；Cloud Agent）
 - backlog 条目：审计后复算；唱段旗标结论撤回；抽样框显式声明
 - 执行角色：Cloud Agent（阶段 2 脚手架）+ 分析员（阶段 3 复算）+ 审稿员（方法审）；**音频员本轮不执行任何模型推断**
 - 方法审打回计数：2/2
 - 复核打回计数：0/2
-- Cloud Agent launch 次数：0/2
+- Cloud Agent launch 次数：1/2（本次阶段2脚手架）
 - 预测仓库：`https://github.com/99yyy/cantoai-analysis`
 - 预测 commit：`d6f1132a1fdfddffb36d6855e322580b22e9dc9c`（含冻结后的预测三不等式；必须早于任何结果 commit）
 - 预测 commit 核验路径（clone 内已含对象，无需 fetch）：`/workspace/repos/cantoai-analysis` 与 `/tmp/cantoai-analysis-push`；命令：`git -C /workspace/repos/cantoai-analysis rev-parse --verify d6f1132a1fdfddffb36d6855e322580b22e9dc9c^{commit}`
@@ -119,3 +119,4 @@ python -m src.round3 \
 - 2026-09-18 阶段1复审 **改**（2/2）：仅硬条件5——审稿员旧 clone 无 `d6f1132` 对象；已刷新 `/tmp/cantoai-analysis-push` 与 `/workspace/repos/cantoai-analysis`（GitHub main 已含该对象）。
 
 -
+- 2026-09-18 阶段1终审 **通过**：硬条件5 rev-parse 在 `/workspace/repos/cantoai-analysis` 与 `/tmp/cantoai-analysis-push` 均为 0；可进阶段2。
