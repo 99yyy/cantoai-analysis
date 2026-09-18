@@ -1,0 +1,24 @@
+# ROUND-4: close expected_rows bypasses; pin corpus sha256.
+# No comparison wave — ROUND-3 metrics retained (see LOOP.md postscript).
+round: 4
+
+baseline_model: none
+baseline_predicate: "1=1"
+
+comparisons: []
+
+write_scopes:
+  impl: ["src/*", "src/**", "sql/*", "frame.yaml"]
+  tests: ["tests/*", "tests/**"]
+  review: ["review/ROUND-4/*", "review/ROUND-4/**"]
+
+waves:
+  - name: wave1
+    scopes: [impl, tests]
+    start_commit: null
+  - name: review
+    scopes: [review]
+    start_commit: null
+
+max_concurrent: 6
+launch_budget: 5
