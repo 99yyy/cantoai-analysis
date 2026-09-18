@@ -121,3 +121,7 @@ python -m src.round3 \
 -
 - 2026-09-18 阶段1终审 **通过**：硬条件5 rev-parse 在 `/workspace/repos/cantoai-analysis` 与 `/tmp/cantoai-analysis-push` 均为 0；可进阶段2。
 - 2026-09-18 阶段2脚手架合入 main（PR #10，merge 含 `2929cec`）：无统计数字；预测 commit 仍为 `d6f1132`。
+
+## 验证记录
+
+- GitHub 例程是否触发：**是**（pr-merged PR #10，https://github.com/99yyy/cantoai-analysis/pull/10 ，分支 `cursor/round3-stage2-scaffold-8178`，标题 ROUND-3 stage 2: analysis-contract scaffolding (no stats)；merge `9f9928b` / scaffold `2929cec`；CST 2026-09-18 ≈14:48）
