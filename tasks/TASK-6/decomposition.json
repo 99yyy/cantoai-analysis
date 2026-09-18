@@ -1,0 +1,128 @@
+{
+  "population": "the 567 videos of this channel",
+  "standardization": "kitagawa_film_pre_mix",
+  "variables": {
+    "film_group": "videos.title markers listed in TASK-6.md; title proxy",
+    "rare_char": "syllables.char frequency < 10 on the full table, all tiers"
+  },
+  "point": {
+    "agree_pre": 0.8749748897540631,
+    "agree_post": 0.7844815208339316,
+    "agree_film_pre": 0.8212465699725597,
+    "agree_film_post": 0.7582865884752678,
+    "agree_other_pre": 0.8841908262638262,
+    "agree_other_post": 0.8114009549318738,
+    "w_film_pre": 0.1464142568802074,
+    "w_other_pre": 0.8535857431197926,
+    "cf_post": 0.8036242544374668,
+    "unadjusted": 0.09049336892013149,
+    "residual": 0.07135063531659636,
+    "explained": 0.019142733603535134,
+    "did": -0.009829889834660377
+  },
+  "residual_pp": 7.135063531659636,
+  "explained_pp": 1.9142733603535134,
+  "unadjusted_pp": 9.049336892013148,
+  "did_pp": -0.9829889834660377,
+  "baseline_gap_pp": 9.049336892013148,
+  "group_gap_minus_baseline_pp": -1.914273360353512,
+  "agree_pre": 0.8749748897540631,
+  "agree_post": 0.7844815208339316,
+  "agree_film_pre": 0.8212465699725597,
+  "agree_film_post": 0.7582865884752678,
+  "agree_other_pre": 0.8841908262638262,
+  "agree_other_post": 0.8114009549318738,
+  "B": 2000,
+  "master_seed": 20250918,
+  "seeds": {
+    "film_pre": 1446693614,
+    "film_post": 2517840136,
+    "other_pre": 249415519,
+    "other_post": 4025277676
+  },
+  "G_h": {
+    "film_pre": 59,
+    "film_post": 60,
+    "other_pre": 332,
+    "other_post": 116
+  },
+  "N_h": {
+    "film_pre": 59,
+    "film_post": 60,
+    "other_pre": 332,
+    "other_post": 116
+  },
+  "n_h_judgeable": {
+    "film_pre": 15306,
+    "film_post": 17649,
+    "other_pre": 89233,
+    "other_post": 17174
+  },
+  "w_h": {
+    "film_pre": 0.0038546975042467006,
+    "film_post": 0.003399626041135475,
+    "other_pre": 0.0037205966402564074,
+    "other_post": 0.006754396180272505
+  },
+  "ci_unreliable": {
+    "film_pre": 0,
+    "film_post": 0,
+    "other_pre": 0,
+    "other_post": 0
+  },
+  "ci_unreliable_any": 0,
+  "conclusion": "estimated",
+  "residual_ci95_pp": [
+    4.599775684971339,
+    9.624337988832634
+  ],
+  "p_raw": 0.0,
+  "p_bh": 0.0,
+  "m": 1,
+  "descriptive": 0,
+  "exploratory": 0,
+  "year_video_counts": [
+    {
+      "year": "2021",
+      "n_videos": 9
+    },
+    {
+      "year": "2022",
+      "n_videos": 193
+    },
+    {
+      "year": "2023",
+      "n_videos": 36
+    },
+    {
+      "year": "2024",
+      "n_videos": 153
+    },
+    {
+      "year": "2025",
+      "n_videos": 138
+    },
+    {
+      "year": "2026",
+      "n_videos": 38
+    }
+  ],
+  "rare_share_pre": 0.03449855983241686,
+  "rare_share_post": 0.031870071790043544,
+  "counts_pre": {
+    "n_total": 122208,
+    "n_match": 91469,
+    "n_judgeable": 104539,
+    "n_empty_realized": 1138,
+    "n_dur_le_0": 16887,
+    "n_empty_and_zerodur": 356
+  },
+  "counts_post": {
+    "n_total": 42485,
+    "n_match": 27318,
+    "n_judgeable": 34823,
+    "n_empty_realized": 1045,
+    "n_dur_le_0": 6973,
+    "n_empty_and_zerodur": 356
+  }
+}
