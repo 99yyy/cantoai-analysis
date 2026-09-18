@@ -1,0 +1,12 @@
+# kills: checked_merge syllables_windows: row count is not 171867
+--- a/src/joins.py
++++ b/src/joins.py
+@@ -6,7 +6,7 @@ import pandas as pd
+ 
+ JOIN_SPEC = {
+     "syllables_windows": {
+-        "on": ["uid"],
++        "on": ["video_id"],
+         "expected": 171867,
+     },
+     "published_syllables_videos": {
