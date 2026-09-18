@@ -1,0 +1,217 @@
+{
+  "git_sha": "856fbd9508a4d59bdb58698240a33cf1872e25e6",
+  "inputs": {
+    "data/corpus_v2.sqlite": {
+      "sha256": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+      "tables": {
+        "videos": {
+          "rows": 567,
+          "columns": [
+            "video_id",
+            "title",
+            "upload_date",
+            "n_windows",
+            "speech_s"
+          ]
+        },
+        "windows": {
+          "rows": 4911,
+          "columns": [
+            "uid",
+            "video_id",
+            "idx",
+            "start",
+            "end",
+            "dur",
+            "start_sample",
+            "end_sample",
+            "boundary_start",
+            "boundary_end",
+            "lang",
+            "text_raw",
+            "text_norm",
+            "text_clean",
+            "flag_hai",
+            "flag_simp",
+            "flag_sing",
+            "flag_boiler",
+            "chars_per_sec",
+            "aligned",
+            "coverage",
+            "first_s",
+            "in_range",
+            "max_zero_run",
+            "tone_shift_suspect",
+            "n_syllables",
+            "tier",
+            "text_human"
+          ]
+        },
+        "syllables": {
+          "rows": 171867,
+          "columns": [
+            "syl_id",
+            "uid",
+            "video_id",
+            "pos",
+            "c0",
+            "char",
+            "start",
+            "end",
+            "dur",
+            "win_start",
+            "jp_default",
+            "jp_ctx",
+            "jp_candidates",
+            "n_cand",
+            "prev_char",
+            "next_char",
+            "ctx",
+            "tier",
+            "jp_realized",
+            "jp_match",
+            "review_prior",
+            "verification_status",
+            "verification_note"
+          ]
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "step": "load_videos",
+      "rule": "videos full table",
+      "group": "all",
+      "rows_before": 567,
+      "rows_after": 567
+    },
+    {
+      "step": "load_windows",
+      "rule": "windows full table",
+      "group": "all",
+      "rows_before": 4911,
+      "rows_after": 4911
+    },
+    {
+      "step": "load_syllables",
+      "rule": "syllables full table",
+      "group": "all",
+      "rows_before": 171867,
+      "rows_after": 171867
+    },
+    {
+      "step": "join_syllables_windows",
+      "rule": "inner uid",
+      "group": "all",
+      "rows_before": 171867,
+      "rows_after": 171867,
+      "unmatched_left": 0
+    },
+    {
+      "step": "tier_whitelist",
+      "rule": "windows.tier IN ('A','B')",
+      "group": "all",
+      "rows_before": 171867,
+      "rows_after": 164693
+    },
+    {
+      "step": "join_published_videos",
+      "rule": "inner video_id",
+      "group": "all",
+      "rows_before": 164693,
+      "rows_after": 164693,
+      "unmatched_left": 0
+    },
+    {
+      "step": "period_assign",
+      "rule": "four-digit year <=2024 vs >=2025",
+      "group": "pre",
+      "rows_before": 164693,
+      "rows_after": 122208
+    },
+    {
+      "step": "period_assign",
+      "rule": "four-digit year <=2024 vs >=2025",
+      "group": "post",
+      "rows_before": 164693,
+      "rows_after": 42485
+    },
+    {
+      "step": "period_assign",
+      "rule": "not a four-digit year",
+      "group": "unassigned_period",
+      "rows_before": 164693,
+      "rows_after": 0
+    },
+    {
+      "step": "film_assign",
+      "rule": "title-proxy markers vs none, title nonempty",
+      "group": "film",
+      "rows_before": 164693,
+      "rows_after": 40020
+    },
+    {
+      "step": "film_assign",
+      "rule": "title-proxy markers vs none, title nonempty",
+      "group": "other",
+      "rows_before": 164693,
+      "rows_after": 124673
+    },
+    {
+      "step": "film_assign",
+      "rule": "title-proxy markers vs none, title nonempty",
+      "group": "unassigned_film",
+      "rows_before": 164693,
+      "rows_after": 0
+    }
+  ],
+  "agreement_counts": {
+    "pre": {
+      "n_total": 122208,
+      "n_match": 91469,
+      "n_judgeable": 104539,
+      "n_empty_realized": 1138,
+      "n_dur_le_0": 16887,
+      "n_empty_and_zerodur": 356
+    },
+    "post": {
+      "n_total": 42485,
+      "n_match": 27318,
+      "n_judgeable": 34823,
+      "n_empty_realized": 1045,
+      "n_dur_le_0": 6973,
+      "n_empty_and_zerodur": 356
+    }
+  },
+  "stratum_sizes": {
+    "film_pre": {
+      "N_h": 59,
+      "G_h": 59,
+      "n_h_judgeable": 15306,
+      "n_h_match": 12570,
+      "n_h_videos_with_judgeable": 59
+    },
+    "film_post": {
+      "N_h": 60,
+      "G_h": 60,
+      "n_h_judgeable": 17649,
+      "n_h_match": 13383,
+      "n_h_videos_with_judgeable": 60
+    },
+    "other_pre": {
+      "N_h": 332,
+      "G_h": 332,
+      "n_h_judgeable": 89233,
+      "n_h_match": 78899,
+      "n_h_videos_with_judgeable": 330
+    },
+    "other_post": {
+      "N_h": 116,
+      "G_h": 116,
+      "n_h_judgeable": 17174,
+      "n_h_match": 13935,
+      "n_h_videos_with_judgeable": 116
+    }
+  }
+}
