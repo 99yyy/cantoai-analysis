@@ -1,0 +1,38 @@
+[
+  {
+    "uid": "vAA_000",
+    "keep": true
+  },
+  {
+    "uid": "vAA_001",
+    "keep": true
+  },
+  {
+    "uid": "vDD_000",
+    "keep": true
+  },
+  {
+    "uid": "vBB_000",
+    "keep": true
+  },
+  {
+    "uid": "vBB_001",
+    "keep": true
+  },
+  {
+    "uid": "vCC_000",
+    "keep": true
+  },
+  {
+    "uid": "vCC_001",
+    "keep": true
+  },
+  {
+    "uid": "dropped_001",
+    "keep": false
+  },
+  {
+    "uid": "dropped_002",
+    "keep": false
+  }
+]

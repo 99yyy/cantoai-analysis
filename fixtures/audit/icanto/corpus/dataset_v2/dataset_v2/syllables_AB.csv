@@ -1,0 +1,8 @@
+syl_id,uid,video_id,pos,char,start,end,dur,tier,jp_default,jp_ctx,jp_realized,jp_match
+s1,vAA_000,vAA,0,你,-0.99,0.2,1.2,A,nei5,nei5,nei5,exact_default
+s2,vAA_000,vAA,1,你,0.2,0.2,0.0,A,nei5,nei5,,none
+s3,vAA_001,vAA,0,你,9.1,9.4,0.3000000000000007,A,nei5,nei5,nei5,exact_default
+s4,vAA_001,vAA,1,你,9.4,9.7,0.29999999999999893,A,nei5,nei5,nei5,exact_default
+s5,vDD_000,vDD,0,你,0.1,0.4,0.30000000000000004,A,nei5,nei5,nei5,exact_default
+s6,vBB_000,vBB,0,你,0.1,0.4,0.30000000000000004,B,nei5,nei5,nei5,exact_default
+s7,vBB_001,vBB,0,你,6.1,6.4,0.3000000000000007,B,nei5,nei5,nei5,exact_default
