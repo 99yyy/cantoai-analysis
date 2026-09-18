@@ -1,0 +1,59 @@
+---
+description: Mandatory contract for data-analysis scripts in this repository
+alwaysApply: true
+---
+
+This file overrides any task brief. A pull request violating any clause is not merged.
+
+If a clause cannot be satisfied, stop and write `BLOCKED: <one line>` in the pull-request body. Do not relax a threshold, edit an assertion, or special-case an input in order to get a green result.
+
+This repository currently has no CI. Every clause below is therefore enforced by the reviewer reading the diff and by the evidence the pull-request body is required to show. When a rule is later implemented as an automated check, that check may be extended but never weakened or deleted.
+
+Do not modify `.cursor/`. Do not modify an assertion that already exists, except in the pull request that changes the code it guards; list each such pair in the body.
+
+This contract names files a task may need to create: `frame.yaml`, `sql/`, `src/`, `tests/`, `manifest.json`, `checks.json`, `STATUS.json`. Create only the ones your task actually needs. The absence of a file named here is not a reason to write `BLOCKED`, and is not a licence to build the rest of them.
+
+# 1. The input is pinned
+
+1. The only dataset is `data/corpus_v2.sqlite`. Before reading it, compute its sha256 and compare it against the value recorded in `README.md`; on mismatch exit non-zero and print both values. A run that has not made this comparison may not report a number. Do not modify the database and do not add a second copy of it.
+
+# 2. Checks must be able to fail
+
+2. Every check a run performs appends one row to `checks.json` beside the output: `{name, status, expected, expected_source, observed, missing}`, with `status` in `PASS|FAIL|SKIP`. `expected_source` is `<path>:<key>` naming a file this run does not write. A check whose expected value and observed value both come from files written by the same run is not a check.
+3. A check that cannot locate the input it claims to read — a script, a SQL file, a column, a table — reports SKIP and names the missing thing in `missing`. Never substitute a built-in default, a reimplementation of the rule, or a value recovered by regex from prose. A result derived from a substitute is SKIP: neither PASS nor FAIL.
+4. Every assertion carries a message unique in the repository, and a test that trips it with `pytest.raises(<its exception type>, match=r"^<that message>")`. A `raise` of any type and `sys.exit("<message>")` count as assertions; an early `return` guarding a data invariant is forbidden and must become a `raise`. The two sets must be equal: every assertion message in `src/` appears as a `^`-anchored `match=` pattern in `tests/`, and every such pattern resolves to a message in `src/`. The pull-request body shows the command that compares them and its output. The body of a `pytest.raises` calls a function imported from `src/`, unmocked, and may not itself `raise`. A constant, a self-comparison, an algebraic identity or a file-existence test is not a check: a field such as `smoke_ok` must come from comparing two independently obtained values.
+5. For each defect class whose code path exists in `src/`, `tests/mutations/` holds one patch: tier filter removed, stratum weights set to 1, join key swapped, per-stratum seed replaced by the master seed, sentinel written with status `ok`. Each patch touches only `src/`, applies cleanly, and carries a header line `# kills: <assertion message>`. A mutant is killed when the suite fails at that assertion, or when a `checks.json` row that was PASS becomes FAIL or SKIP. A surviving mutant, a patch for an absent code path, and an existing code path that no patch names are each a violation. Prose in the pull-request body is not evidence; the verdict of a code-review tool is advisory only.
+6. A bar may not move in the change that moves what it measures. A declared expected value, a tolerance, a threshold, a mutation patch and a counterexample pattern are bars. A pull request that changes a bar may not also change `src/`, `sql/` or `data/`, and its body carries one line beginning `BAR-CHANGE:` naming each bar it moves and why. Adding a bar for new code is not moving one.
+
+# 3. Missing values
+
+7. Every numeric measure column `c` has a companion `c_status` whose enum is declared at `frame.yaml: status_codes`; `unknown` and `other` are not members. `(c_status == "ok")` holds exactly when `c` is non-NULL. A test nulls one fixture row per measure column and per raw input column named in `sql/*.sql` — enumerated from those files, never from a hand-picked list — and asserts that every derived value in that row is NULL with `_status` not `ok`. A sentinel number (0, -1, 999, 9999) standing in for a missing value, or any value alongside `c_status == "ok"` that was not computed from data, is a violation. `fillna`, `mask`, `where`, `nan_to_num`, `replace`, `COALESCE`, `errors="coerce"`, `or 0` and `.get(col, default)` are forbidden on a measure column.
+8. Any truncation, downsampling or analysis window occupies an output column (`t0_s`, `t1_s`). Two measurements may share a row or a comparison only when their `(t0_s, t1_s)` are identical for the same `video_id`.
+
+# 4. Population, joins, provenance
+
+9. Every run writes `manifest.json` containing: per input a sha256, a row count and a column set; `N_h`, `n_h_sampled`, `n_h_judgeable` and the weight used, per stratum; the master seed, every derived per-stratum seed, and `B`; the git sha and whether the tree was dirty. It also carries `row_accounting`: one entry per row-count change, as `{step, rule, group, rows_before, rows_after}`. A printed number is not a record, and paths alone are not a manifest.
+10. `frame.yaml` declares the sampling frame as one filter predicate per line, including the tier whitelist, plus `expected_rows`, `expected_rows_tol` and `expected_rows_source`. `expected_rows_source` names a `sql/*.sql` file that counts a table of the pinned corpus; it may not read the output of any script here, and `expected_rows_tol` may not exceed 2% of `expected_rows`. On load, assert that the actual count falls inside the interval; on mismatch exit non-zero and print both numbers. The set of rows that happen to join is not a population.
+11. Every DataFrame join goes through one helper, `checked_merge(left, right, join_name)`. `pd.merge(`, `.merge(` or `.join(` on a DataFrame or Series outside that helper is a violation, as is a SQL `JOIN` in a `sql/*.sql` file not listed at `frame.yaml: joins.<join_name>.sql`. The expected row count is a literal at `frame.yaml: joins.<join_name>.expected_rows` — an expected operand that references a runtime variable is a violation — and unmatched rows are counted into `row_accounting` under that `join_name`.
+12. Stratified sampling persists `N_h`. Population-level rates use `w_h = N_h / n_h_judgeable`. Never take an unweighted mean across strata.
+13. `frame.yaml: groups.treatment` and `groups.control` are each an explicit predicate. A group defined as the complement of another is a violation. Rows matching neither are counted as `unassigned` in the manifest; a row matching both raises. Inclusion and exclusion rules apply identically to both groups, and rows dropped per rule per group appear in `row_accounting`.
+14. A writer that would emit a duplicate column or key raises, and a flattened key uses a separator that cannot occur inside a key segment.
+
+# 5. Statistics
+
+15. Report the difference between the group gap and the baseline gap, never the raw group gap. The baseline column is named in the task's declaration. Every reported difference lists each group's own value and its baseline value, so that a reader can recompute it. This governs any row carrying a p-value or an interval; a purely descriptive row carries `descriptive=1` and no inferential statistic.
+16. Bootstrap by resampling whole `video_id` clusters, with `B >= 1000`. The seed for stratum `h` is `int(sha256(f"{master_seed}:{h}").hexdigest()[:8], 16)`; the manifest's per-stratum seeds are pairwise distinct and match that construction. Report `G_h`, the number of videos per stratum, and emit `ci_unreliable=1` where `G_h < 10` — a convention of this project, not a theorem. A row with `ci_unreliable=1`, or with `n_h_judgeable` below the declared minimum, carries `conclusion=inconclusive` and its actual judgeable count. The phrase "not supported" is forbidden.
+17. Comparisons are declared as a list of ids before the run, in the task's declaration file, in a commit that precedes the first result commit. Every output row carries its `comparison_id`; `m` equals the number declared, and exactly one row exists per id. Report raw and BH-corrected p-values together with `m`. A row marked `exploratory=1` carries no p-value and may not be cited in a README or a pull-request body.
+18. A stratifying column must come from an input this run does not write, and must not appear as a dependent variable in any declared comparison.
+
+# 6. Executability
+
+19. All SQL lives in `sql/*.sql` and is loaded only through `load_sql(name)`. Run `EXPLAIN` on each file against `data/corpus_v2.sqlite`; a parse error, or a `sql/` file that neither a `load_sql` call nor a `frame.yaml` key references, is a violation. In `src/`, outside the module that defines `load_sql`, a string literal containing both `SELECT` and `FROM` as whole uppercase words is a violation.
+20. Path-bearing arguments and variables carry the suffix `_PATH`, `_DIR`, `_FILE` or `_ROOT` and have no default. `environ.get(` or `getenv(` with a second argument, `environ.get(...) or`, an argparse `default=` for such a name, and a string literal in `src/` beginning with `/` other than `/dev/null` are each a violation. A script that writes more than one output, or that runs for over 60 seconds, writes to a temporary name and renames, and writes `STATUS.json` as `running` before the work and as `complete` with the output sha256 only after the rename. Whatever reads that output refuses it unless `STATUS.json` is `complete` and the sha256 matches.
+
+# 7. Fixed facts about this corpus
+
+21. The published set is tier A+B. Any statistic about it filters on tier explicitly and records the rows removed in `row_accounting`. Every recording comes from a single YouTube channel, so clustering stops at `video_id`, and the population is stated as "the 567 videos of this channel" — never as "Cantonese".
+22. Agreement is `n_match / n_judgeable`, where `n_match` counts syllables whose `jp_match` is `exact_default` or `exact_alt`, and `n_judgeable = n_total - n_empty_realized - n_dur_le_0`. All four counts appear in the output. A NULL `jp_match` on a judgeable row raises.
+23. Syllable onsets are reliable; syllable durations are not. 14.4% of syllables have `dur <= 0` — a known property of the forced aligner, not a defect to repair. A filter on `dur > 0` silently removes 14.5% of the published set, so no sampling frame and no denominator may use it without declaring the removed count under clause 9.
+24. `review_prior` is partly determined by `jp_match`: every `exact_alt` is `dict_default`, and every `exact_default` and every `none` is `low`. It may not stratify, filter or weight any statistic computed from `jp_match`.
