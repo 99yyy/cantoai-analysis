@@ -2,7 +2,7 @@
 
 ## 元数据
 
-- 阶段：4（复核；审稿员）
+- 阶段：5（已结轮）
 - backlog 条目：审计后复算；唱段旗标结论撤回；抽样框显式声明
 - 执行角色：Cloud Agent（阶段 2 脚手架）+ 分析员（阶段 3 复算）+ 审稿员（方法审）；**音频员本轮不执行任何模型推断**
 - 方法审打回计数：2/2
@@ -126,3 +126,4 @@ python -m src.round3 \
 
 - GitHub 例程是否触发：**是**（pr-merged PR #10，https://github.com/99yyy/cantoai-analysis/pull/10 ，分支 `cursor/round3-stage2-scaffold-8178`，标题 ROUND-3 stage 2: analysis-contract scaffolding (no stats)；merge `9f9928b` / scaffold `2929cec`；CST 2026-09-18 ≈14:48）
 - 2026-09-18 阶段3完成：c1 rejects_H1（did≈−0.004 p_bh≈0.857）；c2 rejects_H2（did≈−0.065，未达 −0.15）；c3 supports_H3（delta_pp≈+0.05）；结果 commit `7fe0ccf`。进阶段4复核。
+- 2026-09-18 阶段4复核 **通过**（`review/ROUND-3/result.md`）；阶段5裁决结轮。
