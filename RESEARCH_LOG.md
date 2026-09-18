@@ -79,7 +79,7 @@ ROUND-3 三个 metrics 与审稿重算一致，**结论保留**。过程缺陷�
 
 - **问题**：删 `enforce_expected`、强制 `left_attach` 从 `frame.yaml: joins` 取字面量、钉死语料 sha256 后，三检查是否全绿且与 inputs 一致？
 - **预测冻结**：`d50e2da`；结果：`8533d3c`（impl_a #27）；复核：`4e2614b`（#28 PASS）。
-- **结果**：H1/H2/H3 均成立；`enforce_expected` 已无；`pd.merge(`=1；sha256=`2bd618ba…` 与 frame 一致；joins 字面量与语料计数一致（4439/567）。
+- **结果（2026-09-18 更正）**：旁路已堵——H1/H2 成立（`enforce_expected` 已无；`pd.merge(`=1；joins 字面量路径属实）。**H3 sha256「钉死」不成立**：`contract_check` 不读 `data/corpus_v2.sqlite`（`grep -c corpus scripts/contract_check.py` → 0）；frame 里有 hash 但无检查校验。审稿 recompute 手工对过一次≠契约强制。已入 backlog，ROUND-5 拆 `expected/` 同义反复并对真语料。
 - **过程**：方法审打回 1/2（预测基线误写）后复审通过；wave1 tests #25 + impl_a #27；impl_b #26 红后关闭；无 comparison 波。
 - **下一题**：ROUND-2 听辨继续；其后 backlog SenseVoice。
 
