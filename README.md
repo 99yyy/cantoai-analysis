@@ -7,7 +7,6 @@ Scripts and tables for investigating post-2025 low agreement scores.
 This is model–dictionary consistency, not human accuracy (see PIPELINE.md).
 
 ## Key files
-- `scripts/audit.py` — read-only process audit (`docs/AUDIT-SPEC.md`; how to run: `scripts/README-audit.md`)
 - `analyze_scores_by_year.py` — main reproducible analysis
 - `agreement_by_year.csv` / `agreement_by_period.csv`
 - `effect_size_period.json`
@@ -17,6 +16,9 @@ This is model–dictionary consistency, not human accuracy (see PIPELINE.md).
 - `agreement_by_month_2024plus.csv` + `.png`
 - `quality_issues.json`, `schema_summary.json`
 - plots: `agreement_by_year_AB.png`, `video_agreement_boxplot_by_year.png`, `video_agreement_hist_period.png`
+- `data/corpus_v2.sqlite` — corpus snapshot used for analysis
+- `RESEARCH_LOG.md`, `backlog.md` — research notes and agenda
+- `review/ROUND-4/audit.md` — process audit of the tool-repair work (kept on purpose)
 
 ## Data sources
 - SQLite: `/workspace/cantoai/corpus/dataset_v2/work/corpus.sqlite`
