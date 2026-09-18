@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Write-scope check for parallel Cloud Agent branches.
 
-A branch named ``cursor/r<N>-<scope_id>-...`` may only change paths matched by
+A branch named ``cursor/r<N>-<scope_id>-...`` (Cloud Agent) or ``box/r<N>-<scope_id>-...``
+(shared machine) may only change paths matched by
 ``rounds/ROUND-<N>.yaml: write_scopes.<scope_id>`` (a list of glob patterns).
 Branches that do not follow the naming pattern are not checked (exit 0), so
 human commits and the coordinator's own commits are unaffected.
@@ -21,7 +22,7 @@ from pathlib import Path
 
 import yaml
 
-BRANCH_RE = re.compile(r"^cursor/r(?P<round>\d+)-(?P<scope>[a-z0-9_]+)-")
+BRANCH_RE = re.compile(r"^(?:cursor|box)/r(?P<round>\d+)-(?P<scope>[a-z0-9_]+)-")
 
 
 def changed_files(base: str) -> list[str]:
