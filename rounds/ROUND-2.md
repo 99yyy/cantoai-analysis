@@ -2,7 +2,7 @@
 
 ## 元数据
 
-- 阶段：3（抽样完成；待 Tom 标注）
+- 阶段：3（抽样完成；Tom 部分标注进行中——标多少用多少）
 - backlog 条目：一.3 人工听辨样本 200 窗抽样与 `listening_sheet`
 - 执行角色：分析员（抽样表）+ 音频员（可选导出短音频切片路径清单）；**标注由 Tom**
 - 方法审打回计数：1/2
@@ -15,7 +15,7 @@
 - 结果 commit：`6b76d2cb1ab42957671647095a91c0017f79792a`（分析库；工作区 `decfb76`）
 - 执行 commit：
 - 合并目标 commit：
-- **Cloud Agent**：推迟已于 2026-09-18 09:10 由 Tom 解除；正在 launch
+- **Cloud Agent**：PR #7 已合入；抽样表已交付
 
 ## 问题（一句话，可被数据否定）
 
@@ -64,6 +64,19 @@
 
 抽样在 `film_flag=1` / `film_flag=0`（contemporary）内按上述 `stratum` 配额随机抽；`stratum` 列写入 sheet。
 
+
+### 部分标注与阶段4汇总（Tom 2026-09-18 定）
+
+听辨工具按 `stratum` **轮流出题**，任意时刻停下时，已标行在五层上严格均衡（例：标 25→每层 5；标 100→每层 20）；film/contemporary 约 80/20。因此**部分标注是合法分层随机子样本**，不是残缺数据。
+
+阶段4 / `--summarize-labels`（及审稿复核）必须：
+
+1. **只统计** `human_label != "unset"` 的行；其余保持 `unset`，不删除、不填补、不把 unset 当缺失插补进比率分母之外的用途。
+2. **先按层算**各层比率，再用每层原定配额权重 **40**（`n_stratum_design=40`）回推整体/对照量；**禁止**对已标行做简单未加权平均当成总体估计。
+3. 每个关键数字附 **按视频重采样** 的 bootstrap **95% CI**，并列出 **每层实际已标 n**。
+4. 报告必须写清：以当前已标 n，区间是否窄到能回答本轮问题（尤其「老电影/低分里唱段到底占多少」）；若不够，**直接给出还需要大约多少条**，**不要硬下结论**，也**不要暂停等待** Tom 继续标。
+5. `annotator_note` 中含标记 **`saw_meta`** 的行：单独统计数量与占比；若占比偏高，在报告里提醒可能存在锚定效应（标标注时看过机器分数）。
+
 ### 产物路径
 
 - `analysis/ROUND-2/listening_sheet.csv`：列 `window_id,video_id,film_flag,clap_sing,singing_prob,var_db,stratum,human_label,annotator_note,forced_flag_sing`；初始 `human_label=unset`
@@ -71,10 +84,11 @@
 - `analysis/ROUND-2/STATUS.json`：至少含 `smoke_ok`（bool）
 - 标注后：`metrics/label_by_quadrant.json`、`metrics/single_track_gap.json`、`metrics/label_by_film.json`（键与预测段一致）
 
-通过/失败（标注完成后）：
+通过/失败（**部分标注即可裁决，不必等满 200**）：
 - H1 成立 → 双轨联合阈值可用。
 - H1 失败或 H2 成立 → 维持双轨，不得只靠单分数。
-- **审批点**：sheet 就绪（`human_label` 全 `unset`）→ **必须通知 Tom**；未标注完不裁决 H1–H3。
+- **审批点（已完成）**：sheet 就绪时已通知 Tom。
+- **交付变更（Tom 2026-09-18 定）**：Tom 标多少算多少；收到任意一批已标行即可跑阶段4汇总，**不要等满 200，也不要暂停等 Tom**。
 
 ## 数据（范围、已知失效情形）
 
@@ -134,12 +148,14 @@ python scripts/build_listening_sheet.py --summarize-labels \
 
 ## 争议记录
 
+- 2026-09-18 **部分标注交付变更**（Tom 定）：标多少用多少；五层轮流出题→已标子集合法；阶段4按层加权(设计n=40)+视频bootstrap CI+saw_meta 计数；不够则报所需增量，不等满200。
 - 2026-09-18 阶段1 **改**（1/2）：`review/ROUND-2/method.md` 硬条件 1–6；本版已钉死窗级 film_flag、全库四分位层、singing_rate 枚举、flag_sing 规则 A、CLI/冒烟。
 
 ## 停止条件
 
 - 冒烟未通过 → 不得全量抽样
-- 抽样表就绪 → **通知 Tom**（审批点）
+- 抽样表就绪 → **通知 Tom**（审批点，已做）
+- 部分标注即可汇总；**不等满 200**
 - 打回满额 → 升级 Tom
 - 本轮不做全库清洗落库
 
