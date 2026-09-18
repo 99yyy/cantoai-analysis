@@ -1,25 +1,17 @@
-# iCantonese corpus analysis outputs
+# cantoai-analysis
 
-Scripts and tables for investigating post-2025 low agreement scores.
+Workspace for analyzing the iCantonese / CantoAI pronunciation corpus.
 
-## Score definition
-`agreement` / "score" = share of syllables with `jp_match` in {exact_default, exact_alt}.
-This is model–dictionary consistency, not human accuracy (see PIPELINE.md).
+## Input
 
-## Key files
-- `analyze_scores_by_year.py` — main reproducible analysis
-- `agreement_by_year.csv` / `agreement_by_period.csv`
-- `effect_size_period.json`
-- `video_agreement_scores.csv` — per-video scores + upload dates
-- `lowest_videos_2025plus.csv` / `highest_videos_2025plus.csv`
-- `cinema_keyword_split.csv` — title-keyword proxy for archival/cinema content
-- `agreement_by_month_2024plus.csv` + `.png`
-- `quality_issues.json`, `schema_summary.json`
-- plots: `agreement_by_year_AB.png`, `video_agreement_boxplot_by_year.png`, `video_agreement_hist_period.png`
-- `data/corpus_v2.sqlite` — corpus snapshot used for analysis
-- `RESEARCH_LOG.md`, `backlog.md` — research notes and agenda
-- `review/ROUND-4/audit.md` — process audit of the tool-repair work (kept on purpose)
+The only dataset in this repository is:
 
-## Data sources
-- SQLite: `/workspace/cantoai/corpus/dataset_v2/work/corpus.sqlite`
-- Docs: `/workspace/cantoai/corpus/dataset_v2/docs/PIPELINE.md`
+- path: `data/corpus_v2.sqlite`
+- sha256: `2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f`
+- size: 59486208 bytes
+
+Tables: `videos` (567), `windows` (4911), `syllables` (171867), `runs` (1).
+
+## History
+
+All prior analysis artifacts live under tag `pre-reset-2026-09-18`.

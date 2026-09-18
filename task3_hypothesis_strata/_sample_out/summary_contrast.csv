@@ -1,8 +1,0 @@
-contrast,description,n_syllables,n_videos,agree_syl,agree_syl_ci_low,agree_syl_ci_high,agree_video_median,agree_video_median_ci_low,agree_video_median_ci_high
-film_all,Film subset (all windows),3229,4.0,0.8894394549396097,0.8737811484290358,0.9098712446351931,0.8885596664935191,0.8344827586206897,0.9205882352941176
-film_no_high_singing,Film subset (singing_prob <= 0.5),3229,4.0,0.8894394549396097,0.8737811484290358,0.9098712446351931,0.8885596664935191,0.8344827586206897,0.9205882352941176
-film_singing_removal_delta,Agreement recovery (delta) after removing singing_prob>0.5,0,,0.0,,,0.0,,
-film_dialogue_highsnr_n_ng_gw,"film dialogue highsnr n ng gw (snr_db>15, n-/ng-/gw- initials)",14,3.0,0.8571428571428571,0.6,1.0,1.0,0.6,1.0
-contemporary_highsnr_n_ng_gw,"contemporary highsnr n ng gw (snr_db>15, n-/ng-/gw- initials)",34,1.0,0.9705882352941176,0.9705882352941176,0.9705882352941176,0.9705882352941176,0.9705882352941176,0.9705882352941176
-film_overall,film overall agreement,3229,4.0,0.8894394549396097,0.8737811484290358,0.9098712446351931,0.8885596664935191,0.8344827586206897,0.9205882352941176
-contemporary_overall,contemporary overall agreement,391,1.0,0.9386189258312021,0.9386189258312021,0.9386189258312021,0.9386189258312021,0.9386189258312021,0.9386189258312021
