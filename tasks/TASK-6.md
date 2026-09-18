@@ -1,6 +1,6 @@
 # TASK-6：2025 年之后一致率下降，能被解释多少
 
-status: open
+status: closed
 
 ## 目标
 
