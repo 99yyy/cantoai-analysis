@@ -11,8 +11,8 @@
 - 预测仓库：`https://github.com/99yyy/cantoai-analysis`
 - 预测 commit：`d6f1132a1fdfddffb36d6855e322580b22e9dc9c`（含冻结后的预测三不等式；必须早于任何结果 commit）
 - 预测 commit 核验路径（clone 内已含对象，无需 fetch）：`/workspace/repos/cantoai-analysis` 与 `/tmp/cantoai-analysis-push`；命令：`git -C /workspace/repos/cantoai-analysis rev-parse --verify d6f1132a1fdfddffb36d6855e322580b22e9dc9c^{commit}`
-- 结果 commit：
-- 执行 commit：
+- 结果 commit：`7fe0ccffa15d7f0cc8bdb0f9fdff04547f64bcdb`
+- 执行 commit：`7fe0ccffa15d7f0cc8bdb0f9fdff04547f64bcdb`
 - 合并目标 commit：
 - 契约：`.cursor/rules/analysis-contract.mdc` 英文 v3，20 条，sha256 `461e8928597b1269be05088f3296663b896f1a5c4d264c2d7be3cf41ad5db3e5`，commit `228c78a`。旧中文版（`7865e108…`）作废。
 
