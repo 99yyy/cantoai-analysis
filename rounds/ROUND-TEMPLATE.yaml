@@ -1,0 +1,40 @@
+# Machine-readable half of a round. Companion to ROUND-N.md.
+# Contract clauses 13 (baseline_model) and 15 (comparisons) read this file;
+# CI's scope-check reads write_scopes; fyp reads waves when launching.
+round: N
+
+baseline_model: <column name>
+baseline_predicate: "<SQL predicate>"
+
+comparisons:
+  - id: <c1_id>
+    hypothesis: H1
+    question: "<one falsifiable sentence>"
+    unit: syllable
+    cluster: video_id
+    threshold: "<inequality>"
+
+# Every scope below is disjoint from every other. Branch names are
+# cursor/r<N>-<scope_id>-... (Cloud Agent) or box/r<N>-audio-... (shared machine).
+write_scopes:
+  impl:   ["src/*", "src/**", "sql/*", "frame.yaml"]
+  tests:  ["tests/*", "tests/**"]
+  <c1_id>: ["ROUND-N/<c1_id>/*", "ROUND-N/<c1_id>/**"]
+  review: ["review/ROUND-N/*", "review/ROUND-N/**"]
+  audio:  ["ROUND-N/audio/*", "ROUND-N/audio/**"]
+
+# Wave 2 starts only after every wave-1 PR is merged; review starts only after
+# every comparison PR is merged. start_commit is filled in by fyp at launch time.
+waves:
+  - name: wave1
+    scopes: [impl, tests]
+    start_commit: null
+  - name: wave2
+    scopes: [<c1_id>]
+    start_commit: null
+  - name: review
+    scopes: [review]
+    start_commit: null
+
+max_concurrent: 6
+launch_budget: 5   # 2 + m + 1, plus 2 retries recorded separately
