@@ -12,7 +12,7 @@
 - 预测 commit：`fffad05152daaf603bef1d99f9e931831b04e0a6`（假设/预测数值门槛冻结于该 commit；本修订只改契约路径、可重算定义与抽样规则）
 - 脚本合入 commit：
 - 工作区执行 commit：`decfb76`
-- 结果 commit：
+- 结果 commit：`6b76d2cb1ab42957671647095a91c0017f79792a`（分析库；工作区 `decfb76`）
 - 执行 commit：
 - 合并目标 commit：
 - **Cloud Agent**：推迟已于 2026-09-18 09:10 由 Tom 解除；正在 launch
