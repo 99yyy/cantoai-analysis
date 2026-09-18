@@ -5,7 +5,7 @@
 - 阶段：1（方法审中）
 - backlog 条目：ROUND-3 后记 — 删 enforce_expected / left_attach 字面量 / contract_check 四条新规则
 - 执行角色：Cloud Agent（阶段 2 盲配对 impl+tests；阶段 4 review）；**音频员本轮不跑推断**
-- 方法审打回计数：0/2
+- 方法审打回计数：1/2
 - 复核打回计数：0/2
 - Cloud Agent launch 次数：0（预算见 yaml）
 - 预测仓库：`https://github.com/99yyy/cantoai-analysis`
@@ -26,7 +26,7 @@
 ## 预测（冻结于方法审通过后的规格 commit）
 
 1. 若 H1–H3：CI `contract-check` 对下列检查均为 PASS：`merge_pd_merge_once`（或等价名）、`no_boolean_gate_bypass`、`review_no_import_src`、`corpus_sha256_matches_frame`（名称以 impl 落地为准，tests 反例必须能杀死缺失实现）。
-2. 当前 main 上已知红的四条（`assertion_message_set`、`select_from_only_load_sql`、`no_measure_fillna_or_get_default`、`mutations_killed`）在 **impl 合入（且已 rebase 含 tests）后** 转绿。
+2. 上述四条（`assertion_message_set`、`select_from_only_load_sql`、`no_measure_fillna_or_get_default`、`mutations_killed`）在当前 main 上已为 `PASS`；**impl 合入（且已 rebase 含 tests）后仍为 `PASS`**（不得因删除 `enforce_expected` / 改 `left_attach` 而转红）。
 3. 本轮 **不** 重跑 ROUND-3 三个 comparison 的 metrics；ROUND-3 结论保留。
 
 ## 判据
@@ -76,6 +76,6 @@
 
 ## 争议记录
 
-（空）
+- 阶段1 方法审打回 #1（审稿员）：预测第2条误写「当前 main 四条红、impl 后转绿」；contract-green 合入后四条已为 PASS。已按硬条件改写。
 
 - 2026-09-18 进入阶段1方法审（#16/#13/#14 已合入 main）。
