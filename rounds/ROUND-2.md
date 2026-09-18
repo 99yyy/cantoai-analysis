@@ -143,6 +143,7 @@ python scripts/build_listening_sheet.py --summarize-labels \
 
 ## 验证记录
 
+- Cloud Agent launch：`bc-34f41e9c-fae5-541c-96a3-135550c48b29`（https://cursor.com/agents/bc-34f41e9c-fae5-541c-96a3-135550c48b29 ）
 - launch 完成是否自动唤醒 fyp：
 - GitHub 例程是否触发：
 
