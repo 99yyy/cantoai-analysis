@@ -1,5 +1,7 @@
 # TASK-6：2025 年之后一致率下降，能被解释多少
 
+status: open
+
 ## 目标
 
 **发布集在 2025 年及之后的一致率明显低于之前。把这个差距分解开，说清其中多少能由语料里已有的列解释，剩下多少不能。**
@@ -14,10 +16,10 @@
 
 - **发布集**：`windows.tier IN ('A','B')`。
 - **期间**：`post` 是 `substr(videos.upload_date,1,4)` 为四位数字且 `>= '2025'`；`pre` 是四位数字且 `<= '2024'`。两个谓词都不满足的视频既不进 `pre` 也不进 `post`，其数量记为 `n_unassigned_period`。不得把任何一组定义成另一组的补集（契约第 18 条）。
-- **一致率**：按契约第 24 条，`n_match / n_judgeable`，其中 `n_match` 是 `jp_match IN ('exact_default','exact_alt')` 的音节数，`n_judgeable = n_total - n_empty_realized - n_dur_le_0`。四个计数都要出现在输出里。
+- **一致率**：按契约第 24 条。一个音节**可判**当且仅当 `jp_realized` 非空且 `dur > 0`。`n_judgeable` 是可判音节数，`n_match` 是**可判音节里** `jp_match IN ('exact_default','exact_alt')` 的数量，一致率 = `n_match / n_judgeable`。分子必须和分母落在同一批行上，否则它不是一个比率。两项剔除**有交集**，所以 `n_judgeable` 不等于 `n_total` 减那两个剔除数——差的正是同时满足两项的行，单独声明为 `n_empty_and_zerodur_*`。
 - **旧片组**：`film` 是 `title` 非空且包含以下任一者——`粵劇` `任劍輝` `芳艷芬` `李小龍` `林鳳` `吳楚帆` `石堅` `謝賢` `新馬師曾` `白雪仙`；`other` 是 `title` 非空且一个都不包含。`title` 为空的视频两组都不进，其数量记为 `n_unassigned_film`。这是标题代理，不是内容判断，结论里要这么说。
 - **稀有字**：该字在**全库全部 tier** 出现少于 10 次。
-- **四个计数**：契约第 24 条要求每个一致率都附上 `n_total`、`n_match`、`n_empty_realized`、`n_dur_le_0`。本轮报告的每个一致率，这四个计数都写进 `manifest.json`；其中 pre 与 post 两个总表的四个计数，以及 film/other 四格的 `n_judgeable`，另外声明在下面的 `numbers` 块里由 `output-check` 钉死。
+- **计数**：契约第 24 条要求每个一致率都附上 `n_total`、`n_match`、`n_judgeable`、`n_empty_realized`、`n_dur_le_0` 与后两者的交集。本轮报告的每个一致率，这些计数都写进 `manifest.json`；其中 pre 与 post 两个总表的六个计数，以及 film/other 四格的 `n_judgeable`，另外声明在下面的 `numbers` 块里由 `output-check` 钉死。
 - **pp** 是百分点，**pm** 是千分之一。
 
 ## 要交的数字
@@ -38,6 +40,8 @@ n_empty_realized_pre       0
 n_empty_realized_post      0
 n_dur_le_0_pre             0
 n_dur_le_0_post            0
+n_empty_and_zerodur_pre    0
+n_empty_and_zerodur_post   0
 n_judgeable_pre            0
 n_judgeable_post           0
 n_judgeable_film_pre       0
@@ -67,14 +71,54 @@ rate_none_post_pm          0.5
 
 各自的算法：
 
-- `gap_contract_pp` 是 `agreement(pre) - agreement(post)`，用契约第 24 条的分母。
-- `gap_all_pp`、`gap_excl_none_pp`、`gap_excl_zerodur_pp` 是同一个差，分母分别换成：全部 A+B 音节；只排除 `jp_match='none'`；只排除 `dur<=0`。三者只用于稳健性对照。
-- `agree_*` 四个是 film/other × pre/post 的四格一致率，契约分母。
+- `n_match_*` 是**可判集内**的匹配数，不是该期全部匹配数。
+- `n_empty_and_zerodur_*` 是 `jp_realized` 为空**且** `dur<=0` 的音节数。恒等式 `n_judgeable = n_total - n_empty_realized - n_dur_le_0 + n_empty_and_zerodur` 必须成立；两条算路里有一条把 `n_judgeable_*` 写成这个 `derived:` 式子最好，另一条直接数集合，这样恒等式本身也被验了一遍。
+- `gap_contract_pp` 是 `agreement(pre) - agreement(post)`，用契约第 24 条的可判集。
+- `gap_all_pp`、`gap_excl_none_pp`、`gap_excl_zerodur_pp` 是同一个差换三种口径。**每一种的分子都要跟着分母一起换**：全部 A+B 音节 / 全部匹配；只剔除 `jp_realized` 为空的行（即 `jp_match='none'`）/ 剩下的行里的匹配；只剔除 `dur<=0` 的行 / 剩下的行里的匹配。三者只用于稳健性对照。
+- `agree_*` 四个是 film/other × pre/post 的四格一致率，分子分母都在可判集内。
 - `did_film_pp = (agree_film_pre - agree_film_post) - (agree_other_pre - agree_other_post)`。
 - `rare_share_*` 是稀有字音节占该期 A+B 音节的比例。
 - `rate_<verdict>_<period>_pm` 是该期 A+B 中该 `jp_match` 取值的千分比，分母是该期 A+B 全部音节。
 - `n_unassigned_period` 与 `n_unassigned_film` 是两个分组谓词都没匹配上的视频数。今天应当都是 0；容差是 0，所以将来语料一变就会红。
 - `n_dur_le_0_*` 同时是 `gap_excl_zerodur_pp` 那一版被剔除的行数（契约第 25 条要求声明）。
+
+## 怎么交这 39 个数字
+
+两个 agent 交的是**同一种文件**，形状一样，都不含任何判定字段：
+
+```
+worker    tasks/TASK-6/results.json
+verifier  tasks/TASK-6/mine.json
+
+[{"name": …, "value": <数>, "n": <整数>, "query": "…"}]
+```
+
+谁都不写 `match`，也不写 `abs_diff`。比对由 `output-check` 做。
+
+`query` 是这个数字的算路，`output-check` 会**照着它把每个数字重新跑一遍**，跑出来的和你写下的不一致就红。只有两种形式：
+
+- **`tasks/TASK-6/sql/<名>.sql`**（worker）或 **`tasks/TASK-6/mine_sql/<名>.sql`**（verifier）：一个文件一条语句，`SELECT` 或 `WITH` 开头，返回**恰好一行一列**，那一格就是这个数字。
+- **`derived:<表达式>`**：只能用这 39 个名字里的其他名字、数字、`+ - * /` 和括号。例如
+  `derived:100 * (n_match_pre / n_judgeable_pre - n_match_post / n_judgeable_post)`。
+  重放时代进去的是**重放出来的**输入值，不是你写下的值——所以把输入写错、再把推导写成与错输入自洽，两行都会红。
+
+两条约束：一个 `.sql` 文件只能支撑一个数字；worker 与 verifier 不得指向同一个 `.sql` 文件，所以两个目录分开。`derived:` 两边写成一样没问题，它的每个输入都各自被重放过。
+
+39 个数字每一个都必须落进这两种形式之一。这确实限制了写法，换来的是从此没有一个数字只是「写在那里」。开工前先定下哪些走 SQL、哪些走 `derived:`。
+
+## `n` 是什么
+
+`n` 是这个数字**算在多少行语料上**。两条算路必须给出完全相同的 `n`，所以这里把它钉死：
+
+| 数字 | `n` |
+|---|---|
+| `n_videos_*`、`n_unassigned_period`、`n_unassigned_film` | 567（`videos` 全表） |
+| `n_total_*`、`n_match_*`、`n_empty_realized_*`、`n_dur_le_0_*`、`n_empty_and_zerodur_*`、`n_judgeable_*`、`n_judgeable_film_*`、`n_judgeable_other_*` | 该期 A+B 音节数，即 `n_total_pre` 或 `n_total_post` |
+| `rare_share_*`、`rate_*_pm` | 同上 |
+| `agree_film_*`、`agree_other_*` | 对应那一格的 `n_judgeable_film_*` / `n_judgeable_other_*` |
+| `gap_contract_pp` | `n_judgeable_pre + n_judgeable_post` |
+| `gap_all_pp`、`gap_excl_none_pp`、`gap_excl_zerodur_pp` | `n_total_pre + n_total_post` |
+| `did_film_pp` | 四格 `n_judgeable`（film/other × pre/post）之和 |
 
 ## 还要交的东西（这部分不进 numbers 块）
 
@@ -96,9 +140,11 @@ rate_none_post_pm          0.5
 
 ## 分工
 
-- `worker`，分支 `cursor/t6-worker-…`：写 `src/`、`sql/`、`tests/`，交 `tasks/TASK-6/results.json` 与上面那部分开放分析。
-- `verifier`，分支 `cursor/t6-verifier-…`：**不读 worker 的代码**，只读本文件和语料，用自己的 SQL 把这 37 个数字重算一遍，交 `tasks/TASK-6/verify.json`。
-- 有 `match:false` 就把不匹配的行发回 worker，最多两次；仍不匹配就停，两套数字一起升级给 Tom。
-- 两个都合入后放 `auditor`，写 `review/TASK-6/audit.md`。
+`worker` 与 `verifier` **同时启动，从同一个 `starting_ref`**。不是一个做完另一个再做：`output-check` 会检查引入你那个文件的 commit，它的树里不能有对方的文件，所以谁在对方合入之后才切分支，谁就红。
 
-两个 agent 都不能改本文件——`tasks/` 在 `scope-check` 的拒绝清单里。
+- `worker`，分支 `cursor/t6-worker-…`：写 `tasks/TASK-6/sql/`、`src/`、`tests/`，交 `tasks/TASK-6/results.json` 与上面那部分开放分析。
+- `verifier`，分支 `cursor/t6-verifier-…`：**不读 worker 的代码、对话、PR**，只读本文件和语料，用自己的 SQL 把这 39 个数字重算一遍，写 `tasks/TASK-6/mine_sql/`，交 `tasks/TASK-6/mine.json`。
+- 不一致的行发回去重算。同一个输出文件最多被改三次——第一次加两次重试，`output-check` 数 commit。仍不一致就停，两套数字一起升级给 Tom。
+- 两个都合入、`output-check` 报出 39 个全一致之后，把本文件的 `status:` 改成 `closed`。改不动就说明还没齐，那是检查在告诉你事实。然后放 `auditor`，写 `review/TASK-6/audit.md`。
+
+两个 agent 都不能改本文件，但**必须**能写 `tasks/TASK-6/` 下面自己的产出。
