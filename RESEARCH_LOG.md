@@ -65,3 +65,12 @@
 ### 矛盾
 
 - 与旧 REPORT「期间 film 低分稳健 / SNR 不能解释的声母残差 ≥15pp / 唱段可忽略」叙事部分冲突：在显式抽样框 + pre-2025 DID 下，**期间组间差与高SNR onset 残差两条均未过本轮阈值**；唱段剔除影响仍小。记入矛盾，不自动停回路。ROUND-2 人工听辨与后续转写一致字分析仍必要。
+
+## 2026-09-18 ROUND-3 过程缺陷（不重跑）
+
+ROUND-3 三个 metrics 与审稿重算一致，**结论保留**。过程缺陷两条，记入而不重开 ROUND-3：
+
+1. **阶段 3 直推 main、无 CI**：分析员在共享机器上直接推送结果 commit（`7fe0ccf`），当时缺少强制 PR + 三检查闸门。
+2. **`src/merge.py` 同 commit 旁路**：同一结果 commit 为 `checked_merge` 增加 `enforce_expected=False`，并为 `left_attach` 提供不经 `expected_rows` 门的路径，掏空契约第 9 条。
+
+处置：LOOP v2（分支保护 + `data/corpus_v2.sqlite` + 盲配对）；**ROUND-4** 第 1 波固定删除 `enforce_expected`、强制 `left_attach` 字面量、`contract_check` 四条新规则。
