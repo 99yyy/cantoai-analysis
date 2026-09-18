@@ -2,14 +2,14 @@
 
 ## 元数据
 
-- 阶段：1（方法审通过，待合入后进阶段2）
+- 阶段：2（wave1 进行中）
 - backlog 条目：ROUND-3 后记 — 删 enforce_expected / left_attach 字面量 / contract_check 四条新规则
 - 执行角色：Cloud Agent（阶段 2 盲配对 impl+tests；阶段 4 review）；**音频员本轮不跑推断**
 - 方法审打回计数：1/2
 - 复核打回计数：0/2
-- Cloud Agent launch 次数：0（预算见 yaml）
+- Cloud Agent launch 次数：3（wave1 impl_a+impl_b+tests；预算见 yaml）
 - 预测仓库：`https://github.com/99yyy/cantoai-analysis`
-- 预测 commit：（方法审通过且规格合入后填入；必须早于任何结果 commit）
+- 预测 commit：`d50e2dac57f39677fb98367ec600ea51c6600806`（方法审通过后冻结；必须早于任何结果 commit）
 - 结果 commit：
 - 契约：`.cursor/rules/analysis-contract.mdc` 英文 v3，sha256 `461e8928597b1269be05088f3296663b896f1a5c4d264c2d7be3cf41ad5db3e5`，commit `228c78a`
 
@@ -83,3 +83,4 @@
 ## 验证记录
 
 - GitHub 例程是否触发：**是**（pr-merged PR #19，https://github.com/99yyy/cantoai-analysis/pull/19 ，分支 `chore/r4-pred2-baseline`，标题 docs(round-4): fix pred#2 baseline (PASS) + method reject 1/2；merge `8ede859`；CST 2026-09-18 ≈16:44）
+- GitHub 例程是否触发：**是**（pr-merged PR #21，https://github.com/99yyy/cantoai-analysis/pull/21 ，分支 `chore/r4-method-pass`，标题 chore(round-4): method review — 通过 (re-review after #19)；merge `d50e2da`；CST 2026-09-18 ≈16:53）
