@@ -7,22 +7,74 @@ on:
     branches: [main]
 
 jobs:
-  pytest-and-sql-explain:
+  tests:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Pytest (including falsifiable / anti-example assertions)
+      - run: pip install -r requirements.txt
+      - name: pytest
         run: pytest -q
-
-      - name: SQL EXPLAIN dry-run against fixtures/schema.sqlite
+      - name: SQL EXPLAIN dry-run over legacy scripts
         run: python scripts/sql_explain.py
+
+  contract-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Resolve current round
+        id: round
+        run: |
+          f=$(ls rounds/ROUND-[0-9]*.yaml | sort -V | tail -1)
+          echo "yaml=$f" >> "$GITHUB_OUTPUT"
+          echo "current round file: $f"
+      - name: contract_check (regenerates checks.json in the runner; the committed copy is never trusted)
+        run: |
+          python scripts/contract_check.py \
+            --repo-root . \
+            --schema-sqlite fixtures/schema.sqlite \
+            --checks-file checks.json \
+            --frame-file frame.yaml \
+            --round-yaml "${{ steps.round.outputs.yaml }}"
+      - name: Summarise
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          rows = json.load(open("checks.json"))
+          for r in rows:
+              if r["status"] != "PASS":
+                  print(r["status"], r["name"], "missing=", r.get("missing"))
+          print(f"{len(rows)} checks; FAIL={sum(r['status']=='FAIL' for r in rows)} SKIP={sum(r['status']=='SKIP' for r in rows)}")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checks-json
+          path: checks.json
+
+  scope-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install PyYAML==6.0.2
+      - name: Write scope of the agent branch
+        run: |
+          python scripts/scope_check.py \
+            --branch "${{ github.head_ref }}" \
+            --base "origin/${{ github.base_ref }}" \
+            --rounds-dir rounds
