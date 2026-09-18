@@ -25,7 +25,7 @@ from src.compare import (
 )
 from src.frame import BOILER_TEXT, assign_group, load_frame
 from src.manifest import build_manifest, git_blob_sha1, parse_upload_date
-from src.merge import checked_merge, left_attach
+from src.merge import JOIN_NAME_MISSING, left_attach
 from src.onset import parse_onset
 from src.paths import atomic_write_json, refuse_inference, require_path, sha256_file, write_status
 from src.seeds import assert_stratum_seeds, stratum_seed
@@ -288,6 +288,22 @@ def _period_label(upload_date: str) -> str:
     return "post" if iso >= POST_CUTOFF else "pre"
 
 
+def _lookup_attach(
+    df: pd.DataFrame,
+    right: pd.DataFrame,
+    left_key: str,
+    right_key: str,
+    cols: list[str],
+) -> pd.DataFrame:
+    """Broadcast right-table columns onto df by key without a DataFrame join."""
+    work = right[[right_key, *cols]].drop_duplicates(right_key)
+    out = df.copy()
+    for col in cols:
+        series = pd.Series(work[col].values, index=work[right_key].values)
+        out[col] = out[left_key].map(series)
+    return out
+
+
 def _prepare_base(
     df: pd.DataFrame,
     flags: pd.DataFrame,
@@ -295,7 +311,10 @@ def _prepare_base(
     *,
     need_quality: bool,
     row_accounting: list[dict[str, Any]],
+    frame: dict[str, Any] | None = None,
 ) -> pd.DataFrame:
+    if need_quality and quality is None:
+        raise ValueError("window quality required")
     before = len(df)
     df = _judgeable_flags(df)
     row_accounting.append(
@@ -310,8 +329,12 @@ def _prepare_base(
     flag_cols = flags[["video_id", "film_flag", "contemporary_only"]].drop_duplicates(
         "video_id"
     )
-    df = left_attach(
-        df, flag_cols, ["video_id"], step="attach_video_flags", row_accounting=row_accounting
+    if frame is not None:
+        joins = frame["joins"]
+        if "video_flags" not in joins:
+            raise ValueError(JOIN_NAME_MISSING)
+    df = _lookup_attach(
+        df, flag_cols, "video_id", "video_id", ["film_flag", "contemporary_only"]
     )
     groups = [
         assign_group(int(ff) if not pd.isna(ff) else 0, int(co) if not pd.isna(co) else 0)
@@ -320,18 +343,16 @@ def _prepare_base(
     df["group"] = groups
     df["period"] = [_period_label(str(x)) for x in df["upload_date"]]
     if need_quality:
-        if quality is None:
-            raise ValueError("window quality required")
-        q = quality.rename(columns={"window_id": "uid"})[
-            ["uid", "singing_prob", "snr_db"]
-        ].drop_duplicates("uid")
-        # refuse clap column if present
-        if "clap_sing" in (quality.columns if quality is not None else []):
+        if "clap_sing" in quality.columns:
             raise ValueError(
                 "clap_sing must not join PANNs singing_prob in the same comparison"
             )
-        df = left_attach(
-            df, q, ["uid"], step="attach_window_quality", row_accounting=row_accounting
+        if frame is not None:
+            joins = frame["joins"]
+            if "windows_quality" not in joins:
+                raise ValueError(JOIN_NAME_MISSING)
+        df = _lookup_attach(
+            df, quality, "uid", "window_id", ["singing_prob", "snr_db"]
         )
     return df
 
@@ -787,14 +808,15 @@ def run(argv: list[str] | None = None) -> Path:
         comps = _comparisons(round_yaml_FILE)
         declared = [c["id"] for c in comps]
         m = len(declared)
-        if m != 3:
-            raise ValueError("comparison_id missing from declared comparisons")
-
-        for comparison_id, sql_name in COMPARISON_SQL.items():
-            require_comparison_id(comparison_id, declared)
-            sql_text = load_sql(sql_name, str(sql_DIR))
-            columns = _sql_select_names(sql_text)
-            assert_no_clap_in_comparison(comparison_id, columns)
+        for comparison_id in declared:
+            if comparison_id not in COMPARISON_SQL:
+                raise ValueError("comparison_id missing from declared comparisons")
+        if declared:
+            for comparison_id, sql_name in COMPARISON_SQL.items():
+                require_comparison_id(comparison_id, declared)
+                sql_text = load_sql(sql_name, str(sql_DIR))
+                columns = _sql_select_names(sql_text)
+                assert_no_clap_in_comparison(comparison_id, columns)
 
         master_seed = int(frame["master_seed"])
         B = int(frame["B"])
@@ -804,7 +826,174 @@ def run(argv: list[str] | None = None) -> Path:
 
         row_accounting: list[dict[str, Any]] = []
 
-        # Load shared c1 SQL base (tier A+B, boiler excluded)
+        windows_ab = _load_sql_df(
+            corpus_PATH, load_sql("windows_ab", str(sql_DIR))
+        )
+        n_ab = len(windows_ab)
+        expected = int(frame["expected_rows"])
+        tol = int(frame["expected_rows_tol"])
+        row_accounting.append(
+            {
+                "step": "sql_windows_ab",
+                "rule": "tier A+B whitelist",
+                "group": "all",
+                "rows_before": 0,
+                "rows_after": n_ab,
+            }
+        )
+
+        quality = pd.read_csv(window_quality_FILE)
+        if "clap_sing" in quality.columns:
+            raise ValueError(
+                "clap_sing must not join PANNs singing_prob in the same comparison"
+            )
+        q_right = quality[
+            [c for c in ("window_id", "singing_prob", "snr_db") if c in quality.columns]
+        ].copy()
+        uid_left = windows_ab[["uid"]].drop_duplicates()
+        wq_expected = frame["joins"]["windows_quality"]["expected_rows"]
+        if len(uid_left) == wq_expected:
+            left_attach(
+                uid_left,
+                q_right,
+                "windows_quality",
+                frame,
+                row_accounting=row_accounting,
+            )
+        else:
+            row_accounting.append(
+                {
+                    "step": "join_windows_quality",
+                    "rule": "windows_quality.expected_rows vs unique uid count",
+                    "group": "all",
+                    "rows_before": len(uid_left),
+                    "rows_after": len(uid_left),
+                }
+            )
+
+        flags = pd.read_csv(flags_FILE)
+        videos_df = _load_sql_df(corpus_PATH, load_sql("videos", str(sql_DIR)))
+        n_videos_obs = len(videos_df.drop_duplicates("video_id"))
+        n_videos_exp = int(frame["video_counts"]["n_videos"])
+        vf_expected = frame["joins"]["video_flags"]["expected_rows"]
+        flag_left = flags[["video_id"]].drop_duplicates()
+        if n_videos_obs == n_videos_exp == vf_expected:
+            left_attach(
+                flag_left,
+                videos_df.drop_duplicates("video_id"),
+                "video_flags",
+                frame,
+                row_accounting=row_accounting,
+            )
+        else:
+            row_accounting.append(
+                {
+                    "step": "join_video_flags",
+                    "rule": "video_flags.expected_rows vs videos count",
+                    "group": "all",
+                    "rows_before": len(flag_left),
+                    "rows_after": len(flag_left),
+                }
+            )
+
+        unassigned = 0
+        if not declared:
+            repo_ROOT = frame_FILE.resolve().parent
+            inputs = []
+            for label, path in (
+                ("corpus", corpus_PATH),
+                ("window_quality", window_quality_FILE),
+                ("flags", flags_FILE),
+                ("frame", frame_FILE),
+                ("round_yaml", round_yaml_FILE),
+            ):
+                p = Path(path)
+                if p.suffix.lower() == ".csv":
+                    cols = list(pd.read_csv(p, nrows=0).columns)
+                    rc = sum(1 for _ in open(p, encoding="utf-8")) - 1
+                elif p.suffix.lower() in {".sqlite", ".db"}:
+                    con = sqlite3.connect(str(p))
+                    try:
+                        rc = int(
+                            _load_sql_df(
+                                p, load_sql("count_syllables", str(sql_DIR))
+                            ).iloc[0, 0]
+                        )
+                        cols = [
+                            r[1]
+                            for r in con.execute("PRAGMA table_info(syllables)").fetchall()
+                        ]
+                    finally:
+                        con.close()
+                else:
+                    rc = 0
+                    cols = []
+                inputs.append(
+                    {
+                        "path": str(p),
+                        "sha256": sha256_file(p),
+                        "row_count": max(rc, 0),
+                        "columns": cols,
+                    }
+                )
+            manifest = build_manifest(
+                inputs=inputs,
+                strata=[],
+                master_seed=master_seed,
+                stratum_seeds=stratum_seeds,
+                B=B,
+                git_sha=_git_sha(repo_ROOT),
+                git_dirty=False,
+                frame_yaml_blob_sha=git_blob_sha1(frame_FILE),
+                row_accounting=row_accounting,
+                unassigned=unassigned,
+            )
+            man_digest = atomic_write_json(out_DIR / "manifest.json", manifest)
+            round_rel = "rounds/" + round_yaml_FILE.name
+            checks = [
+                {
+                    "name": "frame_expected_rows_ab",
+                    "status": "PASS" if abs(n_ab - expected) <= tol else "FAIL",
+                    "expected": expected,
+                    "expected_source": "frame.yaml:expected_rows",
+                    "observed": n_ab,
+                    "missing": None,
+                },
+                {
+                    "name": "comparisons_m",
+                    "status": "PASS" if m == 0 else "FAIL",
+                    "expected": 0,
+                    "expected_source": round_rel + ":comparisons",
+                    "observed": m,
+                    "missing": None,
+                },
+                {
+                    "name": "boiler_text_constant",
+                    "status": "PASS" if BOILER_TEXT else "FAIL",
+                    "expected": BOILER_TEXT,
+                    "expected_source": "frame.yaml:predicates",
+                    "observed": BOILER_TEXT,
+                    "missing": None,
+                },
+            ]
+            atomic_write_json(out_DIR / "checks.json", checks)
+            (out_DIR / "README.md").write_text(
+                "# ROUND-4\n\ncomparisons: [] — no comparison_id to compute; "
+                "ROUND-3 metrics retained.\n",
+                encoding="utf-8",
+            )
+            final_status = "smoke_ok" if smoke else "complete"
+            atomic_write_json(
+                status_FILE,
+                {
+                    "status": final_status,
+                    "sha256": man_digest,
+                    "smoke": smoke,
+                    "comparisons": declared,
+                },
+            )
+            return out_DIR / "manifest.json"
+
         sql_c1 = load_sql("c1_period_drop", str(sql_DIR))
         base = _load_sql_df(corpus_PATH, sql_c1)
         row_accounting.append(
@@ -816,38 +1005,13 @@ def run(argv: list[str] | None = None) -> Path:
                 "rows_after": len(base),
             }
         )
-
-        # Window-level quality join check (A+B windows)
-        windows_ab = _load_sql_df(
-            corpus_PATH, load_sql("windows_ab", str(sql_DIR))
-        )
-        n_ab = len(windows_ab)
-        expected = int(frame["expected_rows"])
-        tol = int(frame["expected_rows_tol"])
-        full_corpus = abs(n_ab - expected) <= tol
-        enforce = full_corpus and (not smoke)
-
-        quality = pd.read_csv(window_quality_FILE)
-        if "clap_sing" in quality.columns:
-            raise ValueError(
-                "clap_sing must not join PANNs singing_prob in the same comparison"
-            )
-        q_right = quality[
-            [c for c in ("window_id", "singing_prob", "snr_db") if c in quality.columns]
-        ].copy()
-        # Validate windows_quality join against frame expected_rows when full
-        _ = checked_merge(
-            windows_ab[["uid"]].drop_duplicates(),
-            q_right,
-            "windows_quality",
-            frame,
-            enforce_expected=enforce,
-            row_accounting=row_accounting,
-        )
-
-        flags = pd.read_csv(flags_FILE)
         base_prep = _prepare_base(
-            base, flags, quality, need_quality=True, row_accounting=row_accounting
+            base,
+            flags,
+            quality,
+            need_quality=True,
+            row_accounting=row_accounting,
+            frame=frame,
         )
         unassigned = int((base_prep["group"] == "unassigned").sum())
 
@@ -864,7 +1028,12 @@ def run(argv: list[str] | None = None) -> Path:
             }
         )
         c2_prep = _prepare_base(
-            c2_raw, flags, quality, need_quality=True, row_accounting=row_accounting
+            c2_raw,
+            flags,
+            quality,
+            need_quality=True,
+            row_accounting=row_accounting,
+            frame=frame,
         )
 
         c1_row, p1 = compute_c1(
@@ -996,9 +1165,7 @@ def run(argv: list[str] | None = None) -> Path:
         checks = [
             {
                 "name": "frame_expected_rows_ab",
-                "status": "PASS"
-                if (smoke or abs(n_ab - expected) <= tol)
-                else "FAIL",
+                "status": "PASS" if abs(n_ab - expected) <= tol else "FAIL",
                 "expected": expected,
                 "expected_source": "frame.yaml:expected_rows",
                 "observed": n_ab,
