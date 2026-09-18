@@ -15,9 +15,9 @@ branch, and nothing looked at it because the branch name matched no pattern.
 
 What each class may touch:
 
-    agent   anything except DENY
-    chore   only CHORE_ALLOW, which already excludes everything in DENY but the
-            task briefs, which are the owner's to write
+    agent   anything except DENY and the task briefs; it writes its outputs
+            under tasks/TASK-N/, which is allowed
+    chore   only CHORE_ALLOW, which already excludes everything in DENY
     repair  anything, but the prefix makes it visible in the history
 
 Per-scope path lists are not checked here. They belong to a task declaration,
@@ -38,12 +38,17 @@ AGENT_RE = re.compile(r"^(?:cursor|box)/[rt](?P<task>\d+)-(?P<scope>[a-z0-9_]+)-
 REPAIR_RE = re.compile(r"^(?:repair/|cursor/repair-)")
 CHORE_RE = re.compile(r"^chore/")
 
-# Only the owner changes the rules, the corpus, the CI that enforces them, or the
-# task brief. An agent may not edit the brief that grades it: the numbers it must
-# produce, and the tolerance each one gets, are not its to move. An agent that
-# needs one of these changed writes BLOCKED instead.
-DENY = [".cursor/*", ".cursor/**", ".github/*", ".github/**",
-        "data/*", "data/**", "tasks/*", "tasks/**"]
+# Only the owner changes the rules, the corpus, or the CI that enforces them. An
+# agent that needs one of these changed writes BLOCKED instead.
+DENY = [".cursor/*", ".cursor/**", ".github/*", ".github/**", "data/*", "data/**"]
+
+# The brief is the agent's scoresheet: the numbers it owes and the tolerance each
+# one gets are not its to move. Its outputs sit beside it, under tasks/TASK-N/,
+# and it must be able to write those. fnmatch cannot express that distinction --
+# its * crosses a slash, so "tasks/*" would deny tasks/TASK-N/results.json as
+# well, and every worker and verifier pull request would fail. This matches the
+# brief itself and nothing below it.
+BRIEF_RE = re.compile(r"^tasks/[^/]+\.md$")
 
 CHORE_ALLOW = [
     "README.md", "SCHEMA.md", "PIPELINE.md", "REPORT.md", "RESEARCH_LOG.md",
@@ -71,11 +76,11 @@ def main() -> int:
 
     branch = args.branch.strip()
     if REPAIR_RE.match(branch):
-        cls, allow, deny = "repair", None, []
+        cls, allow, deny, no_brief = "repair", None, [], False
     elif CHORE_RE.match(branch):
-        cls, allow, deny = "chore", CHORE_ALLOW, []
+        cls, allow, deny, no_brief = "chore", CHORE_ALLOW, [], False
     elif AGENT_RE.match(branch):
-        cls, allow, deny = "agent", None, DENY
+        cls, allow, deny, no_brief = "agent", None, DENY, True
     else:
         print(f"scope_check: FAIL branch {branch!r} matches no branch class")
         print("  allowed prefixes: cursor/t<N>-<scope>-, box/t<N>-<scope>-, chore/, repair/")
@@ -86,7 +91,7 @@ def main() -> int:
 
     bad: list[str] = []
     for f in files:
-        if match_any(f, deny):
+        if match_any(f, deny) or (no_brief and BRIEF_RE.match(f)):
             print(f"  DENY    {f}")
             bad.append(f)
         elif allow is not None and not match_any(f, allow):
@@ -100,6 +105,8 @@ def main() -> int:
         if allow is not None:
             print(f"  chore/ may touch: {allow}")
         print(f"  no class but repair/ may touch: {DENY}")
+        if no_brief:
+            print("  a task brief tasks/<name>.md is the owner's; an agent writes only under tasks/TASK-N/")
         return 1
 
     print("scope_check: PASS")

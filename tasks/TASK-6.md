@@ -13,10 +13,11 @@
 ## 定义（两条算路必须用同一套）
 
 - **发布集**：`windows.tier IN ('A','B')`。
-- **期间**：`post` 是 `substr(videos.upload_date,1,4) >= '2025'`，其余为 `pre`。
+- **期间**：`post` 是 `substr(videos.upload_date,1,4)` 为四位数字且 `>= '2025'`；`pre` 是四位数字且 `<= '2024'`。两个谓词都不满足的视频既不进 `pre` 也不进 `post`，其数量记为 `n_unassigned_period`。不得把任何一组定义成另一组的补集（契约第 18 条）。
 - **一致率**：按契约第 24 条，`n_match / n_judgeable`，其中 `n_match` 是 `jp_match IN ('exact_default','exact_alt')` 的音节数，`n_judgeable = n_total - n_empty_realized - n_dur_le_0`。四个计数都要出现在输出里。
-- **旧片组**：视频标题包含以下任一者——`粵劇` `任劍輝` `芳艷芬` `李小龍` `林鳳` `吳楚帆` `石堅` `謝賢` `新馬師曾` `白雪仙`。其余为 `other`。这是标题代理，不是内容判断，结论里要这么说。
+- **旧片组**：`film` 是 `title` 非空且包含以下任一者——`粵劇` `任劍輝` `芳艷芬` `李小龍` `林鳳` `吳楚帆` `石堅` `謝賢` `新馬師曾` `白雪仙`；`other` 是 `title` 非空且一个都不包含。`title` 为空的视频两组都不进，其数量记为 `n_unassigned_film`。这是标题代理，不是内容判断，结论里要这么说。
 - **稀有字**：该字在**全库全部 tier** 出现少于 10 次。
+- **四个计数**：契约第 24 条要求每个一致率都附上 `n_total`、`n_match`、`n_empty_realized`、`n_dur_le_0`。本轮报告的每个一致率，这四个计数都写进 `manifest.json`；其中 pre 与 post 两个总表的四个计数，以及 film/other 四格的 `n_judgeable`，另外声明在下面的 `numbers` 块里由 `output-check` 钉死。
 - **pp** 是百分点，**pm** 是千分之一。
 
 ## 要交的数字
@@ -27,8 +28,22 @@
 # name                     tol
 n_videos_pre               0
 n_videos_post              0
+n_unassigned_period        0
+n_unassigned_film          0
+n_total_pre                0
+n_total_post               0
+n_match_pre                0
+n_match_post               0
+n_empty_realized_pre       0
+n_empty_realized_post      0
+n_dur_le_0_pre             0
+n_dur_le_0_post            0
 n_judgeable_pre            0
 n_judgeable_post           0
+n_judgeable_film_pre       0
+n_judgeable_film_post      0
+n_judgeable_other_pre      0
+n_judgeable_other_post     0
 gap_contract_pp            0.05
 gap_all_pp                 0.05
 gap_excl_none_pp           0.05
@@ -58,6 +73,8 @@ rate_none_post_pm          0.5
 - `did_film_pp = (agree_film_pre - agree_film_post) - (agree_other_pre - agree_other_post)`。
 - `rare_share_*` 是稀有字音节占该期 A+B 音节的比例。
 - `rate_<verdict>_<period>_pm` 是该期 A+B 中该 `jp_match` 取值的千分比，分母是该期 A+B 全部音节。
+- `n_unassigned_period` 与 `n_unassigned_film` 是两个分组谓词都没匹配上的视频数。今天应当都是 0；容差是 0，所以将来语料一变就会红。
+- `n_dur_le_0_*` 同时是 `gap_excl_zerodur_pp` 那一版被剔除的行数（契约第 25 条要求声明）。
 
 ## 还要交的东西（这部分不进 numbers 块）
 
@@ -80,7 +97,7 @@ rate_none_post_pm          0.5
 ## 分工
 
 - `worker`，分支 `cursor/t6-worker-…`：写 `src/`、`sql/`、`tests/`，交 `tasks/TASK-6/results.json` 与上面那部分开放分析。
-- `verifier`，分支 `cursor/t6-verifier-…`：**不读 worker 的代码**，只读本文件和语料，用自己的 SQL 把 23 个数字重算一遍，交 `tasks/TASK-6/verify.json`。
+- `verifier`，分支 `cursor/t6-verifier-…`：**不读 worker 的代码**，只读本文件和语料，用自己的 SQL 把这 37 个数字重算一遍，交 `tasks/TASK-6/verify.json`。
 - 有 `match:false` 就把不匹配的行发回 worker，最多两次；仍不匹配就停，两套数字一起升级给 Tom。
 - 两个都合入后放 `auditor`，写 `review/TASK-6/audit.md`。
 

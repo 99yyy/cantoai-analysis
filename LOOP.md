@@ -30,14 +30,14 @@ STOP     全绿 → 收口。两次尝试用完仍不匹配 → 停，两套数�
 
 | 检查 | 管什么 |
 |---|---|
-| `scope-check` | 分支必须属于已知类别；agent 不得碰 `.cursor/` `.github/` `data/` `tasks/` |
+| `scope-check` | 分支必须属于已知类别；agent 不得碰 `.cursor/` `.github/` `data/`，也不得改任务书 `tasks/TASK-N.md` |
 | `history-audit` | 移动已有的栅不得与被它度量的东西同 PR，且正文须有 `BAR-CHANGE:` |
 | `output-check` | 输出文件的名字集合必须与任务书的 `numbers` 块相等；任何 `match:false` 即红 |
 | `tests` | 有 `tests/test_*.py` 时跑 pytest |
 
 前三个是 main 的必需检查。`output-check` 是这条回路里唯一**能真正失败**的检查：它比的是两条独立算路的结果，不是让谁给自己打分。
 
-agent 不能改 `tasks/`，所以它改不了自己的标尺。
+agent 改不了任务书，所以它改不了自己的标尺——但它必须能写自己的产出，那些在 `tasks/TASK-N/` 下面，是允许的。这两件事只差一层目录，`fnmatch` 的 `*` 会跨斜杠，所以这条规则用正则写，不用 glob。
 
 ## 输出形状
 
