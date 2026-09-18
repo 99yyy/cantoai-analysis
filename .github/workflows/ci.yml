@@ -27,11 +27,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: The two independent computations must agree
-        run: python scripts/output_check.py --repo-root .
+      - name: Replay every number, and make the two computations agree
+        if: github.event_name == 'pull_request'
+        run: |
+          python scripts/output_check.py \
+            --base-ref "origin/${{ github.base_ref }}" \
+            --head-ref HEAD
+      - name: The same on main, where there is no branch point to check
+        if: github.event_name != 'pull_request'
+        run: python scripts/output_check.py --head-ref HEAD
 
   scope-check:
     if: github.event_name == 'pull_request'
