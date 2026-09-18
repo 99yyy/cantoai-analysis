@@ -2,7 +2,7 @@
 
 ## 元数据
 
-- 阶段：0（立题；待方法审）
+- 阶段：1（方法审中）
 - backlog 条目：ROUND-3 后记 — 删 enforce_expected / left_attach 字面量 / contract_check 四条新规则
 - 执行角色：Cloud Agent（阶段 2 盲配对 impl+tests；阶段 4 review）；**音频员本轮不跑推断**
 - 方法审打回计数：0/2
@@ -77,3 +77,5 @@
 ## 争议记录
 
 （空）
+
+- 2026-09-18 进入阶段1方法审（#16/#13/#14 已合入 main）。
