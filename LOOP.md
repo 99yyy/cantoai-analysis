@@ -12,7 +12,7 @@ v2 改了什么、为什么：ROUND-3 暴露了三个 v1 结构性缺口。（1�
 | 1 方法审 | Cloud Agent ×3，各审一个维度 | 跑之前审。`mr_falsify`：预测是否已写死、每条假设是否有能否定它的数据模式、阈值有无依据；`mr_tools`：工具在这批数据上是否适用、已知失效情形是否都写成了谓词、跨度是否一致；`mr_stats`：单位、聚类、基线、m、min_judgeable、组定义的来源。各写 `review/ROUND-N/method/<mandate>.md`，结论只有 PASS 或 RETURN + 可验证条件；三份全 PASS 才进阶段 2 |
 | 2 代码 | Cloud Agent ×3，**盲配对 + 二选一** | `impl_a`、`impl_b` 同一 prompt 各写一份，只写 `src/ sql/ frame.yaml`；`tests` 只写 `tests/`，且**看不到** impl 的分支，只看规格。三者并发，各自开 PR。tests 的 PR 先合；两个 impl 都必须在 tests 合入后 Update branch 过 CI，**先绿的合，另一个关闭**；两个都红 → 规格有歧义，回阶段 0 |
 | 3 执行 | Cloud Agent ×m（非音频）/ 音频员（音频） | 阶段 2 全部合入后，**每个 `comparison_id` 一个 agent**，从同一个 main commit 出发，只写 `ROUND-N/<comparison_id>/`；音频推断留在共享机器，走 `box/rN-audio-…` 分支开 PR |
-| 4 复核 | Cloud Agent ×1 | 独立重算：只写 `review/ROUND-N/`，禁止 `import src`；从 `data/` 和 `ROUND-N/*/metrics` 用自己的最小 SQL/pandas 重算每个关键数字；写 `review/ROUND-N/result.md`，结论只有「通过」或「打回 + 可验证条件」 |
+| 4 复核 | Cloud Agent ×1 | 独立重算：只写 `review/ROUND-N/result.md` 与 `review/ROUND-N/recompute/`，禁止 `import src`；从 `data/` 和 `ROUND-N/*/metrics` 用自己的最小 SQL/pandas 重算每个关键数字；写 `review/ROUND-N/result.md`，结论只有「通过」或「打回 + 可验证条件」 |
 | 5 裁决 | fyp | 只读 CI 状态与 `review/ROUND-N/result.md`；写 `RESEARCH_LOG.md`，取下一题；经 PR 合入 |
 
 一轮只回答 ROUND-N.md 里的那一个问题。顺便发现的东西只进 `backlog.md`。
@@ -86,7 +86,7 @@ Branch name must begin with cursor/r<N>-<comparison_id>-. Run the analysis for c
 
 **review**
 ```
-Branch name must begin with cursor/r<N>-review-. Recompute every number in ROUND-<N>/*/metrics/*.json from data/corpus_v2.sqlite with your own minimal SQL or pandas. You may not import anything under src/. Write only under review/ROUND-<N>/. For each number write: the value you got, the value in metrics, and the command that reproduces yours. Verdict is either PASS or RETURN with one verifiable pass condition per item (path plus command, or file key equals value). Never write "not supported". Open a PR whose body is exactly the verdict line.
+Branch name must begin with cursor/r<N>-review-. Recompute every number in ROUND-<N>/*/metrics/*.json from data/corpus_v2.sqlite with your own minimal SQL or pandas. You may not import anything under src/. Read LAYOUT.md first. Write only review/ROUND-<N>/result.md and files under review/ROUND-<N>/recompute/; nothing else, anywhere. For each number write: the value you got, the value in metrics, and the command that reproduces yours. Verdict is either PASS or RETURN with one verifiable pass condition per item (path plus command, or file key equals value). Never write "not supported". Open a PR whose body is exactly the verdict line.
 ```
 
 ## ROUND-3 的后记（记录，不重跑）
