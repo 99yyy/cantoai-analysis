@@ -1,0 +1,26 @@
+{
+  "C3": {
+    "independent": 2183,
+    "spec": 2183
+  },
+  "C4": {
+    "independent": 23860,
+    "spec": 23860
+  },
+  "L2": {
+    "independent_max": 410,
+    "text": "如果覺得內容啱睇嘅subscribe",
+    "spec_max": 410
+  },
+  "R1": {
+    "independent": 42,
+    "n": 200,
+    "spec": 42
+  },
+  "R2": {
+    "independent": 32,
+    "n": 200,
+    "spec": 32
+  },
+  "match": true
+}
