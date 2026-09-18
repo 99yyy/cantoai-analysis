@@ -1,0 +1,49 @@
+{
+  "ancestor_ok": true,
+  "H1": {
+    "recalc_did": -0.004224756746657676,
+    "reported_did": -0.004224756746657676,
+    "match": true,
+    "recalc_rates": {
+      "film_post": 0.7535452048651982,
+      "film_pre": 0.8341649856672683,
+      "cont_post": 0.8057042205812615,
+      "cont_pre": 0.8820992446366739
+    },
+    "reported_rates": {
+      "film_post": 0.7535452048651982,
+      "film_pre": 0.8341649856672683,
+      "cont_post": 0.8057042205812615,
+      "cont_pre": 0.8820992446366739
+    },
+    "n_judgeable_recalc": 132593,
+    "n_judgeable_reported": 132593
+  },
+  "H2": {
+    "recalc_did_kw": -0.06456606643970009,
+    "recalc_did_no_kw": -0.06133907169345498,
+    "reported_did": -0.06456606643970009,
+    "match_kw": true,
+    "match_no_kw": false,
+    "n_judge_kw": 3364,
+    "n_judge_no_kw": 3329,
+    "n_judge_reported": 3364
+  },
+  "H3": {
+    "recalc_delta_pp": 0.05018951647176584,
+    "reported_delta_pp": 0.05018951647176584,
+    "match": true,
+    "before": 0.7949507892799694,
+    "after": 0.7954526844446871,
+    "reported_before": 0.7949507892799694,
+    "reported_after": 0.7954526844446871
+  },
+  "predictions": {
+    "H1_rejects": true,
+    "H2_rejects": true,
+    "H3_supports": true,
+    "H1_did_near_zero": true,
+    "H2_threshold_fail": true,
+    "H3_ok": true
+  }
+}
