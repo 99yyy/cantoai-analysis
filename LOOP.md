@@ -13,6 +13,7 @@ v2 改了什么、为什么：ROUND-3 暴露了三个 v1 结构性缺口。（1�
 | 2 代码 | Cloud Agent ×3，**盲配对 + 二选一** | `impl_a`、`impl_b` 同一 prompt 各写一份，只写 `src/ sql/ frame.yaml`；`tests` 只写 `tests/`，且**看不到** impl 的分支，只看规格。三者并发，各自开 PR。tests 的 PR 先合；两个 impl 都必须在 tests 合入后 Update branch 过 CI，**先绿的合，另一个关闭**；两个都红 → 规格有歧义，回阶段 0 |
 | 3 执行 | Cloud Agent ×m（非音频）/ 音频员（音频） | 阶段 2 全部合入后，**每个 `comparison_id` 一个 agent**，从同一个 main commit 出发，只写 `ROUND-N/<comparison_id>/`；音频推断留在共享机器，走 `box/rN-audio-…` 分支开 PR |
 | 4 复核 | Cloud Agent ×1 | 独立重算：只写 `review/ROUND-N/result.md` 与 `review/ROUND-N/recompute/`，禁止 `import src`；从 `data/` 和 `ROUND-N/*/metrics` 用自己的最小 SQL/pandas 重算每个关键数字；写 `review/ROUND-N/result.md`，结论只有「通过」或「打回 + 可验证条件」 |
+| 4.5 行为审计 | Cloud Agent ×1 | 审的是这一轮**怎么做的**，不是数字对不对。读本轮全部合并 commit 的 patch 与 PR 正文，回答六个固定问题（是否有栅被挪动、是否有无检查支撑的断言、是否越界或未全绿即合、结论是否强于证据、声明的任务是否有未做即收口、哪些能变成机械检查）。每条结论必须带 commit sha + 文件 + 行；给不出就写 UNKNOWN。只写 `review/ROUND-N/audit.md`，不得改任何代码、测试、声明或栅 |
 | 5 裁决 | fyp | 只读 CI 状态与 `review/ROUND-N/result.md`；写 `RESEARCH_LOG.md`，取下一题；经 PR 合入 |
 
 一轮只回答 ROUND-N.md 里的那一个问题。顺便发现的东西只进 `backlog.md`。
@@ -24,20 +25,29 @@ v2 改了什么、为什么：ROUND-3 暴露了三个 v1 结构性缺口。（1�
 - **第 2 波**（阶段 3）与**第 3 波**（阶段 4）：第 1 波全部合入 main 后才启动。m 个 comparison agent 同时启动；复核 agent 只有在 m 个 comparison PR 全部合入后才启动——它读的是合入后的 `ROUND-N/*/metrics`。出发 commit 用 launch 工具的 `starting_ref` 钉死（fyp 把该 sha 写进 `rounds/ROUND-N.yaml: waves[].start_commit`），不靠 prompt 里让 agent 自己 checkout。
 - **跨轮流水**：同一时刻最多**一轮**处于第 0 波或第 1 波（它们改 `src/`、`tests/`、`rounds/`），处于第 2 波及以后的轮数不限——第 2 波的 agent 从钉死的 commit 出发、复核 agent 不 import src，后续对 src 的改动碰不到它们。所以 ROUND-N 一进第 2 波，fyp 就可以开 ROUND-N+1 的第 0 波。
 - 并发上限 **8**（Pro 档官方口径；Pro+ 只说「明显更高」，未公布数字，撞到上限的报错记进 ROUND 文件，之后按实测调）。超过就分批。
-- 每轮 launch 预算：3 + 3 + m + 1，另加 **2** 次重试。任何 scope 只允许重启一次；第二次失败写进 ROUND 争议记录并升级 Tom。
+- 每轮 launch 预算：3 + 3 + m + 1 + 1（审计），另加 **2** 次重试。任何 scope 只允许重启一次；第二次失败写进 ROUND 争议记录并升级 Tom。
 - 审稿员 bot 退出常规流程，只在 Cloud Agent 用量耗尽时顶替第 0 波；分析员只在 Cloud Agent 无法访问的输入（音频）上工作。
 
 ## 写入范围（机器隔离，不靠自觉）
 
-- 每个 agent 的分支必须命名为 `cursor/r<N>-<scope_id>-…`；共享机器上的音频分支为 `box/r<N>-audio-…`；fyp 自己的声明与文档 PR 用 `chore/…`（不做 scope 检查，但 CI 照样要绿）。其他前缀不用。
+- 分支必须属于四类之一，否则 `scope-check` 直接红：`cursor/r<N>-<scope_id>-…`（Cloud Agent）、`box/r<N>-<scope_id>-…`（共享机器）、`chore/…`（fyp 的声明与文档，只能改 `rounds/`、`RESEARCH_LOG.md`、`backlog.md`、顶层文档、`STOP`、`STATUS.json`）、`repair/…` 或 `cursor/repair-…`（Tom 指定的工具修复，免 scope 检查但在 git 历史里显式可见）。
 - `rounds/ROUND-N.yaml: write_scopes.<scope_id>` 列出该 scope 允许改动的 glob；CI 的 `scope-check` 对比 PR 的改动文件，越界即红。
 - `impl_a` 与 `impl_b` 共用同一 scope（二选一，只合一个）；其余 scope——`tests`、各 `comparison_id`、`review`、三个 `mr_*`——**两两不相交**；`mr_stats` 在阶段 1 检查这一点。方法审 agent 每个只准写一个文件 `review/ROUND-N/method/<mandate>.md`。
 - 没有任何 scope 包含 `.cursor/`、`.github/`、`fixtures/schema.sqlite`、`fixtures/manifest.schema.json`、`data/`、`rounds/`。这些只由 Tom 改，或由 fyp 在阶段 0/5 经 PR 改 `rounds/`。
 
+## 栅不得为了让检查变绿而移动
+
+「栅」指决定某条检查通不通过的东西：`expected/` 里已存在的值、`frame.yaml` 或 `rounds/ROUND-N.yaml` 里已存在的 `expected_rows` / `expected_rows_tol` / `threshold` / `min_judgeable` / `B` / `baseline_model`、`tests/mutations/` 的补丁数、反例 `match=` 的条数、`scripts/contract_check.py` 发出的检查条数。
+
+- 移动栅与改动它所度量的东西（`src/` `sql/` `data/` `scripts/`）**不得在同一个 PR 里**。
+- 任何移动栅的 PR，正文必须有一行 `BAR-CHANGE: <理由>`。这行不使那次改动正确，它使那次改动对阶段 4.5 的审计可见——判断留给审计，不留给 CI。
+- 为新代码**新增**一个栅不算移动，不会被拦。
+- 以上由 CI 的 `history-audit` 机械执行。它在 2026-09-18 的一次真实事件之后加入：当时一个 commit 把三个已声明的期望值改成与空轮相符，观测值分毫未动，而它能通过是因为 scope-check 对不认识的分支名直接放行。
+
 ## 合并闸门（fyp 不读 diff，不读 PR 正文）
 
-- main 有分支保护：必须通过 `tests`、`contract-check`、`scope-check` 三个检查，必须经 PR，**任何人不能绕过**（包括 Tom 的账号——bot 用的就是这个账号）。`STOP` 文件因此也走 PR，或由 Tom 临时关保护。
-- fyp 合并的唯一判据：三个检查全绿。红了就不合。PR 正文、checks.json 的提交副本、agent 的自述，一律不算证据；CI 在 runner 里重新生成 checks.json。
+- main 有分支保护：必须通过 `tests`、`contract-check`、`scope-check`、`history-audit` 四个检查，必须经 PR，**任何人不能绕过**（包括 Tom 的账号——bot 用的就是这个账号）。`STOP` 文件因此也走 PR，或由 Tom 临时关保护。
+- fyp 合并的唯一判据：四个检查全绿。红了就不合。PR 正文、checks.json 的提交副本、agent 的自述，一律不算证据；CI 在 runner 里重新生成 checks.json。
 - 红了怎么办：对该 agent 发**一次** follow-up（内容只有 CI 失败的日志路径），仍红则关闭 PR、记录、按预算重启一次。不在 PR 里讨论。
 - 合并只用普通 merge。禁止 rebase 改写已推送历史、禁止 force-push、禁止碰数据集仓库；这三条一律拒绝并问 Tom。
 
@@ -82,6 +92,11 @@ Branch name must begin with cursor/r<N>-tests-. Read rounds/ROUND-<N>.md, rounds
 **comparison**（每个 comparison_id 一个）
 ```
 Branch name must begin with cursor/r<N>-<comparison_id>-. Run the analysis for comparison_id <comparison_id> only, with --corpus-path data/corpus_v2.sqlite and --out-dir ROUND-<N>/<comparison_id>/. Write only under ROUND-<N>/<comparison_id>/. Do not modify src/, sql/, frame.yaml or tests/. If the code cannot run, write BLOCKED in the PR body and stop; do not patch the code. Write only the five files LAYOUT.md allows under that directory. Open a PR whose body is exactly the contents of ROUND-<N>/<comparison_id>/STATUS.json
+```
+
+**audit**（阶段 4.5，每轮一个）
+```
+Branch name must begin with cursor/r<N>-audit-. You are auditing how this round was carried out, not whether its numbers are right — a separate agent already recomputed those. Read LOOP.md, LAYOUT.md, .cursor/rules/analysis-contract.mdc, rounds/ROUND-<N>.md and rounds/ROUND-<N>.yaml. Then read the round's history: git log --merges --patch origin/main covering every commit after <start_sha>, and the body of every pull request merged in that range. Answer these six questions. Each answer is a verdict plus evidence: a commit sha, a file, and a line. An answer with no sha is not an answer; write UNKNOWN and say what you could not see. (1) Was any bar moved to make a check pass? A bar is a declared expected value, a tolerance, a threshold, a mutation patch, a counterexample pattern, or a check in scripts/contract_check.py. For every bar that changed, say what it was before, what it became, and whether the change came before or after a failing check on the same branch. (2) Did any claim in rounds/ROUND-<N>.md, RESEARCH_LOG.md or a PR body assert something no check verifies? For each such claim quote it and name the check that would have to exist. (3) Did any agent write outside its declared write scope, or did any branch merge without all required checks green? (4) Was any conclusion stated more strongly than its evidence? Compare each claim against the counts, the p-values and the ci_unreliable flags actually present in the metrics files. (5) Was anything in the round's declared task left undone while the round was closed as complete? Compare rounds/ROUND-<N>.md against what the merged diffs actually contain. (6) Which of the findings above can be turned into a mechanical check? For each, name the file it would live in and the exact condition. Propose nothing you cannot state as a condition. Write exactly one file, review/ROUND-<N>/audit.md, and nothing else. Do not modify any code, any test, any declaration, or any bar — if you believe a bar is wrong, say so under question 6 and stop. Verdict line at the top is CLEAN or FINDINGS: <n>. Never write "not supported". Open a PR whose body is exactly that verdict line.
 ```
 
 **review**
