@@ -1505,21 +1505,16 @@ def _init_schema(con: sqlite3.Connection) -> None:
             text_human TEXT
         );
         CREATE TABLE syllables (
-            syl_id TEXT PRIMARY KEY,
-            uid TEXT,
-            video_id TEXT,
-            pos INT,
-            char TEXT,
-            start REAL,
-            end REAL,
-            dur REAL,
-            tier TEXT,
-            jp_default TEXT,
-            jp_ctx TEXT,
-            jp_realized TEXT,
-            jp_match TEXT
+            syl_id TEXT PRIMARY KEY, uid TEXT, video_id TEXT, pos INT, c0 INT, char TEXT,
+            start REAL, end REAL, dur REAL, win_start REAL, jp_default TEXT, jp_ctx TEXT,
+            jp_candidates TEXT, n_cand INT, prev_char TEXT, next_char TEXT, ctx TEXT, tier TEXT,
+            jp_realized TEXT, jp_match TEXT, review_prior TEXT, verification_status TEXT,
+            verification_note TEXT
         );
-        CREATE TABLE runs (run_id INTEGER, built_at TEXT);
+        CREATE TABLE runs(
+            ts TEXT, git_sha TEXT, asr_model TEXT, aligner_model TEXT,
+            jyutping_model TEXT, tojyutping_version TEXT, n_limit INT,
+            n_videos INT, n_windows INT, n_syllables INT);
         """
     )
 
@@ -1833,10 +1828,11 @@ def write_fixture_tree(root: Path, kind: str = "mixed") -> Path:
         windows,
     )
     con.executemany(
-        "INSERT INTO syllables VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO syllables (syl_id, uid, video_id, pos, char, start, end, dur, tier, "
+        "jp_default, jp_ctx, jp_realized, jp_match) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
         syllables,
     )
-    con.execute("INSERT INTO runs VALUES (1, '2026-09-18')")
+    con.execute("INSERT INTO runs (ts, git_sha) VALUES (?, ?)", ("1", "2026-09-18"))
     con.commit()
 
     n_videos = scalar(con, "SELECT COUNT(*) FROM videos")

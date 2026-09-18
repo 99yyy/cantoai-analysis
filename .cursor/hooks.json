@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": "python3 scripts/git_commit_pytest_hook.py",
+        "timeout": 180,
+        "matcher": "git",
+        "failClosed": true
+      }
+    ]
+  }
+}

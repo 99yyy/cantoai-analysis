@@ -64,8 +64,8 @@ def load_shares_from_db(
       {SNR_BIN_EXPR} AS bin,
       CASE WHEN s.jp_match IN ('exact_default', 'exact_alt') THEN 1.0 ELSE 0.0 END AS agree
     FROM syllables s
-    JOIN windows w ON w.window_id = s.window_id
-    JOIN _tmp_quality q ON q.window_id = CAST(w.window_id AS TEXT)
+    JOIN windows w ON w.uid = s.uid
+    JOIN _tmp_quality q ON q.window_id = CAST(w.uid AS TEXT)
     WHERE w.tier IN ('A', 'B')
       AND q.snr_db IS NOT NULL
     """
