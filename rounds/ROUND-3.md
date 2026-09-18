@@ -9,7 +9,7 @@
 - 复核打回计数：0/2
 - Cloud Agent launch 次数：0/2
 - 预测仓库：`https://github.com/99yyy/cantoai-analysis`
-- 预测 commit：（方法审通过时填入；必须早于任何结果 commit）
+- 预测 commit：`d6f1132a1fdfddffb36d6855e322580b22e9dc9c`（含冻结后的预测三不等式；必须早于任何结果 commit）
 - 结果 commit：
 - 执行 commit：
 - 合并目标 commit：
