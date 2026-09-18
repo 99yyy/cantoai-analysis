@@ -78,3 +78,22 @@ jobs:
             --branch "${{ github.head_ref }}" \
             --base "origin/${{ github.base_ref }}" \
             --rounds-dir rounds
+  history-audit:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Capture the pull-request body without interpolating it into a shell
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: printf '%s' "$PR_BODY" > /tmp/pr_body.txt
+      - name: A bar may not move in the change that moves what it measures
+        run: |
+          python scripts/history_audit.py \
+            --base "origin/${{ github.base_ref }}" \
+            --pr-body-file /tmp/pr_body.txt
