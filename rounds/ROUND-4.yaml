@@ -20,7 +20,7 @@ waves:
     start_commit: d50e2dac57f39677fb98367ec600ea51c6600806
   - name: review
     scopes: [review]
-    start_commit: null
+    start_commit: 8533d3ca020de84754b117612f9212dc6aaf12b6
 
 max_concurrent: 6
 launch_budget: 8
