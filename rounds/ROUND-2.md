@@ -77,6 +77,38 @@
 4. 报告必须写清：以当前已标 n，区间是否窄到能回答本轮问题（尤其「老电影/低分里唱段到底占多少」）；若不够，**直接给出还需要大约多少条**，**不要硬下结论**，也**不要暂停等待** Tom 继续标。
 5. `annotator_note` 中含标记 **`saw_meta`** 的行：单独统计数量与占比；若占比偏高，在报告里提醒可能存在锚定效应（标标注时看过机器分数）。
 
+
+### 抽样框偏差（核实 2026-09-18；不重抽）
+
+对照 `corpus.sqlite` 的 `windows.lang` / `windows.tier`（join 键 `window_id = uid`）：
+
+| 项 | 核实结果 |
+|----|----------|
+| 听辨 200 窗中 `lang != yue` | **32**（`zh` 25 + `en` 7）= **16%** |
+| 其中 `film_flag=1` | **23** / 32 |
+| 这 32 条的 `tier` | **全部 C** |
+| 全库非 yue | en 135 + ja 1 + zh 299，**无一例外 tier=C**；非 yue ∩ tier∈{A,B} = **0** |
+| 听辨表 `tier` 构成 | A 103 / B 55 / C **42**（含上述 32 非 yue + 10 条 yue∧C） |
+| 听辨表 `lang` | yue 168 / zh 25 / en 7 |
+
+`dataset_v2` 发布导出只含 **tier A+B**，故这 32 条**不在发布数据集**，却进入听辨样本。**不重抽、不换表**（Tom 已在标）。
+
+**后果（供阶段4与审稿判断）**
+
+1. **第四种成因候选**：非粤语窗用粤拼模型对读必然低分，原因是「不是粤语」，与唱段/旧读无关——原假设未列。
+2. **film 偏倚**：32 条中 23 条 film，可能放大 film vs contemporary 差距，影响旧 REPORT 叙事外推。
+3. **框不一致**：若下游主分析框是 tier A+B，而听辨框是「全库可配对窗」，校准结果**不能直接迁移**到发布子集。
+
+**阶段4必须拆两套报告**
+
+- **全集**：当前听辨样本中所有 `human_label != unset`（含非 yue / tier C）。
+- **子集**：仅 `lang=yue`（或等价 **tier∈{A,B}**；二者在「排除非 yue」上等价于丢掉那 32 条非 yue，但仍可能保留 yue∩C——报告时写明采用的是 `lang=yue` 还是 `tier∈{A,B}`）。
+- 两套的关键比率/CI **并排**，并单独一节写差异。
+
+**`lang` 坑（勿当真值）**
+
+`lang=zh` 多为**文本风格/书面语被 ASR 归类**（如七言唱词），不等于口语一定是国语；`lang=en` 同理。口语语种以 Tom 备注「国语」「英文」等**听感**为准，不以 `lang` 列覆盖人工标签。
+
 ### 产物路径
 
 - `analysis/ROUND-2/listening_sheet.csv`：列 `window_id,video_id,film_flag,clap_sing,singing_prob,var_db,stratum,human_label,annotator_note,forced_flag_sing`；初始 `human_label=unset`
@@ -97,7 +129,7 @@
   - `n_total=200`；`n_film=160`；`n_contemporary=40`（池不够则在 manifest 记录实际数并按比例缩）。
   - **`flag_sing=1` 规则 A**：全部强制纳入，**计入** `n_total=200`（`forced_in_quota: true`）；`forced_flag_sing_ids` 列出这些 id。
   - 栅格：**四分位交叉**（上表五层）；`seed=20260918`。
-- 已知失效：人工主观；短窗难判；`transcription_error` 与内容类冲突时标 `mixed` 并 note。
+- 已知失效：人工主观；短窗难判；`transcription_error` 与内容类冲突时标 `mixed` 并 note；**抽样框含 tier C / 非 yue（见上节）**；`lang` 非口语真值。
 
 ## 工具
 
@@ -148,6 +180,7 @@ python scripts/build_listening_sheet.py --summarize-labels \
 
 ## 争议记录
 
+- 2026-09-18 **抽样框偏差**：200 窗中 32 条 lang∉{yue} 且全为 tier C（不在 A+B 发布集）；阶段1未拦。阶段4拆全集 vs lang=yue（或 A+B）两套；不重抽。详见上节。
 - 2026-09-18 **部分标注交付变更**（Tom 定）：标多少用多少；五层轮流出题→已标子集合法；阶段4按层加权(设计n=40)+视频bootstrap CI+saw_meta 计数；不够则报所需增量，不等满200。
 - 2026-09-18 阶段1 **改**（1/2）：`review/ROUND-2/method.md` 硬条件 1–6；本版已钉死窗级 film_flag、全库四分位层、singing_rate 枚举、flag_sing 规则 A、CLI/冒烟。
 
