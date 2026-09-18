@@ -1,0 +1,60 @@
+name: analysis-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: pytest; green while the repository has no test yet
+        run: |
+          if find tests -name 'test_*.py' -print -quit 2>/dev/null | grep -q .; then
+            pytest -q
+          else
+            echo "no tests/test_*.py yet; this job starts checking the moment one appears"
+          fi
+
+  scope-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Every branch must belong to a known class
+        run: |
+          python scripts/scope_check.py \
+            --branch "${{ github.head_ref }}" \
+            --base "origin/${{ github.base_ref }}"
+
+  history-audit:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Capture the pull-request body without interpolating it into a shell
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: printf '%s' "$PR_BODY" > /tmp/pr_body.txt
+      - name: A bar may not move in the change that moves what it measures
+        run: |
+          python scripts/history_audit.py \
+            --base "origin/${{ github.base_ref }}" \
+            --pr-body-file /tmp/pr_body.txt
