@@ -84,6 +84,7 @@ SKIP_WALK_DIRS = {
     ".cache",
     "models",
     "pip-cache",
+    "fixtures",  # never treat analysis fixtures as corpus when ICANTO_ROOT is monorepo root
 }
 
 # STATS.json nine integer counts (T4). Aliases cover likely pipeline key names.
@@ -188,6 +189,12 @@ def analysis_root_from_env() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+
+def _is_fixture_path(path: Path) -> bool:
+    """True if path lives under a fixtures/ directory (analysis smoke trees)."""
+    return "fixtures" in path.parts
+
+
 def walk_files(root: Path) -> Iterator[Path]:
     if not root.is_dir():
         return
@@ -204,7 +211,10 @@ def walk_files(root: Path) -> Iterator[Path]:
             dirnames[:] = []
             continue
         for name in filenames:
-            yield Path(dirpath) / name
+            fp = Path(dirpath) / name
+            if _is_fixture_path(fp):
+                continue
+            yield fp
 
 
 def open_ro(sqlite_path: Path) -> sqlite3.Connection:
@@ -250,13 +260,32 @@ def discover_corpus(root: Path) -> CorpusPaths:
         root / "work/corpus.sqlite",
         root / "corpus.sqlite",
     ]
+    preferred_common = [
+        root / "corpus/dataset_v2/scripts/common.py",
+        root / "scripts/common.py",
+    ]
+    preferred_stats = [
+        root / "corpus/dataset_v2/dataset_v2/STATS.json",
+        root / "corpus/dataset_v2/STATS.json",
+        root / "STATS.json",
+    ]
+    for pref in preferred_common:
+        if pref.is_file() and "def tier_of" in _read_text_head(pref, 200_000):
+            common_py = pref
+            break
+    for pref in preferred_stats:
+        if pref.is_file():
+            stats = pref
+            break
 
     for p in walk_files(root):
+        if _is_fixture_path(p):
+            continue
         name = p.name
         low = name.lower()
         if low == "corpus.sqlite":
             sqlite_candidates.append(p)
-        elif low == "stats.json" and stats is None:
+        elif low == "stats.json" and stats is None and not _is_fixture_path(p):
             stats = p
         elif low == "ids.txt" and ids_txt is None:
             ids_txt = p
@@ -264,7 +293,7 @@ def discover_corpus(root: Path) -> CorpusPaths:
             readmes.append(p)
         elif low == "syllables_ab.csv":
             syllables_ab = p
-        elif name == "common.py" and common_py is None:
+        elif name == "common.py" and common_py is None and not _is_fixture_path(p):
             if "def tier_of" in _read_text_head(p, 200_000):
                 common_py = p
         elif re.match(r"09_.*\.py$", name) or (
