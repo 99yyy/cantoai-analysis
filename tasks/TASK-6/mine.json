@@ -1,0 +1,236 @@
+[
+  {
+    "name": "n_videos_pre",
+    "value": 391,
+    "n": 567,
+    "query": "tasks/TASK-6/mine_sql/count_videos_pre.sql"
+  },
+  {
+    "name": "n_videos_post",
+    "value": 176,
+    "n": 567,
+    "query": "tasks/TASK-6/mine_sql/count_videos_post.sql"
+  },
+  {
+    "name": "n_unassigned_period",
+    "value": 0,
+    "n": 567,
+    "query": "tasks/TASK-6/mine_sql/count_period_unassigned.sql"
+  },
+  {
+    "name": "n_unassigned_film",
+    "value": 0,
+    "n": 567,
+    "query": "tasks/TASK-6/mine_sql/count_film_unassigned.sql"
+  },
+  {
+    "name": "n_total_pre",
+    "value": 122208,
+    "n": 122208,
+    "query": "tasks/TASK-6/mine_sql/count_syl_pre.sql"
+  },
+  {
+    "name": "n_total_post",
+    "value": 42485,
+    "n": 42485,
+    "query": "tasks/TASK-6/mine_sql/count_syl_post.sql"
+  },
+  {
+    "name": "n_match_pre",
+    "value": 91469,
+    "n": 122208,
+    "query": "tasks/TASK-6/mine_sql/count_match_pre.sql"
+  },
+  {
+    "name": "n_match_post",
+    "value": 27318,
+    "n": 42485,
+    "query": "tasks/TASK-6/mine_sql/count_match_post.sql"
+  },
+  {
+    "name": "n_empty_realized_pre",
+    "value": 1138,
+    "n": 122208,
+    "query": "tasks/TASK-6/mine_sql/count_empty_realized_pre.sql"
+  },
+  {
+    "name": "n_empty_realized_post",
+    "value": 1045,
+    "n": 42485,
+    "query": "tasks/TASK-6/mine_sql/count_empty_realized_post.sql"
+  },
+  {
+    "name": "n_dur_le_0_pre",
+    "value": 16887,
+    "n": 122208,
+    "query": "tasks/TASK-6/mine_sql/count_dur_le0_pre.sql"
+  },
+  {
+    "name": "n_dur_le_0_post",
+    "value": 6973,
+    "n": 42485,
+    "query": "tasks/TASK-6/mine_sql/count_dur_le0_post.sql"
+  },
+  {
+    "name": "n_empty_and_zerodur_pre",
+    "value": 356,
+    "n": 122208,
+    "query": "tasks/TASK-6/mine_sql/count_empty_and_zerodur_pre.sql"
+  },
+  {
+    "name": "n_empty_and_zerodur_post",
+    "value": 356,
+    "n": 42485,
+    "query": "tasks/TASK-6/mine_sql/count_empty_and_zerodur_post.sql"
+  },
+  {
+    "name": "n_judgeable_pre",
+    "value": 104539,
+    "n": 122208,
+    "query": "tasks/TASK-6/mine_sql/count_judgeable_pre.sql"
+  },
+  {
+    "name": "n_judgeable_post",
+    "value": 34823,
+    "n": 42485,
+    "query": "tasks/TASK-6/mine_sql/count_judgeable_post.sql"
+  },
+  {
+    "name": "n_judgeable_film_pre",
+    "value": 15306,
+    "n": 122208,
+    "query": "tasks/TASK-6/mine_sql/count_judgeable_film_pre.sql"
+  },
+  {
+    "name": "n_judgeable_film_post",
+    "value": 17649,
+    "n": 42485,
+    "query": "tasks/TASK-6/mine_sql/count_judgeable_film_post.sql"
+  },
+  {
+    "name": "n_judgeable_other_pre",
+    "value": 89233,
+    "n": 122208,
+    "query": "tasks/TASK-6/mine_sql/count_judgeable_other_pre.sql"
+  },
+  {
+    "name": "n_judgeable_other_post",
+    "value": 17174,
+    "n": 42485,
+    "query": "tasks/TASK-6/mine_sql/count_judgeable_other_post.sql"
+  },
+  {
+    "name": "gap_contract_pp",
+    "value": 9.049336892013148,
+    "n": 139362,
+    "query": "derived:100 * (n_match_pre / n_judgeable_pre - n_match_post / n_judgeable_post)"
+  },
+  {
+    "name": "gap_all_pp",
+    "value": 10.38666478038257,
+    "n": 164693,
+    "query": "tasks/TASK-6/mine_sql/gap_all_pp.sql"
+  },
+  {
+    "name": "gap_excl_none_pp",
+    "value": 9.283775532071969,
+    "n": 164693,
+    "query": "tasks/TASK-6/mine_sql/gap_excl_none_pp.sql"
+  },
+  {
+    "name": "gap_excl_zerodur_pp",
+    "value": 9.921717634880068,
+    "n": 164693,
+    "query": "tasks/TASK-6/mine_sql/gap_excl_zerodur_pp.sql"
+  },
+  {
+    "name": "agree_film_pre",
+    "value": 0.8212465699725597,
+    "n": 15306,
+    "query": "tasks/TASK-6/mine_sql/agree_film_pre.sql"
+  },
+  {
+    "name": "agree_film_post",
+    "value": 0.7582865884752678,
+    "n": 17649,
+    "query": "tasks/TASK-6/mine_sql/agree_film_post.sql"
+  },
+  {
+    "name": "agree_other_pre",
+    "value": 0.8841908262638262,
+    "n": 89233,
+    "query": "tasks/TASK-6/mine_sql/agree_other_pre.sql"
+  },
+  {
+    "name": "agree_other_post",
+    "value": 0.8114009549318738,
+    "n": 17174,
+    "query": "tasks/TASK-6/mine_sql/agree_other_post.sql"
+  },
+  {
+    "name": "did_film_pp",
+    "value": -0.9829889834660377,
+    "n": 139362,
+    "query": "derived:100 * ((agree_film_pre - agree_film_post) - (agree_other_pre - agree_other_post))"
+  },
+  {
+    "name": "rare_share_pre",
+    "value": 0.03449855983241686,
+    "n": 122208,
+    "query": "tasks/TASK-6/mine_sql/rare_share_pre.sql"
+  },
+  {
+    "name": "rare_share_post",
+    "value": 0.031870071790043544,
+    "n": 42485,
+    "query": "tasks/TASK-6/mine_sql/rare_share_post.sql"
+  },
+  {
+    "name": "rate_tone_pre_pm",
+    "value": 73.03940822204765,
+    "n": 122208,
+    "query": "tasks/TASK-6/mine_sql/rate_tone_pre_pm.sql"
+  },
+  {
+    "name": "rate_tone_post_pm",
+    "value": 106.53171707661528,
+    "n": 42485,
+    "query": "tasks/TASK-6/mine_sql/rate_tone_post_pm.sql"
+  },
+  {
+    "name": "rate_segment_pre_pm",
+    "value": 46.73180151872218,
+    "n": 122208,
+    "query": "tasks/TASK-6/mine_sql/rate_segment_pre_pm.sql"
+  },
+  {
+    "name": "rate_segment_post_pm",
+    "value": 86.07743909615158,
+    "n": 42485,
+    "query": "tasks/TASK-6/mine_sql/rate_segment_post_pm.sql"
+  },
+  {
+    "name": "rate_diff_pre_pm",
+    "value": 8.076394344069127,
+    "n": 122208,
+    "query": "tasks/TASK-6/mine_sql/rate_diff_pre_pm.sql"
+  },
+  {
+    "name": "rate_diff_post_pm",
+    "value": 23.820171825350123,
+    "n": 42485,
+    "query": "tasks/TASK-6/mine_sql/rate_diff_post_pm.sql"
+  },
+  {
+    "name": "rate_none_pre_pm",
+    "value": 9.311992668237759,
+    "n": 122208,
+    "query": "tasks/TASK-6/mine_sql/rate_none_pre_pm.sql"
+  },
+  {
+    "name": "rate_none_post_pm",
+    "value": 24.596916558785455,
+    "n": 42485,
+    "query": "tasks/TASK-6/mine_sql/rate_none_post_pm.sql"
+  }
+]
