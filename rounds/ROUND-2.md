@@ -196,7 +196,7 @@ python scripts/build_listening_sheet.py --summarize-labels \
 
 - Cloud Agent launch：`bc-34f41e9c-fae5-541c-96a3-135550c48b29`（https://cursor.com/agents/bc-34f41e9c-fae5-541c-96a3-135550c48b29 ）
 - launch 完成是否自动唤醒 fyp：**是**（status=finished，PR #7）
-- GitHub 例程（待事件）：
-- GitHub 例程是否触发：
+- GitHub 例程（待事件）：已有事件
+- GitHub 例程是否触发：**是**（pr-merged PR #9，https://github.com/99yyy/cantoai-analysis/pull/9 ，分支 `cursor/ci-hooks-sql-explain-4608`，标题 Add pytest CI, SQL EXPLAIN dry-run, and git-commit pytest hook；merge `316d504`；CST 2026-09-18 ≈15:27）
 
 - 阶段1复审：通过（`review/ROUND-2/method.md`，CST 2026-09-18 ≈00:23）；预测门槛仍冻结于 `fffad051…`；Cloud Agent 不早于约 04:20 HKT launch。
