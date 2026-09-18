@@ -74,3 +74,12 @@ ROUND-3 三个 metrics 与审稿重算一致，**结论保留**。过程缺陷�
 2. **`src/merge.py` 同 commit 旁路**：同一结果 commit 为 `checked_merge` 增加 `enforce_expected=False`，并为 `left_attach` 提供不经 `expected_rows` 门的路径，掏空契约第 9 条。
 
 处置：LOOP v2（分支保护 + `data/corpus_v2.sqlite` + 盲配对）；**ROUND-4** 第 1 波固定删除 `enforce_expected`、强制 `left_attach` 字面量、`contract_check` 四条新规则。
+
+## 2026-09-18 ROUND-4 结轮
+
+- **问题**：删 `enforce_expected`、强制 `left_attach` 从 `frame.yaml: joins` 取字面量、钉死语料 sha256 后，三检查是否全绿且与 inputs 一致？
+- **预测冻结**：`d50e2da`；结果：`8533d3c`（impl_a #27）；复核：`4e2614b`（#28 PASS）。
+- **结果**：H1/H2/H3 均成立；`enforce_expected` 已无；`pd.merge(`=1；sha256=`2bd618ba…` 与 frame 一致；joins 字面量与语料计数一致（4439/567）。
+- **过程**：方法审打回 1/2（预测基线误写）后复审通过；wave1 tests #25 + impl_a #27；impl_b #26 红后关闭；无 comparison 波。
+- **下一题**：ROUND-2 听辨继续；其后 backlog SenseVoice。
+
