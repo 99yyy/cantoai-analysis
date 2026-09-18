@@ -22,11 +22,12 @@ def checked_merge(
     join_name: str,
     frame: dict[str, Any],
     *,
-    enforce_expected: bool = True,
     row_accounting: list[dict[str, Any]] | None = None,
 ) -> pd.DataFrame:
-    joins = frame.get("joins") or {}
-    if join_name not in joins:
+    if "joins" not in frame:
+        raise ValueError(JOIN_NAME_MISSING)
+    joins = frame["joins"]
+    if not isinstance(joins, dict) or join_name not in joins:
         raise ValueError(JOIN_NAME_MISSING)
     spec = joins[join_name]
     keys = list(spec["keys"])
@@ -51,9 +52,10 @@ def checked_merge(
     assert_unique_columns([c for c in merged.columns if c != "_merge"])
     expected_rows = spec["expected_rows"]
     matched = int((merged["_merge"] == "both").sum())
-    if enforce_expected and matched != expected_rows:
+    if matched != expected_rows:
         raise ValueError(JOIN_KEYS_MISMATCH)
     if row_accounting is not None:
+        unmatched = int((merged["_merge"] == "left_only").sum())
         row_accounting.append(
             {
                 "step": f"join_{join_name}",
@@ -63,33 +65,31 @@ def checked_merge(
                 "rows_after": len(merged),
             }
         )
+        row_accounting.append(
+            {
+                "step": f"join_{join_name}_unmatched",
+                "rule": f"checked_merge:{join_name}:unmatched",
+                "group": "all",
+                "rows_before": before,
+                "rows_after": unmatched,
+            }
+        )
     return merged.drop(columns=["_merge"])
 
 
 def left_attach(
     left: pd.DataFrame,
     right: pd.DataFrame,
-    on: list[str],
+    join_name: str,
+    frame: dict[str, Any],
     *,
-    step: str,
-    row_accounting: list[dict[str, Any]],
+    row_accounting: list[dict[str, Any]] | None = None,
 ) -> pd.DataFrame:
-    """Left-attach columns via merge; records row_accounting. No expected_rows gate."""
-    overlap = (set(left.columns) & set(right.columns)) - set(on)
-    if overlap:
-        raise ValueError(DUPLICATE_OUTPUT)
-    assert_unique_columns(list(left.columns))
-    assert_unique_columns(list(right.columns))
-    before = len(left)
-    merged = pd.merge(left, right, on=on, how="left", indicator=True)
-    assert_unique_columns([c for c in merged.columns if c != "_merge"])
-    row_accounting.append(
-        {
-            "step": step,
-            "rule": f"left_attach on {','.join(on)}",
-            "group": "all",
-            "rows_before": before,
-            "rows_after": int((merged["_merge"] == "both").sum()),
-        }
+    """Left-attach columns via checked_merge; expected_rows from frame.yaml joins."""
+    return checked_merge(
+        left,
+        right,
+        join_name,
+        frame,
+        row_accounting=row_accounting,
     )
-    return merged.drop(columns=["_merge"])
