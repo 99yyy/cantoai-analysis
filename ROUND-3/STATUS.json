@@ -33,5 +33,6 @@
       "ROUND-3/clap_with_span.csv",
       "ROUND-3/metrics/span_provenance_summary.json"
     ]
-  }
+  },
+  "result_commit": "7fe0ccffa15d7f0cc8bdb0f9fdff04547f64bcdb"
 }
