@@ -12,7 +12,8 @@ write_scopes:
   impl_a: ["src/*", "src/**", "sql/*", "frame.yaml"]
   impl_b: ["src/*", "src/**", "sql/*", "frame.yaml"]
   tests: ["tests/*", "tests/**"]
-  review: ["review/ROUND-4/*", "review/ROUND-4/**"]
+  review: ["review/ROUND-4/result.md", "review/ROUND-4/recompute/*", "review/ROUND-4/recompute/**"]
+  audit: ["review/ROUND-4/audit.md"]
 
 waves:
   - name: wave1
@@ -21,9 +22,12 @@ waves:
   - name: review
     scopes: [review]
     start_commit: 8533d3ca020de84754b117612f9212dc6aaf12b6
+  - name: audit
+    scopes: [audit]
+    start_commit: null
 
 max_concurrent: 6
-launch_budget: 8
+launch_budget: 9
 
 # Keep frame.yaml singing_prob pin in sync for contract_check (ROUND-3 metrics retained).
 singing_prob_source:
