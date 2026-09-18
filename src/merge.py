@@ -22,10 +22,11 @@ def checked_merge(
     join_name: str,
     frame: dict[str, Any],
     *,
-    enforce_expected: bool = True,
     row_accounting: list[dict[str, Any]] | None = None,
 ) -> pd.DataFrame:
-    joins = frame.get("joins") or {}
+    if "joins" not in frame or not isinstance(frame["joins"], dict):
+        raise ValueError(JOIN_NAME_MISSING)
+    joins = frame["joins"]
     if join_name not in joins:
         raise ValueError(JOIN_NAME_MISSING)
     spec = joins[join_name]
@@ -49,9 +50,11 @@ def checked_merge(
     before = len(left)
     merged = pd.merge(left, right_work, on=merge_keys, how="left", indicator=True)
     assert_unique_columns([c for c in merged.columns if c != "_merge"])
+    if "expected_rows" not in spec or type(spec["expected_rows"]) is not int:
+        raise ValueError(JOIN_KEYS_MISMATCH)
     expected_rows = spec["expected_rows"]
     matched = int((merged["_merge"] == "both").sum())
-    if enforce_expected and matched != expected_rows:
+    if matched != expected_rows:
         raise ValueError(JOIN_KEYS_MISMATCH)
     if row_accounting is not None:
         row_accounting.append(
@@ -69,27 +72,22 @@ def checked_merge(
 def left_attach(
     left: pd.DataFrame,
     right: pd.DataFrame,
-    on: list[str],
+    join_name: str,
+    frame: dict[str, Any],
     *,
     step: str,
     row_accounting: list[dict[str, Any]],
 ) -> pd.DataFrame:
-    """Left-attach columns via merge; records row_accounting. No expected_rows gate."""
-    overlap = (set(left.columns) & set(right.columns)) - set(on)
-    if overlap:
-        raise ValueError(DUPLICATE_OUTPUT)
-    assert_unique_columns(list(left.columns))
-    assert_unique_columns(list(right.columns))
+    """Left-attach columns via checked_merge. Match count is frame.yaml joins expected_rows."""
     before = len(left)
-    merged = pd.merge(left, right, on=on, how="left", indicator=True)
-    assert_unique_columns([c for c in merged.columns if c != "_merge"])
+    merged = checked_merge(left, right, join_name, frame, row_accounting=None)
     row_accounting.append(
         {
             "step": step,
-            "rule": f"left_attach on {','.join(on)}",
+            "rule": f"checked_merge:{join_name}",
             "group": "all",
             "rows_before": before,
-            "rows_after": int((merged["_merge"] == "both").sum()),
+            "rows_after": len(merged),
         }
     )
-    return merged.drop(columns=["_merge"])
+    return merged

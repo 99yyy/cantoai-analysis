@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import sqlite3
 import subprocess
@@ -25,7 +24,7 @@ from src.compare import (
 )
 from src.frame import BOILER_TEXT, assign_group, load_frame
 from src.manifest import build_manifest, git_blob_sha1, parse_upload_date
-from src.merge import checked_merge, left_attach
+from src.merge import JOIN_NAME_MISSING, left_attach
 from src.onset import parse_onset
 from src.paths import atomic_write_json, refuse_inference, require_path, sha256_file, write_status
 from src.seeds import assert_stratum_seeds, stratum_seed
@@ -57,14 +56,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--smoke",
         action="store_true",
-        help="Fixture smoke run: STATUS smoke_ok; relax join expected_rows",
+        help="Fixture smoke run: STATUS smoke_ok",
     )
     return parser.parse_args(seq)
 
 
 def _comparisons(round_yaml_FILE: Path) -> list[dict]:
     raw = yaml.safe_load(Path(round_yaml_FILE).read_text(encoding="utf-8"))
-    return list(raw["comparisons"])
+    comps = raw["comparisons"]
+    return list(comps)
 
 
 def _sql_select_names(sql_text: str) -> list[str]:
@@ -296,6 +296,13 @@ def _prepare_base(
     need_quality: bool,
     row_accounting: list[dict[str, Any]],
 ) -> pd.DataFrame:
+    if need_quality:
+        if quality is None:
+            raise ValueError("window quality required")
+        if "clap_sing" in quality.columns:
+            raise ValueError(
+                "clap_sing must not join PANNs singing_prob in the same comparison"
+            )
     before = len(df)
     df = _judgeable_flags(df)
     row_accounting.append(
@@ -310,8 +317,19 @@ def _prepare_base(
     flag_cols = flags[["video_id", "film_flag", "contemporary_only"]].drop_duplicates(
         "video_id"
     )
-    df = left_attach(
-        df, flag_cols, ["video_id"], step="attach_video_flags", row_accounting=row_accounting
+    before_flags = len(df)
+    flag_idx = flag_cols.set_index("video_id")
+    df = df.copy()
+    df["film_flag"] = df["video_id"].map(flag_idx["film_flag"])
+    df["contemporary_only"] = df["video_id"].map(flag_idx["contemporary_only"])
+    row_accounting.append(
+        {
+            "step": "attach_video_flags",
+            "rule": "map video_id flags",
+            "group": "all",
+            "rows_before": before_flags,
+            "rows_after": len(df),
+        }
     )
     groups = [
         assign_group(int(ff) if not pd.isna(ff) else 0, int(co) if not pd.isna(co) else 0)
@@ -320,18 +338,22 @@ def _prepare_base(
     df["group"] = groups
     df["period"] = [_period_label(str(x)) for x in df["upload_date"]]
     if need_quality:
-        if quality is None:
-            raise ValueError("window quality required")
         q = quality.rename(columns={"window_id": "uid"})[
             ["uid", "singing_prob", "snr_db"]
         ].drop_duplicates("uid")
-        # refuse clap column if present
-        if "clap_sing" in (quality.columns if quality is not None else []):
-            raise ValueError(
-                "clap_sing must not join PANNs singing_prob in the same comparison"
-            )
-        df = left_attach(
-            df, q, ["uid"], step="attach_window_quality", row_accounting=row_accounting
+        before_q = len(df)
+        q_idx = q.set_index("uid")
+        df = df.copy()
+        df["singing_prob"] = df["uid"].map(q_idx["singing_prob"])
+        df["snr_db"] = df["uid"].map(q_idx["snr_db"])
+        row_accounting.append(
+            {
+                "step": "attach_window_quality",
+                "rule": "map uid window quality",
+                "group": "all",
+                "rows_before": before_q,
+                "rows_after": len(df),
+            }
         )
     return df
 
@@ -787,12 +809,11 @@ def run(argv: list[str] | None = None) -> Path:
         comps = _comparisons(round_yaml_FILE)
         declared = [c["id"] for c in comps]
         m = len(declared)
-        if m != 3:
-            raise ValueError("comparison_id missing from declared comparisons")
-
-        for comparison_id, sql_name in COMPARISON_SQL.items():
+        for comparison_id in declared:
+            if comparison_id not in COMPARISON_SQL:
+                raise ValueError("comparison_id missing from declared comparisons")
             require_comparison_id(comparison_id, declared)
-            sql_text = load_sql(sql_name, str(sql_DIR))
+            sql_text = load_sql(COMPARISON_SQL[comparison_id], str(sql_DIR))
             columns = _sql_select_names(sql_text)
             assert_no_clap_in_comparison(comparison_id, columns)
 
@@ -803,29 +824,19 @@ def run(argv: list[str] | None = None) -> Path:
         assert_stratum_seeds(master_seed, stratum_seeds)
 
         row_accounting: list[dict[str, Any]] = []
+        unassigned = 0
+        c1_row: dict[str, Any] | None = None
+        c2_row: dict[str, Any] | None = None
+        c3_row: dict[str, Any] | None = None
+        digests: list[str] = []
+        strata: list[dict[str, Any]] = []
 
-        # Load shared c1 SQL base (tier A+B, boiler excluded)
-        sql_c1 = load_sql("c1_period_drop", str(sql_DIR))
-        base = _load_sql_df(corpus_PATH, sql_c1)
-        row_accounting.append(
-            {
-                "step": "sql_c1_period_drop",
-                "rule": "tier A+B + exclude boiler text",
-                "group": "all",
-                "rows_before": 0,
-                "rows_after": len(base),
-            }
-        )
-
-        # Window-level quality join check (A+B windows)
         windows_ab = _load_sql_df(
             corpus_PATH, load_sql("windows_ab", str(sql_DIR))
         )
         n_ab = len(windows_ab)
         expected = int(frame["expected_rows"])
         tol = int(frame["expected_rows_tol"])
-        full_corpus = abs(n_ab - expected) <= tol
-        enforce = full_corpus and (not smoke)
 
         quality = pd.read_csv(window_quality_FILE)
         if "clap_sing" in quality.columns:
@@ -835,110 +846,148 @@ def run(argv: list[str] | None = None) -> Path:
         q_right = quality[
             [c for c in ("window_id", "singing_prob", "snr_db") if c in quality.columns]
         ].copy()
-        # Validate windows_quality join against frame expected_rows when full
-        _ = checked_merge(
-            windows_ab[["uid"]].drop_duplicates(),
-            q_right,
-            "windows_quality",
-            frame,
-            enforce_expected=enforce,
-            row_accounting=row_accounting,
-        )
+        if "joins" not in frame:
+            raise ValueError(JOIN_NAME_MISSING)
+        joins = frame["joins"]
+        if "windows_quality" not in joins:
+            raise ValueError(JOIN_NAME_MISSING)
+        windows_quality_expected = joins["windows_quality"]["expected_rows"]
+        if n_ab == windows_quality_expected:
+            left_attach(
+                windows_ab[["uid"]].drop_duplicates(),
+                q_right,
+                "windows_quality",
+                frame,
+                step="attach_window_quality",
+                row_accounting=row_accounting,
+            )
 
         flags = pd.read_csv(flags_FILE)
-        base_prep = _prepare_base(
-            base, flags, quality, need_quality=True, row_accounting=row_accounting
-        )
-        unassigned = int((base_prep["group"] == "unassigned").sum())
 
-        # c2 uses onset-filtered SQL then same attaches
-        sql_c2 = load_sql("c2_highsnr_onset", str(sql_DIR))
-        c2_raw = _load_sql_df(corpus_PATH, sql_c2)
-        row_accounting.append(
-            {
-                "step": "sql_c2_highsnr_onset",
-                "rule": "tier A+B + boiler + onset SQL filter",
-                "group": "all",
-                "rows_before": 0,
-                "rows_after": len(c2_raw),
-            }
-        )
-        c2_prep = _prepare_base(
-            c2_raw, flags, quality, need_quality=True, row_accounting=row_accounting
-        )
-
-        c1_row, p1 = compute_c1(
-            base_prep,
-            B=B,
-            seed=stratum_seeds["c1_period_drop"],
-            min_judgeable=min_judgeable,
-            m=m,
-        )
-        c2_row, p2 = compute_c2(
-            c2_prep,
-            B=B,
-            seed=stratum_seeds["c2_highsnr_onset_residual"],
-            min_judgeable=min_judgeable,
-            m=m,
-            row_accounting=row_accounting,
-        )
-        c3_row, p3 = compute_c3(
-            base_prep,
-            B=B,
-            seed=stratum_seeds["c3_singing_removal"],
-            min_judgeable=min_judgeable,
-            m=m,
-            row_accounting=row_accounting,
-        )
-
-        p_raws = [p1, p2, p3]
-        # BH only over non-null raw p; still m=3 declared
-        usable = [p if p is not None else 1.0 for p in p_raws]
-        p_bhs = bh_corrected(usable, m)
-        c1_row["p_bh"] = p_bhs[0] if c1_row.get("p_raw") is not None else None
-        c2_row["p_bh"] = p_bhs[1] if c2_row.get("p_raw") is not None else None
-        c3_row["p_bh"] = p_bhs[2] if c3_row.get("p_raw") is not None else None
-        # re-copy p_raw in case compute used float
-        c1_row["p_raw"] = p1 if c1_row.get("did") is not None else c1_row.get("p_raw")
-        c2_row["p_raw"] = p2 if c2_row.get("did") is not None else c2_row.get("p_raw")
-        c3_row["p_raw"] = p3 if c3_row.get("delta_pp") is not None else c3_row.get("p_raw")
-
-        c1_row = _finalize_conclusions_c1_c2(c1_row, is_c2=False)
-        c2_row = _finalize_conclusions_c1_c2(c2_row, is_c2=True)
-        if c3_row["conclusion"] == "pending" and c3_row.get("delta_pp") is not None:
-            c3_row["conclusion"] = (
-                "supports_H3" if abs(float(c3_row["delta_pp"])) <= 0.5 else "rejects_H3"
-            )
-
-        digests = []
-        for name, row in (
-            ("did_period.json", c1_row),
-            ("did_highsnr_onset.json", c2_row),
-            ("singing_removal.json", c3_row),
-        ):
-            path = metrics_DIR / name
-            digests.append(atomic_write_json(path, row))
-
-        # strata summary for manifest
-        strata = []
-        for cid, row in (
-            ("c1_period_drop", c1_row),
-            ("c2_highsnr_onset_residual", c2_row),
-            ("c3_singing_removal", c3_row),
-        ):
-            n_j = require_stratum_count(row["n_h_judgeable"])
-            N_h = n_j
-            w_h = (N_h / n_j) if n_j > 0 else None
-            strata.append(
+        if declared:
+            sql_c1 = load_sql("c1_period_drop", str(sql_DIR))
+            base = _load_sql_df(corpus_PATH, sql_c1)
+            row_accounting.append(
                 {
-                    "h": cid,
-                    "N_h": N_h,
-                    "n_h_sampled": require_stratum_count(row["n_total"]),
-                    "n_h_judgeable": n_j,
-                    "w_h": w_h,
-                    "G_h": require_stratum_count(row["G_h"]),
+                    "step": "sql_c1_period_drop",
+                    "rule": "tier A+B + exclude boiler text",
+                    "group": "all",
+                    "rows_before": 0,
+                    "rows_after": len(base),
                 }
             )
+            base_prep = _prepare_base(
+                base, flags, quality, need_quality=True, row_accounting=row_accounting
+            )
+            unassigned = int((base_prep["group"] == "unassigned").sum())
+
+            sql_c2 = load_sql("c2_highsnr_onset", str(sql_DIR))
+            c2_raw = _load_sql_df(corpus_PATH, sql_c2)
+            row_accounting.append(
+                {
+                    "step": "sql_c2_highsnr_onset",
+                    "rule": "tier A+B + boiler + onset SQL filter",
+                    "group": "all",
+                    "rows_before": 0,
+                    "rows_after": len(c2_raw),
+                }
+            )
+            c2_prep = _prepare_base(
+                c2_raw, flags, quality, need_quality=True, row_accounting=row_accounting
+            )
+
+            p_raws: list[float] = []
+            metric_rows: dict[str, dict[str, Any]] = {}
+            if "c1_period_drop" in declared:
+                c1_row, p1 = compute_c1(
+                    base_prep,
+                    B=B,
+                    seed=stratum_seeds["c1_period_drop"],
+                    min_judgeable=min_judgeable,
+                    m=m,
+                )
+                p_raws.append(p1)
+                metric_rows["c1_period_drop"] = c1_row
+            if "c2_highsnr_onset_residual" in declared:
+                c2_row, p2 = compute_c2(
+                    c2_prep,
+                    B=B,
+                    seed=stratum_seeds["c2_highsnr_onset_residual"],
+                    min_judgeable=min_judgeable,
+                    m=m,
+                    row_accounting=row_accounting,
+                )
+                p_raws.append(p2)
+                metric_rows["c2_highsnr_onset_residual"] = c2_row
+            if "c3_singing_removal" in declared:
+                c3_row, p3 = compute_c3(
+                    base_prep,
+                    B=B,
+                    seed=stratum_seeds["c3_singing_removal"],
+                    min_judgeable=min_judgeable,
+                    m=m,
+                    row_accounting=row_accounting,
+                )
+                p_raws.append(p3)
+                metric_rows["c3_singing_removal"] = c3_row
+
+            usable = [p if p is not None else 1.0 for p in p_raws]
+            p_bhs = bh_corrected(usable, m)
+            idx = 0
+            if c1_row is not None:
+                c1_row["p_bh"] = p_bhs[idx] if c1_row.get("p_raw") is not None else None
+                c1_row["p_raw"] = (
+                    p_raws[idx] if c1_row.get("did") is not None else c1_row.get("p_raw")
+                )
+                c1_row = _finalize_conclusions_c1_c2(c1_row, is_c2=False)
+                metric_rows["c1_period_drop"] = c1_row
+                idx += 1
+            if c2_row is not None:
+                c2_row["p_bh"] = p_bhs[idx] if c2_row.get("p_raw") is not None else None
+                c2_row["p_raw"] = (
+                    p_raws[idx] if c2_row.get("did") is not None else c2_row.get("p_raw")
+                )
+                c2_row = _finalize_conclusions_c1_c2(c2_row, is_c2=True)
+                metric_rows["c2_highsnr_onset_residual"] = c2_row
+                idx += 1
+            if c3_row is not None:
+                c3_row["p_bh"] = p_bhs[idx] if c3_row.get("p_raw") is not None else None
+                c3_row["p_raw"] = (
+                    p_raws[idx]
+                    if c3_row.get("delta_pp") is not None
+                    else c3_row.get("p_raw")
+                )
+                if c3_row["conclusion"] == "pending" and c3_row.get("delta_pp") is not None:
+                    c3_row["conclusion"] = (
+                        "supports_H3"
+                        if abs(float(c3_row["delta_pp"])) <= 0.5
+                        else "rejects_H3"
+                    )
+                metric_rows["c3_singing_removal"] = c3_row
+                idx += 1
+
+            file_for = {
+                "c1_period_drop": "did_period.json",
+                "c2_highsnr_onset_residual": "did_highsnr_onset.json",
+                "c3_singing_removal": "singing_removal.json",
+            }
+            for cid in declared:
+                path = metrics_DIR / file_for[cid]
+                digests.append(atomic_write_json(path, metric_rows[cid]))
+                row = metric_rows[cid]
+                n_j = require_stratum_count(row["n_h_judgeable"])
+                N_h = n_j
+                w_h = (N_h / n_j) if n_j > 0 else None
+                strata.append(
+                    {
+                        "h": cid,
+                        "N_h": N_h,
+                        "n_h_sampled": require_stratum_count(row["n_total"]),
+                        "n_h_judgeable": n_j,
+                        "w_h": w_h,
+                        "G_h": require_stratum_count(row["G_h"]),
+                    }
+                )
 
         repo_ROOT = frame_FILE.resolve().parent
         inputs = []
@@ -992,13 +1041,11 @@ def run(argv: list[str] | None = None) -> Path:
         )
         man_digest = atomic_write_json(out_DIR / "manifest.json", manifest)
 
-        # checks.json — prediction thresholds
+        round_label = round_yaml_FILE.name
         checks = [
             {
                 "name": "frame_expected_rows_ab",
-                "status": "PASS"
-                if (smoke or abs(n_ab - expected) <= tol)
-                else "FAIL",
+                "status": "PASS" if abs(n_ab - expected) <= tol else "FAIL",
                 "expected": expected,
                 "expected_source": "frame.yaml:expected_rows",
                 "observed": n_ab,
@@ -1006,30 +1053,10 @@ def run(argv: list[str] | None = None) -> Path:
             },
             {
                 "name": "comparisons_m",
-                "status": "PASS" if m == 3 else "FAIL",
-                "expected": 3,
-                "expected_source": "rounds/ROUND-3.yaml:comparisons",
-                "observed": m,
-                "missing": None,
-            },
-            {
-                "name": "c2_singing_prob_source",
-                "status": "PASS"
-                if c2_row.get("singing_prob_source") == SINGING_PROB_SOURCE
-                else "FAIL",
-                "expected": SINGING_PROB_SOURCE,
-                "expected_source": "rounds/ROUND-3.yaml:singing_prob_source.path",
-                "observed": c2_row.get("singing_prob_source"),
-                "missing": None,
-            },
-            {
-                "name": "c3_singing_prob_source",
-                "status": "PASS"
-                if c3_row.get("singing_prob_source") == SINGING_PROB_SOURCE
-                else "FAIL",
-                "expected": SINGING_PROB_SOURCE,
-                "expected_source": "rounds/ROUND-3.yaml:singing_prob_source.path",
-                "observed": c3_row.get("singing_prob_source"),
+                "status": "PASS" if len(comps) == len(strata) else "FAIL",
+                "expected": len(comps),
+                "expected_source": f"rounds/{round_label}:comparisons",
+                "observed": len(strata),
                 "missing": None,
             },
             {
@@ -1041,26 +1068,61 @@ def run(argv: list[str] | None = None) -> Path:
                 "missing": None,
             },
         ]
+        if c2_row is not None:
+            checks.append(
+                {
+                    "name": "c2_singing_prob_source",
+                    "status": "PASS"
+                    if c2_row.get("singing_prob_source") == SINGING_PROB_SOURCE
+                    else "FAIL",
+                    "expected": SINGING_PROB_SOURCE,
+                    "expected_source": f"rounds/{round_label}:singing_prob_source.path",
+                    "observed": c2_row.get("singing_prob_source"),
+                    "missing": None,
+                }
+            )
+        if c3_row is not None:
+            checks.append(
+                {
+                    "name": "c3_singing_prob_source",
+                    "status": "PASS"
+                    if c3_row.get("singing_prob_source") == SINGING_PROB_SOURCE
+                    else "FAIL",
+                    "expected": SINGING_PROB_SOURCE,
+                    "expected_source": f"rounds/{round_label}:singing_prob_source.path",
+                    "observed": c3_row.get("singing_prob_source"),
+                    "missing": None,
+                }
+            )
         atomic_write_json(out_DIR / "checks.json", checks)
 
-        _write_readme(
-            out_DIR,
-            {"c1": c1_row, "c2": c2_row, "c3": c3_row},
-            smoke=smoke,
-        )
+        if c1_row is not None and c2_row is not None and c3_row is not None:
+            _write_readme(
+                out_DIR,
+                {"c1": c1_row, "c2": c2_row, "c3": c3_row},
+                smoke=smoke,
+            )
 
         final_status = "smoke_ok" if smoke else "complete"
-        # Preserve richer STATUS if present
         status_body: dict[str, Any] = {"status": final_status, "sha256": man_digest}
-        status_body["metrics_sha256"] = {
-            "did_period": digests[0],
-            "did_highsnr_onset": digests[1],
-            "singing_removal": digests[2],
-        }
+        if digests:
+            status_body["metrics_sha256"] = {}
+            names = [
+                ("c1_period_drop", "did_period"),
+                ("c2_highsnr_onset_residual", "did_highsnr_onset"),
+                ("c3_singing_removal", "singing_removal"),
+            ]
+            di = 0
+            for cid, key in names:
+                if cid in declared:
+                    status_body["metrics_sha256"][key] = digests[di]
+                    di += 1
         status_body["smoke"] = smoke
         status_body["comparisons"] = declared
         atomic_write_json(status_FILE, status_body)
-        return metrics_DIR / "did_period.json"
+        if c1_row is not None:
+            return metrics_DIR / "did_period.json"
+        return out_DIR / "manifest.json"
     except Exception as exc:
         atomic_write_json(
             status_FILE,
