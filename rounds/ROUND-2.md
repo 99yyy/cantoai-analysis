@@ -2,14 +2,15 @@
 
 ## 元数据
 
-- 阶段：2（Cloud Agent launch 中）
+- 阶段：3（执行 / 分析员抽样）
 - backlog 条目：一.3 人工听辨样本 200 窗抽样与 `listening_sheet`
 - 执行角色：分析员（抽样表）+ 音频员（可选导出短音频切片路径清单）；**标注由 Tom**
 - 方法审打回计数：1/2
 - 复核打回计数：0/2
-- Cloud Agent launch 次数：1/2（进行中）
+- Cloud Agent launch 次数：1/2（完成；PR #7 已合入）
 - **预测仓库**：`https://github.com/99yyy/cantoai-analysis`
 - 预测 commit：`fffad05152daaf603bef1d99f9e931831b04e0a6`（假设/预测数值门槛冻结于该 commit；本修订只改契约路径、可重算定义与抽样规则）
+- 脚本合入 commit：
 - 结果 commit：
 - 执行 commit：
 - 合并目标 commit：
@@ -144,7 +145,8 @@ python scripts/build_listening_sheet.py --summarize-labels \
 ## 验证记录
 
 - Cloud Agent launch：`bc-34f41e9c-fae5-541c-96a3-135550c48b29`（https://cursor.com/agents/bc-34f41e9c-fae5-541c-96a3-135550c48b29 ）
-- launch 完成是否自动唤醒 fyp：
+- launch 完成是否自动唤醒 fyp：**是**（status=finished，PR #7）
+- GitHub 例程（待事件）：
 - GitHub 例程是否触发：
 
 - 阶段1复审：通过（`review/ROUND-2/method.md`，CST 2026-09-18 ≈00:23）；预测门槛仍冻结于 `fffad051…`；Cloud Agent 不早于约 04:20 HKT launch。
