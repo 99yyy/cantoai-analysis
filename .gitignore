@@ -26,3 +26,8 @@ task3_hypothesis_strata/_sample_out/*.json
 # keep empty schema fixture for SQL EXPLAIN CI (contract §19)
 !fixtures/
 !fixtures/schema.sqlite
+
+# LOOP v2: published corpus for Cloud Agent (sha256 pinned in frame.yaml inputs)
+!data/
+!data/corpus_v2.sqlite
+

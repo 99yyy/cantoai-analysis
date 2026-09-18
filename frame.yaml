@@ -3,6 +3,11 @@
 # (tier A+B whitelist), not a number produced by a script in this repository.
 
 round: 3
+
+# LOOP v2 / contract: corpus path + sha256 (Cloud Agents use relative path only).
+inputs:
+  corpus_path: data/corpus_v2.sqlite
+  corpus_sha256: 2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f
 min_judgeable: 200
 master_seed: 20260918
 B: 1000
