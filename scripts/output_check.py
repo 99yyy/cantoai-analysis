@@ -48,9 +48,12 @@ What this enforces, in order:
                within one file (``route()``-resolved Path, not the raw query
                string: ``sql/../sql/x.sql`` and ``sql/x.sql`` are one file).
   route        every SQL path exists, resolves under tasks/TASK-<N>/, and is
-               not named by both files: two agents may share a definition but
-               not an implementation. A shared *derivation* is allowed, because
-               each of its inputs was replayed on its own.
+               not named by both files; after strip_and_split, no worker
+               statement sha256 may equal any verifier statement sha256 (copying
+               sql/ into mine_sql/ is not a second computation). Two agents may
+               share a definition but not an implementation. A shared
+               *derivation* is allowed, because each of its inputs was replayed
+               on its own.
   replay       every number equals what its own route produces, within tol.
                A SQL route whose plan never SCAN/SEARCHes a corpus table
                fails, so two constant SELECTs cannot certify agreement.
@@ -379,6 +382,51 @@ def strip_and_split(text: str) -> list[str]:
         i += 1
     out.append("".join(buf))
     return [s.strip() for s in out if s.strip()]
+
+
+def statement_sha256(text: str) -> str:
+    """sha256 of the comment-stripped statement text from ``strip_and_split``.
+
+    One statement hashes as itself; several join on ``;``. Leading and trailing
+    whitespace are already gone; comments are already gone. Internal whitespace
+    is kept, so this is identity after the splitter, not a second canonicalizer.
+    """
+    stmts = strip_and_split(text)
+    body = stmts[0] if len(stmts) == 1 else ";".join(stmts)
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
+def cross_side_sql_hash_collisions(
+    n: str,
+    root: Path,
+    worker: dict[Path, str],
+    verifier: dict[Path, str],
+) -> list[str]:
+    """Any worker SQL hash equal to any verifier SQL hash is a shared implementation."""
+
+    def by_hash(files: dict[Path, str]) -> dict[str, list[tuple[Path, str]]]:
+        out: dict[str, list[tuple[Path, str]]] = {}
+        for p, nm in files.items():
+            h = statement_sha256(p.read_text(encoding="utf-8"))
+            out.setdefault(h, []).append((p, nm))
+        return out
+
+    w_h, v_h = by_hash(worker), by_hash(verifier)
+    msgs: list[str] = []
+    for h in sorted(set(w_h) & set(v_h)):
+        for wp, wn in sorted(w_h[h], key=lambda t: t[0].as_posix()):
+            for vp, vn in sorted(v_h[h], key=lambda t: t[0].as_posix()):
+                if wp == vp:
+                    continue
+                w_rel = wp.relative_to(root)
+                v_rel = vp.relative_to(root)
+                msgs.append(
+                    f"TASK-{n}: {w_rel} backs {wn} in {WORKER} and "
+                    f"{v_rel} backs {vn} in {VERIFIER}; "
+                    f"statement sha256 {h} after strip_and_split; "
+                    f"the second computation must be its own"
+                )
+    return msgs
 
 
 def _mask_strings(text: str) -> str:
@@ -715,6 +763,7 @@ def check_task(
                 f"TASK-{n}: {p.relative_to(root)} backs {w[p]} in {WORKER} and "
                 f"{v[p]} in {VERIFIER}; the second computation must be its own"
             )
+        fail.extend(cross_side_sql_hash_collisions(n, root, w, v))
 
     paired = 0
     if WORKER in rows and VERIFIER in rows:
