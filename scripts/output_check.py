@@ -44,8 +44,9 @@ What this enforces, in order:
   brief        exactly one ``status: open|closed`` line; a parseable block.
   shape        top-level list; every row exactly {name, value, n, query}; the
                name set equals the declared set, so a missing number and an
-               extra number both fail; no duplicate name; no duplicate query
-               within one file.
+               extra number both fail; no duplicate name; no duplicate route
+               within one file (``route()``-resolved Path, not the raw query
+               string: ``sql/../sql/x.sql`` and ``sql/x.sql`` are one file).
   route        every SQL path exists, resolves under tasks/TASK-<N>/, and is
                not named by both files: two agents may share a definition but
                not an implementation. A shared *derivation* is allowed, because
@@ -263,7 +264,9 @@ def parse_brief(md: Path) -> tuple[str, dict[str, float]]:
     return st[0], tol
 
 
-def parse_rows(path: Path, tol: dict[str, float], fail: list[str]) -> dict[str, dict] | None:
+def parse_rows(
+    path: Path, tol: dict[str, float], fail: list[str], n: str, root: Path
+) -> dict[str, dict] | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
@@ -305,20 +308,27 @@ def parse_rows(path: Path, tol: dict[str, float], fail: list[str]) -> dict[str, 
     if extra or missing:
         ok = False
 
-    seen: dict[str, str] = {}
+    # Keyed by route() target (resolved Path for SQL, stripped expr for
+    # derived), not the raw query string. Otherwise sql/../sql/x.sql and
+    # sql/x.sql look like two routes and back two numbers.
+    seen: dict[object, str] = {}
     for name, r in rows.items():
         q = str(r["query"]).strip()
         if not q:
             fail.append(f"{path.name}:{name}: query is empty")
             ok = False
             continue
-        if q in seen:
+        try:
+            _kind, target = route(path.name, n, name, q, root)
+        except Fail:
+            target = q
+        if target in seen:
             fail.append(
-                f"{path.name}:{name}: query {q!r} already backs {seen[q]}; "
+                f"{path.name}:{name}: query {q!r} already backs {seen[target]}; "
                 f"one route may produce only one number"
             )
             ok = False
-        seen[q] = name
+        seen[target] = name
 
     return rows if ok else None
 
@@ -677,7 +687,7 @@ def check_task(
     rows: dict[str, dict[str, dict]] = {}
     routes: dict[str, dict[str, tuple[str, object]]] = {}
     for k, p in present.items():
-        r = parse_rows(p, tol, fail)
+        r = parse_rows(p, tol, fail, n, root)
         if r is None:
             print(f"  TASK-{n} [{status}]: {k} is malformed")
             continue
