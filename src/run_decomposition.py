@@ -7,7 +7,6 @@ import json
 import subprocess
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from src.agreement import agreement_counts
@@ -25,7 +24,6 @@ from src.hashing import verify_corpus_hash
 from src.measures import attach_agreement, flatten_key
 from src.status_io import sha256_file, write_json_atomic, write_status, write_text_atomic
 from src.tables import open_corpus
-from src.weights import assert_stratum_weights, stratum_weights
 
 MASTER_SEED = 20250918
 B = 2000
@@ -244,11 +242,6 @@ def run(
     del _key
 
     sizes = stratum_sizes(video_df)
-    N_h = np.array([sizes[h]["N_h"] for h in STRATA], dtype=float)
-    n_h = np.array([sizes[h]["n_h_judgeable"] for h in STRATA], dtype=float)
-    w = stratum_weights(N_h, n_h)
-    assert_stratum_weights(w, N_h, n_h)
-
     point = point_kitagawa(video_df)
     boot = bootstrap_residual(video_df, B=B, master_seed=MASTER_SEED)
     residual_pp = 100.0 * point["residual"]
@@ -285,7 +278,6 @@ def run(
         "G_h": boot["G_h"],
         "N_h": {h: sizes[h]["N_h"] for h in STRATA},
         "n_h_judgeable": {h: sizes[h]["n_h_judgeable"] for h in STRATA},
-        "w_h": {h: float(w[i]) for i, h in enumerate(STRATA)},
         "ci_unreliable": boot["ci_unreliable"],
         "ci_unreliable_any": ci_unreliable_any,
         "conclusion": conclusion,
