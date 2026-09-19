@@ -1,0 +1,18 @@
+{
+  "task": "TASK-7",
+  "subtype": "success",
+  "verdict": "refuted",
+  "hypothesis": "Agreement falls after 2025.",
+  "why": "gap_all_pp is 7.1.",
+  "numbers": {
+    "n_count": {
+      "value": 567.0,
+      "within_tol": true
+    }
+  },
+  "turns_used": 17,
+  "turn_cap": 3,
+  "corpus_sha": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+  "forked_from": null,
+  "fork_depth": 0
+}
