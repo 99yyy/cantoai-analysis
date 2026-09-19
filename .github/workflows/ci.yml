@@ -32,10 +32,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Take the gates from the base branch, not from this PR
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdir -p /tmp/gate
+          for f in output_check history_audit scope_check; do
+            git show origin/${{ github.base_ref }}:scripts/$f.py > /tmp/gate/$f.py
+          done
       - name: Replay every number, and make the two computations agree
         if: github.event_name == 'pull_request'
         run: |
-          python scripts/output_check.py \
+          python /tmp/gate/output_check.py \
             --base-ref "origin/${{ github.base_ref }}" \
             --head-ref HEAD
       - name: The same on main, where there is no branch point to check
@@ -52,12 +59,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Take the gates from the base branch, not from this PR
+        run: |
+          mkdir -p /tmp/gate
+          for f in output_check history_audit scope_check; do
+            git show origin/${{ github.base_ref }}:scripts/$f.py > /tmp/gate/$f.py
+          done
       - name: Every branch must belong to a known class
         env:
           SCOPE_ACTOR: ${{ github.actor }}
           SCOPE_OWNERS: ${{ github.repository_owner }}
         run: |
-          python scripts/scope_check.py \
+          python /tmp/gate/scope_check.py \
             --branch "${{ github.head_ref }}" \
             --base "origin/${{ github.base_ref }}" \
             --actor "$SCOPE_ACTOR" \
@@ -73,12 +86,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Take the gates from the base branch, not from this PR
+        run: |
+          mkdir -p /tmp/gate
+          for f in output_check history_audit scope_check; do
+            git show origin/${{ github.base_ref }}:scripts/$f.py > /tmp/gate/$f.py
+          done
       - name: Capture the pull-request body without interpolating it into a shell
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: printf '%s' "$PR_BODY" > /tmp/pr_body.txt
       - name: A bar may not move in the change that moves what it measures
         run: |
-          python scripts/history_audit.py \
+          python /tmp/gate/history_audit.py \
             --base "origin/${{ github.base_ref }}" \
             --pr-body-file /tmp/pr_body.txt
