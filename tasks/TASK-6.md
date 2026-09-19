@@ -108,17 +108,62 @@ verifier  tasks/TASK-6/mine.json
 
 ## `n` 是什么
 
-`n` 是这个数字**算在多少行语料上**。两条算路必须给出完全相同的 `n`，所以这里把它钉死：
+`n` 是这个数字**算在多少行语料上**。两条算路必须给出完全相同的 `n`，且每个 `n` 必须等于下面 ```n``` 块里声明的常数或 `derived:` 表达式（代入的是重放出来的值，不是 agent 写下的值）。只两边相等不够：两边一起抄 `1` 也会相等。
 
-| 数字 | `n` |
-|---|---|
-| `n_videos_*`、`n_unassigned_period`、`n_unassigned_film` | 567（`videos` 全表） |
-| `n_total_*`、`n_match_*`、`n_empty_realized_*`、`n_dur_le_0_*`、`n_empty_and_zerodur_*`、`n_judgeable_*`、`n_judgeable_film_*`、`n_judgeable_other_*` | 该期 A+B 音节数，即 `n_total_pre` 或 `n_total_post` |
-| `rare_share_*`、`rate_*_pm` | 同上 |
-| `agree_film_*`、`agree_other_*` | 对应那一格的 `n_judgeable_film_*` / `n_judgeable_other_*` |
-| `gap_contract_pp` | `n_judgeable_pre + n_judgeable_post` |
-| `gap_all_pp`、`gap_excl_none_pp`、`gap_excl_zerodur_pp` | `n_total_pre + n_total_post` |
-| `did_film_pp` | 四格 `n_judgeable`（film/other × pre/post）之和 |
+```n
+# name                     n
+n_videos_pre               567
+n_videos_post              567
+n_unassigned_period        567
+n_unassigned_film          567
+n_total_pre                derived:n_total_pre
+n_total_post               derived:n_total_post
+n_match_pre                derived:n_total_pre
+n_match_post               derived:n_total_post
+n_empty_realized_pre       derived:n_total_pre
+n_empty_realized_post      derived:n_total_post
+n_dur_le_0_pre             derived:n_total_pre
+n_dur_le_0_post            derived:n_total_post
+n_empty_and_zerodur_pre    derived:n_total_pre
+n_empty_and_zerodur_post   derived:n_total_post
+n_judgeable_pre            derived:n_total_pre
+n_judgeable_post           derived:n_total_post
+n_judgeable_film_pre       derived:n_total_pre
+n_judgeable_film_post      derived:n_total_post
+n_judgeable_other_pre      derived:n_total_pre
+n_judgeable_other_post     derived:n_total_post
+gap_contract_pp            derived:n_judgeable_pre + n_judgeable_post
+gap_all_pp                 derived:n_total_pre + n_total_post
+gap_excl_none_pp           derived:n_total_pre + n_total_post
+gap_excl_zerodur_pp        derived:n_total_pre + n_total_post
+agree_film_pre             derived:n_judgeable_film_pre
+agree_film_post            derived:n_judgeable_film_post
+agree_other_pre            derived:n_judgeable_other_pre
+agree_other_post           derived:n_judgeable_other_post
+did_film_pp                derived:n_judgeable_film_pre + n_judgeable_film_post + n_judgeable_other_pre + n_judgeable_other_post
+rare_share_pre             derived:n_total_pre
+rare_share_post            derived:n_total_post
+rate_tone_pre_pm           derived:n_total_pre
+rate_tone_post_pm          derived:n_total_post
+rate_segment_pre_pm        derived:n_total_pre
+rate_segment_post_pm       derived:n_total_post
+rate_diff_pre_pm           derived:n_total_pre
+rate_diff_post_pm          derived:n_total_post
+rate_none_pre_pm           derived:n_total_pre
+rate_none_post_pm          derived:n_total_post
+```
+
+## 抽样框
+
+下面 ```frame``` 块在出现 `videos_expected` 时激活恒等式
+`n_videos_pre + n_videos_post + n_unassigned_period = frame.videos_expected`
+（容差 `videos_expected_tol`；未写则按 0）。没有这块、或没有 `videos_expected` 时，恒等式检查不运行。检查读的是这个字段，不得把 567 写进闸门脚本。
+
+```frame
+windows.tier IN ('A','B')
+videos_expected 567
+videos_expected_tol 0
+```
 
 ## 还要交的东西（这部分不进 numbers 块）
 
