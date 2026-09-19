@@ -48,6 +48,14 @@ jobs:
       - name: The same on main, where there is no branch point to check
         if: github.event_name != 'pull_request'
         run: python scripts/output_check.py --head-ref HEAD
+      - name: Double and permute invariants from this checkout (HEAD, not /tmp/gate)
+        # After A1, the three gate scripts are copied from the base branch into
+        # /tmp/gate. This file (scripts/relations.py) is new: a base
+        # output_check.py cannot import or invoke it until this PR merges, so
+        # this job would stay green without ever running the new check.
+        # Run it from the pull-request workspace. Do not fold it into
+        # /tmp/gate/output_check.py. Temp corpora go to $RUNNER_TEMP, never data/.
+        run: python scripts/relations.py --head-ref HEAD
 
   scope-check:
     if: github.event_name == 'pull_request'
