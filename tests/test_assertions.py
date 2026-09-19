@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import sqlite3
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -12,7 +11,9 @@ from src.agreement import assert_no_null_jp_match
 from src.bootstrap import (
     assert_bootstrap_B,
     assert_inconclusive_when_unreliable,
+    assert_kitagawa_pre_mix,
     assert_seeds_distinct,
+    kitagawa_from_stratum_sums,
     make_stratum_seeds,
 )
 from src.frame import (
@@ -40,7 +41,6 @@ from src.measures import (
 )
 from src.status_io import read_completed_output, write_json_atomic, write_status
 from src.tables import quote_ident
-from src.weights import assert_stratum_weights, stratum_weights
 from src.write_results import eval_derived, n_for, run_sql_file
 
 
@@ -238,21 +238,25 @@ def test_null_jp_match():
         assert_no_null_jp_match(df, judgeable)
 
 
-def test_stratum_weights():
-    w = np.ones(2)
-    N_h = np.array([10.0, 20.0])
-    n_h = np.array([5.0, 8.0])
+def test_kitagawa_pre_mix_weights():
     with pytest.raises(
-        ValueError, match=r"^stratum weights do not equal N_h divided by n_h_judgeable"
+        ValueError,
+        match=r"^kitagawa pre-mix weights do not equal pre-period judgeable shares",
     ):
-        assert_stratum_weights(w, N_h, n_h)
+        assert_kitagawa_pre_mix(1.0, 0.0, 10.0, 10.0)
 
 
-def test_stratum_weights_ok():
-    N_h = np.array([10.0, 20.0])
-    n_h = np.array([5.0, 8.0])
-    w = stratum_weights(N_h, n_h)
-    assert_stratum_weights(w, N_h, n_h)
+def test_kitagawa_pre_mix_weights_ok():
+    assert_kitagawa_pre_mix(0.25, 0.75, 10.0, 30.0)
+    sums = {
+        "film_pre": (10.0, 8.0),
+        "film_post": (10.0, 7.0),
+        "other_pre": (30.0, 24.0),
+        "other_post": (20.0, 16.0),
+    }
+    point = kitagawa_from_stratum_sums(sums)
+    assert point["w_film_pre"] == 0.25
+    assert point["w_other_pre"] == 0.75
 
 
 def test_seeds_not_distinct():

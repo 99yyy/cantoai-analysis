@@ -1,0 +1,12 @@
+# kills: kitagawa pre-mix weights do not equal pre-period judgeable shares
+--- a/src/bootstrap.py
++++ b/src/bootstrap.py
+@@ -64,7 +64,7 @@
+     m_post = sums["film_post"][1] + sums["other_post"][1]
+     agree_pre = m_pre / j_pre
+     agree_post = m_post / j_post
+-    w_film_pre = sums["film_pre"][0] / j_pre
++    w_film_pre = 1.0
+     w_other_pre = sums["other_pre"][0] / j_pre
+     assert_kitagawa_pre_mix(
+         w_film_pre, w_other_pre, sums["film_pre"][0], sums["other_pre"][0]

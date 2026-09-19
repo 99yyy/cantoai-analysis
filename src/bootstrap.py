@@ -31,6 +31,24 @@ def assert_bootstrap_B(B: int) -> None:
         raise ValueError("bootstrap B is below 1000")
 
 
+def assert_kitagawa_pre_mix(
+    w_film_pre: float,
+    w_other_pre: float,
+    j_film_pre: float,
+    j_other_pre: float,
+) -> None:
+    total = float(j_film_pre) + float(j_other_pre)
+    expected_film = float(j_film_pre) / total
+    expected_other = float(j_other_pre) / total
+    if (
+        abs(float(w_film_pre) - expected_film) > 1e-6
+        or abs(float(w_other_pre) - expected_other) > 1e-6
+    ):
+        raise ValueError(
+            "kitagawa pre-mix weights do not equal pre-period judgeable shares"
+        )
+
+
 def video_stratum(film_group: str, period: str) -> str:
     return f"{film_group}_{period}"
 
@@ -48,6 +66,9 @@ def kitagawa_from_stratum_sums(sums: dict[str, tuple[float, float]]) -> dict[str
     agree_post = m_post / j_post
     w_film_pre = sums["film_pre"][0] / j_pre
     w_other_pre = sums["other_pre"][0] / j_pre
+    assert_kitagawa_pre_mix(
+        w_film_pre, w_other_pre, sums["film_pre"][0], sums["other_pre"][0]
+    )
     cf_post = w_film_pre * agr("film_post") + w_other_pre * agr("other_post")
     residual = agree_pre - cf_post
     unadjusted = agree_pre - agree_post
