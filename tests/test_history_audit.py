@@ -1,9 +1,12 @@
-"""history_audit treats brief declaration widen/delete as a bar (loop §3.3)
-and measures task SQL, requiring BAR-CHANGE to name bar paths (loop §3.4)."""
+"""history_audit treats brief declaration widen/delete as a bar (loop §3.3),
+measures task SQL and requires BAR-CHANGE to name bar paths (loop §3.4),
+and subtracts bar paths from measured so a gate-script fail-site net delete
+is not a self-lock (loop §7 item 1 alternative)."""
 
 from __future__ import annotations
 
 import importlib.util
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -287,3 +290,60 @@ def test_bar_change_naming_all_paths_is_ok():
     ]
     declared = ["BAR-CHANGE: tests/mutations/ and expected/rows.json unused"]
     assert history_audit.unnamed_bar_paths(bars, declared) == []
+
+
+def test_scripts_py_is_bar_counted():
+    assert "scripts/*.py" in history_audit.BAR_COUNTED
+    assert "scripts/**/*.py" in history_audit.BAR_COUNTED
+    glob, label = history_audit.BAR_COUNTED["scripts/*.py"]
+    assert glob == history_audit.GATE_FAIL_SITE_RE
+    assert label == "fail sites"
+
+
+def test_gate_fail_site_pattern_hits_output_check_not_scope_check():
+    pat = history_audit.GATE_FAIL_SITE_RE
+    oc = (ROOT / "scripts" / "output_check.py").read_text(encoding="utf-8")
+    sc = (ROOT / "scripts" / "scope_check.py").read_text(encoding="utf-8")
+    ha = (ROOT / "scripts" / "history_audit.py").read_text(encoding="utf-8")
+    n_oc = len(re.findall(pat, oc))
+    n_sc = len(re.findall(pat, sc))
+    n_ha = len(re.findall(pat, ha))
+    assert n_oc > 0
+    assert n_sc == 0
+    assert n_ha == 0
+
+
+def test_bar_path_from_gate_fail_site_entry():
+    assert (
+        history_audit.bar_path("scripts/output_check.py (fail sites 53 -> 51)")
+        == "scripts/output_check.py"
+    )
+
+
+def test_gate_dedupe_self_lock_naive_measured_includes_the_bar():
+    files = ["scripts/output_check.py"]
+    bars = ["scripts/output_check.py (fail sites 53 -> 51)"]
+    naive = sorted(f for f in files if history_audit.match_any(f, history_audit.MEASURED))
+    assert naive == ["scripts/output_check.py"]
+    assert bars and naive
+
+
+def test_gate_dedupe_measured_paths_subtracts_the_bar():
+    files = ["scripts/output_check.py"]
+    bars = ["scripts/output_check.py (fail sites 53 -> 51)"]
+    assert history_audit.measured_paths(files, bars) == []
+    declared = ["BAR-CHANGE: scripts/output_check.py gate dedupe"]
+    assert history_audit.unnamed_bar_paths(bars, declared) == []
+
+
+def test_gate_dedupe_with_src_still_cochanges():
+    files = ["scripts/output_check.py", "src/frame.py"]
+    bars = ["scripts/output_check.py (fail sites 53 -> 51)"]
+    assert history_audit.measured_paths(files, bars) == ["src/frame.py"]
+
+
+def test_scope_check_is_measured_and_not_a_fail_site_bar_on_this_tree():
+    assert history_audit.match_any("scripts/scope_check.py", history_audit.MEASURED)
+    files = ["scripts/scope_check.py"]
+    bars: list[str] = []
+    assert history_audit.measured_paths(files, bars) == ["scripts/scope_check.py"]
