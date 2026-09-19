@@ -1,4 +1,4 @@
-"""output_check SQL replay requires EXPLAIN QUERY PLAN to touch the corpus."""
+"""output_check SQL replay requires a corpus plan and a deterministic statement."""
 
 from __future__ import annotations
 
@@ -228,3 +228,106 @@ def test_same_path_on_both_sides_is_not_a_hash_collision(tmp_path):
         "6", tmp_path, {p: "a"}, {p: "a"}
     )
     assert msgs == []
+
+
+DETERMINISM = r"a replayed number must be deterministic"
+
+
+def test_forbidden_nondeterminism_names_random_and_randomblob():
+    assert (
+        output_check.forbidden_nondeterminism(
+            "SELECT COUNT(*) + (abs(random()) % 5) / 100.0 FROM videos"
+        )
+        == "random()"
+    )
+    assert (
+        output_check.forbidden_nondeterminism(
+            "SELECT COUNT(*) + length(randomblob(4)) FROM videos"
+        )
+        == "randomblob()"
+    )
+
+
+def test_forbidden_nondeterminism_strftime_now_family():
+    assert (
+        output_check.forbidden_nondeterminism(
+            "SELECT COUNT(*) + CAST(strftime('%f', 'now') AS REAL) FROM videos"
+        )
+        == "strftime('now')"
+    )
+    assert (
+        output_check.forbidden_nondeterminism(
+            "SELECT COUNT(*) FROM videos WHERE date('now') IS NOT NULL"
+        )
+        == "strftime('now')"
+    )
+    assert (
+        output_check.forbidden_nondeterminism(
+            "SELECT COUNT(*) FROM videos WHERE datetime('now', 'localtime') IS NOT NULL"
+        )
+        == "strftime('now')"
+    )
+    assert (
+        output_check.forbidden_nondeterminism(
+            "SELECT COUNT(*) FROM videos WHERE CURRENT_TIMESTAMP IS NOT NULL"
+        )
+        == "strftime('now')"
+    )
+
+
+def test_forbidden_nondeterminism_allows_strftime_without_now():
+    assert (
+        output_check.forbidden_nondeterminism(
+            "SELECT COUNT(*) FROM videos WHERE strftime('%Y', '2024-01-01') = '2024'"
+        )
+        is None
+    )
+
+
+def test_random_jitter_fails_determinism_gate(conn, tmp_path):
+    with pytest.raises(output_check.Fail, match=DETERMINISM):
+        _run(
+            conn,
+            tmp_path,
+            "SELECT COUNT(*) + (abs(random()) % 5) / 100.0 FROM videos;\n",
+            name="gap_all_pp.sql",
+        )
+
+
+def test_randomblob_fails_determinism_gate(conn, tmp_path):
+    with pytest.raises(output_check.Fail, match=r"uses randomblob\(\)"):
+        _run(
+            conn,
+            tmp_path,
+            "SELECT COUNT(*) + length(randomblob(4)) FROM videos;\n",
+        )
+
+
+def test_strftime_now_fails_determinism_gate(conn, tmp_path):
+    with pytest.raises(output_check.Fail, match=r"strftime\('now'\)"):
+        _run(
+            conn,
+            tmp_path,
+            "SELECT COUNT(*) + CAST(strftime('%f', 'now') AS REAL) / 1000 FROM videos;\n",
+        )
+
+
+def test_random_in_comment_is_not_a_call(conn, tmp_path):
+    got = _run(
+        conn,
+        tmp_path,
+        "SELECT COUNT(*) FROM videos; -- random() strftime('now')\n",
+    )
+    assert got == 567.0
+
+
+def test_execute_twice_disagreement_fails(conn, tmp_path):
+    state = {"n": 0}
+
+    def flip() -> int:
+        state["n"] += 1
+        return state["n"]
+
+    conn.create_function("flip", 0, flip)
+    with pytest.raises(output_check.Fail, match=r"returned 568 then 569"):
+        _run(conn, tmp_path, "SELECT COUNT(*) + flip() FROM videos;\n")
