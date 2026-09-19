@@ -44,10 +44,22 @@ def test_task_brief_regex_is_top_level_only():
 
 def test_real_task_6_numbers_block_has_39_names():
     blocks = history_audit.parse_declaration_blocks(BRIEF.read_text(encoding="utf-8"))
-    assert set(blocks) == {"numbers"}
+    assert set(blocks) == {"numbers", "n", "frame"}
     assert len(blocks["numbers"]) == 39
     assert blocks["numbers"]["n_videos_pre"] == (0.0,)
     assert blocks["numbers"]["gap_contract_pp"] == (0.05,)
+    # derived: n rows are not numeric, so history_audit skips them; the four
+    # video-table constants remain bars.
+    assert blocks["n"] == {
+        "n_videos_pre": (567.0,),
+        "n_videos_post": (567.0,),
+        "n_unassigned_period": (567.0,),
+        "n_unassigned_film": (567.0,),
+    }
+    assert blocks["frame"] == {
+        "videos_expected": (567.0,),
+        "videos_expected_tol": (0.0,),
+    }
 
 
 def test_identical_brief_is_not_a_bar():

@@ -368,14 +368,26 @@ def test_task_ids_from_paths_ignores_review_and_unrelated():
     assert output_check.task_ids_from_paths(["src/frame.py"]) == frozenset()
 
 
-def _write_brief(root: Path, n: str, status: str = "open", name: str = "n_count") -> Path:
+def _write_brief(
+    root: Path,
+    n: str,
+    status: str = "open",
+    name: str = "n_count",
+    n_block: str | None = None,
+    frame_block: str | None = None,
+    extra_numbers: str = "",
+) -> Path:
     md = root / "tasks" / f"TASK-{n}.md"
     md.parent.mkdir(parents=True, exist_ok=True)
-    md.write_text(
+    body = (
         f"# TASK-{n}\n\nstatus: {status}\n\n"
-        f"```numbers\n# name  tol\n{name}  0\n```\n",
-        encoding="utf-8",
+        f"```numbers\n# name  tol\n{name}  0\n{extra_numbers}```\n"
     )
+    if n_block is not None:
+        body += f"\n```n\n{n_block}\n```\n"
+    if frame_block is not None:
+        body += f"\n```frame\n{frame_block}\n```\n"
+    md.write_text(body, encoding="utf-8")
     return md
 
 
@@ -584,9 +596,11 @@ def _touch_results(repo: Path, n: str) -> None:
 def test_parse_brief_accepts_blocked_and_escalated(tmp_path):
     for st in ("open", "closed", "escalated", "blocked"):
         md = _write_brief(tmp_path, f"s{st}", status=st)
-        got, tol = output_check.parse_brief(md)
-        assert got == st
-        assert "n_count" in tol
+        brief = output_check.parse_brief(md)
+        assert brief.status == st
+        assert "n_count" in brief.tol
+        assert brief.n_decl is None
+        assert brief.frame == {}
 
 
 def test_parse_brief_rejects_uppercase_blocked(tmp_path):
@@ -776,3 +790,268 @@ def test_blocked_task_on_main_does_not_fail_the_repo(tmp_path, capsys):
     assert code == 0, out
     assert "suspended" in out
     assert "disagree" not in out
+
+
+# --------------------------------------------------------------------------- §2.5 + period identity
+
+
+def _agreeing_videos(
+    root: Path,
+    n: str = "7",
+    row_n: int = 1,
+    n_block: str | None = None,
+    frame_block: str | None = None,
+    extra_numbers: str = "",
+    names: tuple[str, ...] = ("n_count",),
+) -> Path:
+    """Both sides count videos, same value, chosen ``n``."""
+    md = _write_brief(
+        root,
+        n,
+        name=names[0],
+        n_block=n_block,
+        frame_block=frame_block,
+        extra_numbers=extra_numbers,
+    )
+    w_sql = root / "tasks" / f"TASK-{n}" / "sql" / "count_videos.sql"
+    v_sql = root / "tasks" / f"TASK-{n}" / "mine_sql" / "count_videos_as.sql"
+    w_sql.parent.mkdir(parents=True, exist_ok=True)
+    v_sql.parent.mkdir(parents=True, exist_ok=True)
+    w_sql.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+    v_sql.write_text("SELECT COUNT(*) FROM videos AS vid;\n", encoding="utf-8")
+    w_rows = [
+        {
+            "name": names[0],
+            "value": 567,
+            "n": row_n,
+            "query": f"tasks/TASK-{n}/sql/count_videos.sql",
+        }
+    ]
+    v_rows = [
+        {
+            "name": names[0],
+            "value": 567,
+            "n": row_n,
+            "query": f"tasks/TASK-{n}/mine_sql/count_videos_as.sql",
+        }
+    ]
+    (root / "tasks" / f"TASK-{n}" / "results.json").write_text(
+        json.dumps(w_rows, indent=2) + "\n", encoding="utf-8"
+    )
+    (root / "tasks" / f"TASK-{n}" / "mine.json").write_text(
+        json.dumps(v_rows, indent=2) + "\n", encoding="utf-8"
+    )
+    return md
+
+
+def test_parse_brief_task_6_n_and_frame():
+    brief = output_check.parse_brief(ROOT / "tasks" / "TASK-6.md")
+    assert brief.status == "closed"
+    assert len(brief.tol) == 39
+    assert brief.n_decl is not None
+    assert set(brief.n_decl) == set(brief.tol)
+    assert brief.n_decl["n_videos_pre"] == "567"
+    assert brief.n_decl["n_match_pre"] == "derived:n_total_pre"
+    assert (
+        brief.n_decl["gap_contract_pp"]
+        == "derived:n_judgeable_pre + n_judgeable_post"
+    )
+    assert brief.frame[output_check.VIDEOS_EXPECTED] == 567.0
+    assert brief.frame[output_check.VIDEOS_EXPECTED_TOL] == 0.0
+
+
+def test_n_fence_does_not_eat_the_numbers_fence(tmp_path):
+    md = _write_brief(tmp_path, "7")
+    text = md.read_text(encoding="utf-8")
+    assert output_check.N_FENCE.search(text) is None
+    assert output_check.BLOCK.search(text) is not None
+
+
+def test_parse_n_block_rejects_empty(tmp_path):
+    md = _write_brief(tmp_path, "7", n_block="# nothing\n")
+    with pytest.raises(output_check.Fail, match=r"the n block is empty"):
+        output_check.parse_brief(md)
+
+
+def test_n_block_name_set_must_equal_numbers(tmp_path):
+    md = _write_brief(tmp_path, "7", n_block="other  1\n")
+    with pytest.raises(output_check.Fail, match=r"```n block"):
+        output_check.parse_brief(md)
+    md = _write_brief(
+        tmp_path, "7", n_block="n_count  1\nother  1\n"
+    )
+    with pytest.raises(output_check.Fail, match=r"not in the numbers block: other"):
+        output_check.parse_brief(md)
+
+
+def test_parse_n_block_constant_and_derived(tmp_path):
+    md = _write_brief(tmp_path, "7", n_block="n_count  derived:n_count\n")
+    brief = output_check.parse_brief(md)
+    assert brief.n_decl == {"n_count": "derived:n_count"}
+    md = _write_brief(tmp_path, "7", n_block="n_count  567\n")
+    brief = output_check.parse_brief(md)
+    assert brief.n_decl == {"n_count": "567"}
+
+
+def test_parse_frame_skips_predicates_and_keeps_videos_expected(tmp_path):
+    md = _write_brief(
+        tmp_path,
+        "7",
+        frame_block=(
+            "windows.tier IN ('A','B')\n"
+            "videos_expected 567\n"
+            "videos_expected_tol 0\n"
+        ),
+    )
+    brief = output_check.parse_brief(md)
+    assert brief.frame == {"videos_expected": 567.0, "videos_expected_tol": 0.0}
+
+
+def test_without_n_block_matching_n_of_1_still_passes(conn, tmp_path):
+    """Declared-n check is off when the brief has no ```n``` fence."""
+    md = _agreeing_videos(tmp_path, row_n=1)
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    assert fail == []
+
+
+def test_with_n_block_n_of_1_fails_even_when_agents_agree(conn, tmp_path):
+    """Probe class: both files n=1, pairwise equal, declared n=567 → RED."""
+    md = _agreeing_videos(tmp_path, row_n=1, n_block="n_count  567\n")
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    hits = [m for m in fail if "brief declares n=567" in m]
+    assert len(hits) == 2
+    assert any(m.startswith("results.json:n_count: n=1,") for m in hits)
+    assert any(m.startswith("mine.json:n_count: n=1,") for m in hits)
+    assert not any("disagree" in m for m in fail)
+    assert not any("over the same corpus" in m for m in fail)
+
+
+def test_pairwise_n_still_fires_alongside_declared_n(conn, tmp_path):
+    md = _agreeing_videos(tmp_path, row_n=567, n_block="n_count  567\n")
+    mine = tmp_path / "tasks" / "TASK-7" / "mine.json"
+    data = json.loads(mine.read_text(encoding="utf-8"))
+    data[0]["n"] = 1
+    mine.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    assert any("brief declares n=567" in m and m.startswith("mine.json:") for m in fail)
+    assert any("worker counted n=567 and verifier n=1" in m for m in fail)
+
+
+def test_derived_n_uses_replayed_value(conn, tmp_path):
+    md = _agreeing_videos(tmp_path, row_n=1, n_block="n_count  derived:n_count\n")
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    assert any("brief declares n=567" in m for m in fail)
+
+    md = _agreeing_videos(tmp_path, row_n=567, n_block="n_count  derived:n_count\n")
+    fail = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    assert fail == []
+
+
+def test_period_identity_holds_on_replayed_sum():
+    fail: list[str] = []
+    note = output_check.check_period_identity(
+        "6",
+        "results.json",
+        {
+            "n_videos_pre": 0.0,
+            "n_videos_post": 0.0,
+            "n_unassigned_period": 0.0,
+        },
+        {
+            "n_videos_pre": 391.0,
+            "n_videos_post": 176.0,
+            "n_unassigned_period": 0.0,
+        },
+        {"videos_expected": 567.0, "videos_expected_tol": 0.0},
+        fail,
+    )
+    assert fail == []
+    assert note is not None
+    assert "frame.videos_expected" in note
+    assert "567" in note
+
+
+def test_period_identity_fails_against_frame_field_not_a_literal():
+    fail: list[str] = []
+    note = output_check.check_period_identity(
+        "6",
+        "results.json",
+        {
+            "n_videos_pre": 0.0,
+            "n_videos_post": 0.0,
+            "n_unassigned_period": 0.0,
+        },
+        {
+            "n_videos_pre": 391.0,
+            "n_videos_post": 176.0,
+            "n_unassigned_period": 0.0,
+        },
+        {"videos_expected": 1.0, "videos_expected_tol": 0.0},
+        fail,
+    )
+    assert note is None
+    assert fail == [
+        "TASK-6: results.json: n_videos_pre + n_videos_post + n_unassigned_period "
+        "= 391 + 176 + 0 = 567, but frame.videos_expected is 1 (tol 0)"
+    ]
+
+
+def test_period_identity_skipped_without_videos_expected():
+    fail: list[str] = []
+    note = output_check.check_period_identity(
+        "6",
+        "results.json",
+        {
+            "n_videos_pre": 0.0,
+            "n_videos_post": 0.0,
+            "n_unassigned_period": 0.0,
+        },
+        {
+            "n_videos_pre": 391.0,
+            "n_videos_post": 176.0,
+            "n_unassigned_period": 0.0,
+        },
+        {},
+        fail,
+    )
+    assert note is None
+    assert fail == []
+
+
+def test_period_identity_skipped_when_the_three_names_are_not_declared():
+    fail: list[str] = []
+    note = output_check.check_period_identity(
+        "7",
+        "results.json",
+        {"n_count": 0.0},
+        {"n_count": 567.0},
+        {"videos_expected": 567.0},
+        fail,
+    )
+    assert note is None
+    assert fail == []
+
+
+def test_period_identity_source_does_not_hardcode_567():
+    src = (ROOT / "scripts" / "output_check.py").read_text(encoding="utf-8")
+    start = src.index("def check_period_identity")
+    end = src.index("\ndef parse_rows")
+    body = src[start:end]
+    assert "567" not in body
+    assert "VIDEOS_EXPECTED" in body
+
+
+def test_full_check_task_6_declared_n_and_period_identity(conn, capsys):
+    md = ROOT / "tasks" / "TASK-6.md"
+    fail: list[str] = []
+    output_check.check_task(ROOT, md, conn, 60.0, None, None, fail)
+    out = capsys.readouterr().out
+    assert fail == []
+    assert "39/39 n declared" in out
+    assert "period identity" in out
+    assert "frame.videos_expected" in out
