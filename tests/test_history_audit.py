@@ -1,4 +1,5 @@
-"""history_audit treats brief declaration widen/delete as a bar (loop §3.3)."""
+"""history_audit treats brief declaration widen/delete as a bar (loop §3.3)
+and measures task SQL, requiring BAR-CHANGE to name bar paths (loop §3.4)."""
 
 from __future__ import annotations
 
@@ -224,3 +225,65 @@ status: closed
     assert "tasks/TASK-6.md ```numbers n_videos_pre deleted" in hits
     assert "tasks/TASK-6.md ```numbers gap_contract_pp deleted" in hits
     assert len(hits) == 4
+
+
+def test_measured_includes_tasks_sql_glob():
+    assert "tasks/**/*.sql" in history_audit.MEASURED
+
+
+def test_task_sql_is_measured_toplevel_sql_still_is():
+    m = history_audit.MEASURED
+    assert history_audit.match_any("tasks/TASK-6/sql/n_videos_pre.sql", m)
+    assert history_audit.match_any("tasks/TASK-6/mine_sql/count_videos_pre.sql", m)
+    assert history_audit.match_any("sql/legacy.sql", m)
+    assert not history_audit.match_any("tasks/TASK-6.md", m)
+    assert not history_audit.match_any("tasks/TASK-6/results.json", m)
+    assert not history_audit.match_any("tasks/TASK-6/open_analysis.md", m)
+
+
+def test_bar_path_from_mutation_count_entry():
+    assert history_audit.bar_path("tests/mutations/ (5 -> 4 patches)") == "tests/mutations/"
+
+
+def test_bar_path_from_yaml_and_brief_entries():
+    assert history_audit.bar_path("frame.yaml:threshold (1 -> 2)") == "frame.yaml"
+    assert (
+        history_audit.bar_path(
+            "tasks/TASK-6.md ```numbers gap_contract_pp tolerance widened (0.05 -> 1)"
+        )
+        == "tasks/TASK-6.md"
+    )
+    assert history_audit.bar_path("expected/rows.json") == "expected/rows.json"
+
+
+def test_vague_bar_change_names_no_path():
+    bars = ["tests/mutations/ (5 -> 4 patches)"]
+    assert history_audit.unnamed_bar_paths(bars, ["BAR-CHANGE: x"]) == [
+        "tests/mutations/"
+    ]
+
+
+def test_bar_change_must_name_every_path():
+    bars = [
+        "tests/mutations/ (5 -> 4 patches)",
+        "expected/rows.json",
+    ]
+    missing = history_audit.unnamed_bar_paths(
+        bars, ["BAR-CHANGE: tests/mutations/ fewer patches"]
+    )
+    assert missing == ["expected/rows.json"]
+
+
+def test_bar_change_naming_the_patch_covers_mutations_dir():
+    bars = ["tests/mutations/ (5 -> 4 patches)"]
+    declared = ["BAR-CHANGE: tests/mutations/tier_filter_removed.patch unused"]
+    assert history_audit.unnamed_bar_paths(bars, declared) == []
+
+
+def test_bar_change_naming_all_paths_is_ok():
+    bars = [
+        "tests/mutations/ (5 -> 4 patches)",
+        "expected/rows.json",
+    ]
+    declared = ["BAR-CHANGE: tests/mutations/ and expected/rows.json unused"]
+    assert history_audit.unnamed_bar_paths(bars, declared) == []
