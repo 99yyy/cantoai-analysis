@@ -51,7 +51,9 @@ REPAIR_RE = re.compile(r"^(?:repair/|cursor/repair-)")
 CHORE_RE = re.compile(r"^chore/")
 
 # Only the owner changes the rules, the corpus, the loop docs, or the CI that
-# enforces them. An agent that needs one of these changed writes BLOCKED instead.
+# enforces them. An agent that needs one of these changed writes an empty
+# commit whose subject starts with BLOCKED: instead (plan §4.4); the owner
+# then sets status: blocked or escalated on the brief.
 # scripts/ is the gate that judges the agent; README.md pins the corpus sha;
 # LOOP.md is the procedure the gate enforces. Changing README sha alone is not
 # a full walk-through (data/** is already denied); it is still DENY.
