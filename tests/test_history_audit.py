@@ -59,6 +59,12 @@ def test_real_task_6_numbers_block_has_39_names():
     assert blocks["frame"] == {
         "videos_expected": (567.0,),
         "videos_expected_tol": (0.0,),
+        "windows_expected": (4911.0,),
+        "windows_expected_tol": (0.0,),
+        "syllables_expected": (171867.0,),
+        "syllables_expected_tol": (0.0,),
+        "published_expected": (164693.0,),
+        "published_expected_tol": (0.0,),
     }
 
 

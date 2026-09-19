@@ -9,6 +9,7 @@ import sqlite3
 from pathlib import Path
 
 from src.hashing import verify_corpus_hash
+from src.pins import load_frame_counts
 
 SQL_NAMES = [
     "n_videos_pre",
@@ -138,14 +139,14 @@ def eval_derived(expr: str, known: dict[str, float]) -> float:
     return ev(tree.body)
 
 
-def n_for(name: str, got: dict[str, float]) -> int:
+def n_for(name: str, got: dict[str, float], videos_n: int) -> int:
     if name in {
         "n_videos_pre",
         "n_videos_post",
         "n_unassigned_period",
         "n_unassigned_film",
     }:
-        return 567
+        return videos_n
     if name == "agree_film_pre":
         return int(got["n_judgeable_film_pre"])
     if name == "agree_film_post":
@@ -184,8 +185,11 @@ def query_for(name: str) -> str:
     return f"tasks/TASK-6/sql/{name}.sql"
 
 
-def compute_results(corpus_PATH: str, readme_PATH: str, sql_DIR: str) -> list[dict]:
+def compute_results(
+    corpus_PATH: str, readme_PATH: str, brief_PATH: str, sql_DIR: str
+) -> list[dict]:
     verify_corpus_hash(corpus_PATH, readme_PATH)
+    videos_n = load_frame_counts(brief_PATH, readme_PATH).videos_expected
     conn = sqlite3.connect("file:" + corpus_PATH + "?mode=ro", uri=True)
     try:
         got: dict[str, float] = {}
@@ -202,7 +206,7 @@ def compute_results(corpus_PATH: str, readme_PATH: str, sql_DIR: str) -> list[di
             {
                 "name": name,
                 "value": json_num(name, got[name]),
-                "n": n_for(name, got),
+                "n": n_for(name, got, videos_n),
                 "query": query_for(name),
             }
         )
@@ -213,10 +217,13 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--corpus_PATH", required=True)
     parser.add_argument("--readme_PATH", required=True)
+    parser.add_argument("--brief_PATH", required=True)
     parser.add_argument("--sql_DIR", required=True)
     parser.add_argument("--out_FILE", required=True)
     args = parser.parse_args()
-    rows = compute_results(args.corpus_PATH, args.readme_PATH, args.sql_DIR)
+    rows = compute_results(
+        args.corpus_PATH, args.readme_PATH, args.brief_PATH, args.sql_DIR
+    )
     out_FILE = args.out_FILE
     tmp_FILE = out_FILE + ".tmp"
     Path(tmp_FILE).write_text(json.dumps(rows, indent=2) + "\n", encoding="utf-8")

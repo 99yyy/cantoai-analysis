@@ -19,6 +19,7 @@ from src.bootstrap import (
 )
 from src.decompose import point_kitagawa, rare_char_set, stratum_sizes, video_cells_via_map
 from src.frame import load_published_frame
+from src.pins import FrameCounts
 from src.groups import assign_groups
 from src.hashing import verify_corpus_hash
 from src.measures import attach_agreement, flatten_key
@@ -61,6 +62,7 @@ def render_open_analysis(
     explained_pp: float,
     unadj_pp: float,
     did_pp: float,
+    frame_counts: FrameCounts,
 ) -> str:
     g = boot["G_h"]
     ci_lo, ci_hi = boot["residual_ci95"]
@@ -71,7 +73,7 @@ def render_open_analysis(
     lines = [
         "# TASK-6 open analysis",
         "",
-        "Population: the 567 videos of this channel. The statistic is agreement",
+        f"Population: the {frame_counts.videos_expected} videos of this channel. The statistic is agreement",
         "between the acoustic Jyutping and the dictionary, not a human label.",
         "",
         "## Decomposition",
@@ -116,7 +118,7 @@ def render_open_analysis(
         f"Master seed {boot['master_seed']}. Per-stratum seeds are",
         "`int(sha256(f\"{master_seed}:{h}\").hexdigest()[:8], 16)`.",
         "",
-        "G_h (videos per stratum, census of the 567 videos of this channel):",
+        f"G_h (videos per stratum, census of the {frame_counts.videos_expected} videos of this channel):",
         "",
     ]
     for h in STRATA:
@@ -148,7 +150,7 @@ def render_open_analysis(
             "",
             "## Conclusion",
             "",
-            "On the 567 videos of this channel, the title-proxy film mix accounts for",
+            f"On the {frame_counts.videos_expected} videos of this channel, the title-proxy film mix accounts for",
             "only a minority of the post-2024 agreement drop; the residual remains",
             "after reweighting post rates to the pre film mix and sits in tone and",
             "segment disagreements rather than in rare-character share.",
@@ -158,7 +160,13 @@ def render_open_analysis(
     return "\n".join(lines)
 
 
-def run(corpus_PATH: str, readme_PATH: str, out_DIR: str, repo_ROOT: str) -> None:
+def run(
+    corpus_PATH: str,
+    readme_PATH: str,
+    brief_PATH: str,
+    out_DIR: str,
+    repo_ROOT: str,
+) -> None:
     out_ROOT = Path(out_DIR)
     out_ROOT.mkdir(parents=True, exist_ok=True)
     status_FILE = str(out_ROOT / "STATUS.json")
@@ -167,7 +175,7 @@ def run(corpus_PATH: str, readme_PATH: str, out_DIR: str, repo_ROOT: str) -> Non
     corpus_hash = verify_corpus_hash(corpus_PATH, readme_PATH)
     conn = open_corpus(corpus_PATH)
     try:
-        loaded = load_published_frame(conn)
+        loaded = load_published_frame(conn, brief_PATH, readme_PATH)
     finally:
         conn.close()
 
@@ -252,7 +260,7 @@ def run(corpus_PATH: str, readme_PATH: str, out_DIR: str, repo_ROOT: str) -> Non
     assert_inconclusive_when_unreliable(ci_unreliable_any, conclusion)
 
     decomposition = {
-        "population": "the 567 videos of this channel",
+        "population": f"the {loaded['counts'].videos_expected} videos of this channel",
         "standardization": "kitagawa_film_pre_mix",
         "variables": {
             "film_group": "videos.title markers listed in TASK-6.md; title proxy",
@@ -333,6 +341,7 @@ def run(corpus_PATH: str, readme_PATH: str, out_DIR: str, repo_ROOT: str) -> Non
         explained_pp,
         unadj_pp,
         did_pp,
+        loaded["counts"],
     )
 
     decomp_FILE = str(out_ROOT / "decomposition.json")
@@ -358,10 +367,17 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--corpus_PATH", required=True)
     parser.add_argument("--readme_PATH", required=True)
+    parser.add_argument("--brief_PATH", required=True)
     parser.add_argument("--out_DIR", required=True)
     parser.add_argument("--repo_ROOT", required=True)
     args = parser.parse_args()
-    run(args.corpus_PATH, args.readme_PATH, args.out_DIR, args.repo_ROOT)
+    run(
+        args.corpus_PATH,
+        args.readme_PATH,
+        args.brief_PATH,
+        args.out_DIR,
+        args.repo_ROOT,
+    )
 
 
 if __name__ == "__main__":
