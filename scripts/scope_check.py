@@ -25,7 +25,8 @@ CI, and the contract.
 What each class may touch:
 
     agent   anything except DENY and the task briefs; it writes its outputs
-            under tasks/TASK-N/, which is allowed
+            under tasks/TASK-N/, which is allowed. DENY includes the gates
+            under scripts/, the corpus pin in README.md, and LOOP.md
     chore   only CHORE_ALLOW, and never DENY (same deny list as agent)
     repair  anything, once the actor is a repository owner
 
@@ -49,9 +50,18 @@ AGENT_RE = re.compile(r"^(?:cursor|box)/[rt](?P<task>\d+)-(?P<scope>[a-z0-9_]+)-
 REPAIR_RE = re.compile(r"^(?:repair/|cursor/repair-)")
 CHORE_RE = re.compile(r"^chore/")
 
-# Only the owner changes the rules, the corpus, or the CI that enforces them. An
-# agent that needs one of these changed writes BLOCKED instead.
-DENY = [".cursor/*", ".cursor/**", ".github/*", ".github/**", "data/*", "data/**"]
+# Only the owner changes the rules, the corpus, the loop docs, or the CI that
+# enforces them. An agent that needs one of these changed writes BLOCKED instead.
+# scripts/ is the gate that judges the agent; README.md pins the corpus sha;
+# LOOP.md is the procedure the gate enforces. Changing README sha alone is not
+# a full walk-through (data/** is already denied); it is still DENY.
+DENY = [
+    ".cursor/*", ".cursor/**",
+    ".github/*", ".github/**",
+    "data/*", "data/**",
+    "scripts/*", "scripts/**",
+    "README.md", "LOOP.md",
+]
 
 # The brief is the agent's scoresheet: the numbers it owes and the tolerance each
 # one gets are not its to move. Its outputs sit beside it, under tasks/TASK-N/,
@@ -62,8 +72,8 @@ DENY = [".cursor/*", ".cursor/**", ".github/*", ".github/**", "data/*", "data/**
 BRIEF_RE = re.compile(r"^tasks/[^/]+\.md$")
 
 CHORE_ALLOW = [
-    "README.md", "BACKGROUND.md", "PIPELINE.md", "REPORT.md", "RESEARCH_LOG.md",
-    "backlog.md", "LOOP.md", "STOP", "tasks/*", "tasks/**", "docs/*", "docs/**",
+    "BACKGROUND.md", "PIPELINE.md", "REPORT.md", "RESEARCH_LOG.md",
+    "backlog.md", "STOP", "tasks/*", "tasks/**", "docs/*", "docs/**",
 ]
 
 
