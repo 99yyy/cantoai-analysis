@@ -1,7 +1,9 @@
 """history_audit treats brief declaration widen/delete as a bar (loop §3.3),
 measures task SQL and requires BAR-CHANGE to name bar paths (loop §3.4),
-and subtracts bar paths from measured so a gate-script fail-site net delete
-is not a self-lock (loop §7 item 1 alternative)."""
+subtracts bar paths from measured so a gate-script fail-site net delete
+is not a self-lock (loop §7 item 1 alternative), and moves dead detector
+paths into RETIRED instead of deleting them (loop §7 item 2 alternative).
+"""
 
 from __future__ import annotations
 
@@ -347,3 +349,154 @@ def test_scope_check_is_measured_and_not_a_fail_site_bar_on_this_tree():
     files = ["scripts/scope_check.py"]
     bars: list[str] = []
     assert history_audit.measured_paths(files, bars) == ["scripts/scope_check.py"]
+
+
+PRE_RETIREMENT_SRC = '''\
+BAR_FILES = ["expected/*", "expected/**"]
+BAR_COUNTED = {
+    "scripts/contract_check.py": (r"\\\\b(?:row|compare_check)\\\\s*\\\\(", "contract checks emitted"),
+    "scripts/*.py": (r"fail", "fail sites"),
+    "scripts/**/*.py": (r"fail", "fail sites"),
+    "tests/*.py": (r"match\\\\s*=", "counterexample patterns"),
+    "tests/**/*.py": (r"match\\\\s*=", "counterexample patterns"),
+}
+BAR_YAML_FILES = ["frame.yaml", "rounds/ROUND-*.yaml"]
+MUTATION_GLOB = "tests/mutations/*.patch"
+MEASURED = ["src/*", "src/**", "sql/*", "sql/**", "data/*", "data/**",
+            "scripts/*.py", "scripts/**/*.py", "tasks/**/*.sql"]
+'''
+
+RETIRED_TOKENS = frozenset({
+    "expected/*",
+    "expected/**",
+    "scripts/contract_check.py",
+    "frame.yaml",
+    "rounds/ROUND-*.yaml",
+})
+
+
+def test_retired_convention_markers_are_recognized():
+    text = (ROOT / "scripts" / "history_audit.py").read_text(encoding="utf-8")
+    block = history_audit.retired_block(text)
+    assert block.startswith(history_audit.RETIRED_BEGIN)
+    assert block.endswith(history_audit.RETIRED_END)
+    for token in RETIRED_TOKENS:
+        assert token in block
+    assert "scripts/contract_check.py" in history_audit.RETIRED_LOGIC
+    assert "expected/*" in history_audit.RETIRED_LOGIC
+    assert "frame.yaml" in history_audit.RETIRED_LOGIC
+
+
+def test_retired_block_empty_when_markers_missing_or_inverted():
+    assert history_audit.retired_block("no markers") == ""
+    inverted = history_audit.RETIRED_END + "\n" + history_audit.RETIRED_BEGIN
+    assert history_audit.retired_block(inverted) == ""
+
+
+def test_dead_paths_are_retired_not_live():
+    live = history_audit.live_detector_paths()
+    retired = history_audit.retired_detector_paths()
+    assert retired == RETIRED_TOKENS
+    assert live.isdisjoint(retired)
+    assert "expected/*" not in history_audit.BAR_FILES
+    assert "expected/**" not in history_audit.BAR_FILES
+    assert history_audit.BAR_FILES == []
+    assert "scripts/contract_check.py" not in history_audit.BAR_COUNTED
+    assert history_audit.BAR_YAML_FILES == []
+    assert "sql/*" in history_audit.MEASURED
+    assert "sql/**" in history_audit.MEASURED
+    assert "tasks/**/*.sql" in history_audit.MEASURED
+
+
+def test_source_inventory_equals_live_union_retired():
+    text = (ROOT / "scripts" / "history_audit.py").read_text(encoding="utf-8")
+    inv = history_audit.detector_inventory(text)
+    assert inv == history_audit.live_detector_paths() | history_audit.retired_detector_paths()
+    assert RETIRED_TOKENS <= inv
+    assert "tasks/**/*.sql" in inv
+    assert "sql/*" in inv
+
+
+def test_inventory_does_not_count_regex_values_or_labels():
+    src = (
+        "BAR_COUNTED = {\n"
+        '    "scripts/contract_check.py": (r"\\\\b(?:row|compare_check)\\\\s*\\\\(", '
+        '"contract checks emitted"),\n'
+        "}\n"
+        "RETIRED = {\n"
+        '    "BAR_COUNTED": {\n'
+        '        "scripts/contract_check.py": (r"not-a-path", "contract checks emitted"),\n'
+        "    },\n"
+        "}\n"
+    )
+    inv = history_audit.detector_inventory(src)
+    assert inv == frozenset({"scripts/contract_check.py"})
+    assert "contract checks emitted" not in inv
+    assert "not-a-path" not in inv
+
+
+def test_retirement_preserves_inventory_versus_pre_retirement_source():
+    """Moving dead globs into RETIRED must not drop them from the union."""
+    old = history_audit.detector_inventory(PRE_RETIREMENT_SRC)
+    new = history_audit.detector_inventory(
+        (ROOT / "scripts" / "history_audit.py").read_text(encoding="utf-8")
+    )
+    assert RETIRED_TOKENS <= old
+    assert RETIRED_TOKENS <= new
+    lost = old - new
+    assert lost == frozenset()
+
+
+def test_delete_retired_detector_without_convention_shrinks_inventory():
+    """The withdrawn original: delete the glob and do not keep it in RETIRED."""
+    text = (ROOT / "scripts" / "history_audit.py").read_text(encoding="utf-8")
+    full = history_audit.detector_inventory(text)
+    assert "expected/*" in full
+    stripped = text.replace('"expected/*", ', "").replace('"expected/*"', "")
+    stripped = stripped.replace("'expected/*', ", "").replace("'expected/*'", "")
+    shrunk = history_audit.detector_inventory(stripped)
+    assert "expected/*" not in shrunk
+    assert len(shrunk) < len(full)
+    assert "expected/*" in (full - shrunk)
+
+
+def test_delete_whole_retired_dict_shrinks_inventory():
+    src_with = (
+        "BAR_FILES = []\n"
+        "BAR_COUNTED = {'scripts/*.py': (r'x', 'fail sites')}\n"
+        "BAR_YAML_FILES = []\n"
+        'MUTATION_GLOB = "tests/mutations/*.patch"\n'
+        'MEASURED = ["src/*"]\n'
+        "RETIRED = {\n"
+        '    "BAR_FILES": ["expected/*", "expected/**"],\n'
+        '    "BAR_COUNTED": {"scripts/contract_check.py": (r"row", "x")},\n'
+        '    "BAR_YAML_FILES": ["frame.yaml", "rounds/ROUND-*.yaml"],\n'
+        "}\n"
+    )
+    src_without = (
+        "BAR_FILES = []\n"
+        "BAR_COUNTED = {'scripts/*.py': (r'x', 'fail sites')}\n"
+        "BAR_YAML_FILES = []\n"
+        'MUTATION_GLOB = "tests/mutations/*.patch"\n'
+        'MEASURED = ["src/*"]\n'
+    )
+    was = history_audit.detector_inventory(src_with)
+    now = history_audit.detector_inventory(src_without)
+    assert RETIRED_TOKENS <= was
+    assert was - now == RETIRED_TOKENS
+
+
+def test_bar_path_from_detector_inventory_entry():
+    assert (
+        history_audit.bar_path(
+            "scripts/history_audit.py (detector inventory 20 -> 19; lost expected/*)"
+        )
+        == "scripts/history_audit.py"
+    )
+
+
+def test_yaml_bar_helper_is_preserved_alongside_retired_paths():
+    """Retirement keeps yaml_bar_keys_touched; only the file globs moved."""
+    assert callable(history_audit.yaml_bar_keys_touched)
+    assert history_audit.BAR_YAML_KEYS.search("expected_rows: 164693")
+

@@ -23,6 +23,11 @@ Counting rule for bars that are code: a NET REMOVAL is a bar change (fewer
 checks emitted, fewer fail sites, fewer counterexample patterns, fewer
 mutation patches). Adding checks is never flagged.
 
+Dead detector paths are not deleted. They move into a ``RETIRED`` block
+(plan §7 item 2 alternative) and new detectors sit alongside. The live∪RETIRED
+glob inventory is a bar: dropping a token from both is a lowering; moving a
+token from a live list into ``RETIRED`` is not.
+
 Task briefs ``tasks/TASK-*.md`` declare bars in fenced ``numbers``, ``fixture``,
 ``frame``, and ``n`` blocks (plan §3.3). Widening a tolerance, deleting a name,
 or deleting a whole block is a bar move. Tightening a tolerance is not.
@@ -36,13 +41,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import ast
 import fnmatch
 import re
 import subprocess
 import sys
 from pathlib import Path
 
-BAR_FILES = ["expected/*", "expected/**"]
 # Adding a bar is normal: new code needs its expected value declared in the same
 # change (contract clause 9). Only a bar that already existed and then moved, or
 # disappeared, is a bar being lowered. Every rule below tests for that.
@@ -51,8 +56,11 @@ BAR_FILES = ["expected/*", "expected/**"]
 # ValueError / print FAIL); a rarer token must not freeze that file — rule 1
 # already subtracts bar paths from measured (plan §7 item 1 alternative).
 GATE_FAIL_SITE_RE = r"(?:raise Fail\(|fail\.append)"
+# Live lists: globs this tree still uses. Dead paths are not deleted; they
+# sit in RETIRED (plan §7 item 2 alternative). expected/ is empty here —
+# declared bars live in task-brief fences (plan §3.3).
+BAR_FILES: list[str] = []
 BAR_COUNTED = {
-    "scripts/contract_check.py": (r"\b(?:row|compare_check)\s*\(", "contract checks emitted"),
     "scripts/*.py": (GATE_FAIL_SITE_RE, "fail sites"),
     "scripts/**/*.py": (GATE_FAIL_SITE_RE, "fail sites"),
     "tests/*.py": (r"match\s*=", "counterexample patterns"),
@@ -62,18 +70,176 @@ BAR_YAML_KEYS = re.compile(
     r"^\s*(expected_rows|expected_rows_tol|min_judgeable|B|threshold|max_concurrent|"
     r"launch_budget|baseline_model|expected_rows_source)\s*:", re.M
 )
-BAR_YAML_FILES = ["frame.yaml", "rounds/ROUND-*.yaml"]
+# Live YAML bar files. The old round-layout names are in RETIRED; fenced
+# ``frame`` / ``fixture`` / ``n`` blocks replaced them (plan §3.3).
+BAR_YAML_FILES: list[str] = []
 MUTATION_GLOB = "tests/mutations/*.patch"
 
 # sql/* and sql/** do not match tasks/TASK-N/sql/*.sql (fnmatch is
-# prefix-anchored). Task analysis SQL lives there (plan §3.4).
+# prefix-anchored). Task analysis SQL lives there (plan §3.4). Kept live:
+# a top-level sql/ path is still measured; absence of that directory is
+# zero-cost, not a reason to retire the glob.
 MEASURED = ["src/*", "src/**", "sql/*", "sql/**", "data/*", "data/**",
             "scripts/*.py", "scripts/**/*.py", "tasks/**/*.sql"]
+
+# RETIRED-BEGIN
+# Dead detector paths (plan §7 item 2 alternative). main() does not consult
+# RETIRED. A detector that never fires while its path is absent is zero-cost;
+# deleting it still violates strengthen-only. Move a glob here instead of
+# removing it from the file. Restore by copying it back to the live list.
+# Deleting a token from live AND from RETIRED shrinks detector_inventory and
+# is a bar move. Adding a live glob alongside is not.
+RETIRED = {
+    "BAR_FILES": ["expected/*", "expected/**"],
+    "BAR_COUNTED": {
+        "scripts/contract_check.py": (
+            r"\b(?:row|compare_check)\s*\(",
+            "contract checks emitted",
+        ),
+    },
+    "BAR_YAML_FILES": ["frame.yaml", "rounds/ROUND-*.yaml"],
+}
+RETIRED_LOGIC = r"""
+# Original live fragments. Not executed. Restore by copying back into main()
+# / the live lists. Kept so retirement is not deletion.
+#
+# BAR_FILES = ["expected/*", "expected/**"]
+# for f in files:
+#     if match_any(f, ["expected/*", "expected/**"]) and f in base_tree:
+#         bars.append(f)
+#
+# BAR_COUNTED["scripts/contract_check.py"] = (
+#     r"\b(?:row|compare_check)\s*\(", "contract checks emitted",
+# )
+#
+# BAR_YAML_FILES = ["frame.yaml", "rounds/ROUND-*.yaml"]
+# for f in files:
+#     if match_any(f, ["frame.yaml", "rounds/ROUND-*.yaml"]):
+#         bars.extend(yaml_bar_keys_touched(base, f))
+"""
+# RETIRED-END
+
+RETIRED_BEGIN = "# RETIRED-BEGIN"
+RETIRED_END = "# RETIRED-END"
+HISTORY_AUDIT_PATH = "scripts/history_audit.py"
+LIVE_INVENTORY_LISTS = frozenset({"BAR_FILES", "BAR_YAML_FILES", "MEASURED"})
+LIVE_INVENTORY_DICTS = frozenset({"BAR_COUNTED"})
+LIVE_INVENTORY_STRS = frozenset({"MUTATION_GLOB"})
 
 # Top-level task briefs only. fnmatch '*' matches a slash, so tasks/TASK-*.md
 # would also hit tasks/TASK-6/open_analysis.md.
 TASK_BRIEF_RE = re.compile(r"^tasks/TASK-[^/]+\.md$")
 DECL_KINDS = ("numbers", "fixture", "frame", "n")
+
+
+def retired_block(text: str) -> str:
+    """Inclusive slice between RETIRED markers. Empty if absent or inverted."""
+    start = text.find(RETIRED_BEGIN)
+    end = text.find(RETIRED_END)
+    if start == -1 or end == -1 or end < start:
+        return ""
+    return text[start : end + len(RETIRED_END)]
+
+
+def _list_strings(node: ast.AST) -> list[str]:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return [node.value]
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        out: list[str] = []
+        for elt in node.elts:
+            out.extend(_list_strings(elt))
+        return out
+    return []
+
+
+def _dict_keys(node: ast.AST) -> list[str]:
+    if not isinstance(node, ast.Dict):
+        return []
+    keys: list[str] = []
+    for k in node.keys:
+        if isinstance(k, ast.Constant) and isinstance(k.value, str):
+            keys.append(k.value)
+    return keys
+
+
+def _assignment_values(tree: ast.AST) -> list[tuple[str, ast.AST]]:
+    out: list[tuple[str, ast.AST]] = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    out.append((t.id, node.value))
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.value is not None
+        ):
+            out.append((node.target.id, node.value))
+    return out
+
+
+def _paths_from_retired_node(node: ast.AST) -> set[str]:
+    """Glob tokens from a RETIRED = {...} dict (lists and BAR_COUNTED keys)."""
+    paths: set[str] = set()
+    if not isinstance(node, ast.Dict):
+        return paths
+    for k, v in zip(node.keys, node.values):
+        cat = k.value if isinstance(k, ast.Constant) else None
+        if cat == "BAR_COUNTED":
+            paths.update(_dict_keys(v))
+        elif cat in {"BAR_FILES", "BAR_YAML_FILES", "MEASURED"}:
+            paths.update(_list_strings(v))
+        elif cat == "MUTATION_GLOB":
+            paths.update(_list_strings(v))
+    return paths
+
+
+def detector_inventory(text: str) -> frozenset[str]:
+    """Path globs in live lists plus the RETIRED dict.
+
+    Deleting a detector without keeping the glob in RETIRED shrinks this set.
+    Retirement (live list → RETIRED) does not. Regex values and labels are
+    not paths and are not counted.
+    """
+    if not text.strip():
+        return frozenset()
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return frozenset()
+    paths: set[str] = set()
+    for name, value in _assignment_values(tree):
+        if name in LIVE_INVENTORY_LISTS:
+            paths.update(_list_strings(value))
+        elif name in LIVE_INVENTORY_DICTS:
+            paths.update(_dict_keys(value))
+        elif name in LIVE_INVENTORY_STRS:
+            paths.update(_list_strings(value))
+        elif name == "RETIRED":
+            paths.update(_paths_from_retired_node(value))
+    return frozenset(paths)
+
+
+def live_detector_paths() -> frozenset[str]:
+    """Globs the running check consults (imported constants, not source parse)."""
+    paths = set(BAR_FILES) | set(BAR_COUNTED) | set(BAR_YAML_FILES) | set(MEASURED)
+    paths.add(MUTATION_GLOB)
+    return frozenset(paths)
+
+
+def retired_detector_paths() -> frozenset[str]:
+    """Globs preserved in RETIRED (imported constant, not source parse)."""
+    paths: set[str] = set()
+    for cat, val in RETIRED.items():
+        if cat == "BAR_COUNTED" and isinstance(val, dict):
+            paths.update(val)
+        elif isinstance(val, (list, tuple)):
+            paths.update(s for s in val if isinstance(s, str))
+        elif isinstance(val, str):
+            paths.add(val)
+    return frozenset(paths)
+
+
 DECL_FENCE = re.compile(
     r"^```(" + "|".join(DECL_KINDS) + r")\s*$(.*?)^```\s*$",
     re.M | re.S,
@@ -301,6 +467,16 @@ def main() -> int:
         old = file_at(args.base, f) or ""
         new = file_at("HEAD", f) or ""
         bars.extend(declaration_bars(f, old, new))
+
+    if HISTORY_AUDIT_PATH in files:
+        was = detector_inventory(file_at(args.base, HISTORY_AUDIT_PATH) or "")
+        now = detector_inventory(file_at("HEAD", HISTORY_AUDIT_PATH) or "")
+        lost = sorted(was - now)
+        if lost:
+            bars.append(
+                f"{HISTORY_AUDIT_PATH} (detector inventory {len(was)} -> {len(now)}; "
+                f"lost {', '.join(lost)})"
+            )
 
     bars = sorted(set(bars))
     measured = measured_paths(files, bars)
