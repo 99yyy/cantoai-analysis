@@ -343,7 +343,7 @@ def check_task(
     except Fail as e:
         fail.append(str(e))
         return
-    status, tol, _n_decl, _frame, stamp, _identities = brief
+    status, tol, _n_decl, frame, stamp, identities = brief
 
     if status in output_check.SUSPEND_STATUS:
         print(
@@ -402,6 +402,21 @@ def check_task(
                 f"  TASK-{n} [{status}]: {k} double {d_ok}/{len(routes)} "
                 f"permute {p_ok}/{len(routes)}"
             )
+            note = output_check.check_period_identity(
+                n, k, tol, orig, frame, fail
+            )
+            if note:
+                print(f"  TASK-{n} [{status}]: period identity {note}")
+            held, skipped = output_check.check_identities(
+                n, k, identities, tol, orig, routes, frame, fail
+            )
+            if skipped:
+                print(
+                    f"  TASK-{n} [{status}]: {k} skipped {len(skipped)} identities "
+                    f"(not all SQL-routed)"
+                )
+            for h in held:
+                print(f"  TASK-{n} [{status}]: identity {h}")
     finally:
         dup_conn.close()
         perm_conn.close()
@@ -435,6 +450,7 @@ def main() -> int:
     ap.add_argument("--corpus", default="data/corpus_v2.sqlite")
     ap.add_argument("--sql-seconds", type=float, default=60.0)
     ap.add_argument("--head-ref", default=None)
+    ap.add_argument("--task", default=None, metavar="N")
     args = ap.parse_args()
     root = Path(args.repo_root).resolve()
     corpus = (root / args.corpus).resolve() if not Path(args.corpus).is_absolute() else Path(args.corpus)
@@ -456,6 +472,13 @@ def main() -> int:
         print(f"relations: head {args.head_ref}; double/permute from this checkout")
 
     briefs = output_check.discover_briefs(root)
+    if args.task is not None:
+        try:
+            briefs = output_check.filter_briefs(briefs, args.task)
+        except Fail as e:
+            print(f"relations: FAIL\n  {e}")
+            return 1
+        print(f"relations: only TASK-{output_check.brief_task_id(briefs[0])}")
     if not briefs:
         print("relations: no tasks/TASK-*.md; nothing to check")
         return 0

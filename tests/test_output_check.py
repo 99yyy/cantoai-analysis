@@ -1710,3 +1710,73 @@ def test_closed_stale_mutated_corpus_skips_false_agree_keep_rate(tmp_path, capsy
     assert "written as 567" in out
     assert "output_check: FAIL" in out
 
+
+def test_normalize_task_id_accepts_bare_and_prefixed():
+    assert output_check.normalize_task_id("6") == "6"
+    assert output_check.normalize_task_id("TASK-6") == "6"
+    assert output_check.normalize_task_id("task-12") == "12"
+
+
+def test_normalize_task_id_rejects_empty_and_paths():
+    with pytest.raises(output_check.Fail):
+        output_check.normalize_task_id("")
+    with pytest.raises(output_check.Fail):
+        output_check.normalize_task_id("   ")
+    with pytest.raises(output_check.Fail):
+        output_check.normalize_task_id("../6")
+
+
+def test_filter_briefs_selects_one_or_raises(tmp_path):
+    a = _write_brief(tmp_path, "7")
+    b = _write_brief(tmp_path, "8")
+    briefs = [a, b]
+    got = output_check.filter_briefs(briefs, "8")
+    assert got == [b]
+    got = output_check.filter_briefs(briefs, "TASK-7")
+    assert got == [a]
+    assert output_check.filter_briefs(briefs, None) == briefs
+    with pytest.raises(output_check.Fail):
+        output_check.filter_briefs(briefs, "99")
+
+
+def test_task_flag_checks_named_brief_only(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text(f"sha256: `{CORPUS_SHA}`\n", encoding="utf-8")
+    _iterating_task(repo, "7")
+    _write_brief(repo, "8")
+    w_sql = repo / "tasks" / "TASK-8" / "sql" / "count_videos.sql"
+    w_sql.parent.mkdir(parents=True, exist_ok=True)
+    w_sql.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+    _write_rows(
+        repo / "tasks" / "TASK-8" / "results.json",
+        "n_count",
+        567,
+        "tasks/TASK-8/sql/count_videos.sql",
+    )
+
+    code, _ = _run_main(repo, "--task", "8")
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "only TASK-8" in out
+    assert "disagree" not in out
+    assert "TASK-7" not in out
+
+    code7, _ = _run_main(repo, "--task", "7")
+    out7 = capsys.readouterr().out
+    assert code7 == 1, out7
+    assert "only TASK-7" in out7
+    assert "disagree" in out7
+
+
+def test_unknown_task_flag_fails(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text(f"sha256: `{CORPUS_SHA}`\n", encoding="utf-8")
+    _write_brief(repo, "8")
+    code, _ = _run_main(repo, "--task", "99")
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "no tasks/TASK-99.md" in out
+    assert "output_check: FAIL" in out
+
