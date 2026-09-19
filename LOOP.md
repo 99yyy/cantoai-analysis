@@ -49,7 +49,7 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 
 | 检查 | 管什么 |
 |---|---|
-| `output-check` | 每个数字都能从语料重放出来；SQL 的 `EXPLAIN QUERY PLAN` 必须 `SCAN`/`SEARCH` 语料表；每条语句执行两次必须得到同一个数；规范化后的语句不得出现 `random()` / `randomblob()` / `strftime('now')` 族；两套独立算出的数字必须相等；若任务书有 fenced `n` 块，每个 `n` 还必须等于块里声明的常数或 `derived:`（用重放值求），两套 `n` 仍须完全相等，两道检查一起做不是互相替代；若 `frame` 含 `videos_expected` 且 numbers 声明了 `n_videos_pre` / `n_videos_post` / `n_unassigned_period`，三者重放值之和必须等于 `frame.videos_expected`（容差 `videos_expected_tol`，未写则 0），没有 `videos_expected` 时此恒等式不运行；重写次数有上限（从 reset commit 计起）；两条分支不得从对方的答案出发；`status: closed` 只有在两边齐、全一致时才允许；`status: escalated` 与 `status: blocked` 暂停该任务的重放、比对、改写计数；空 commit 且留言以 `BLOCKED:` 开头会被认出并打印；**pull request 上只完整检查这次 diff 碰到的任务**（任务书或 `tasks/TASK-N/`，任一边输出文件都算碰到），其余任务只打 frozen summary，`status: open` 的不一致不能把无关 PR 打红；main 上仍检查全部任务 |
+| `output-check` | 每个数字都能从语料重放出来；SQL 的 `EXPLAIN QUERY PLAN` 必须 `SCAN`/`SEARCH` 语料表；每条语句执行两次必须得到同一个数；规范化后的语句不得出现 `random()` / `randomblob()` / `strftime('now')` 族；两套独立算出的数字必须相等；若任务书有 fenced `n` 块，每个 `n` 还必须等于块里声明的常数或 `derived:`（用重放值求），两套 `n` 仍须完全相等，两道检查一起做不是互相替代；若 `frame` 含 `videos_expected` 且 numbers 声明了 `n_videos_pre` / `n_videos_post` / `n_unassigned_period`，三者重放值之和必须等于 `frame.videos_expected`（容差 `videos_expected_tol`，未写则 0），没有 `videos_expected` 时此恒等式不运行；重写次数有上限（从 reset commit 计起）；两条分支不得从对方的答案出发；`status: closed` 只有在两边齐、全一致时才允许；`status: escalated` 与 `status: blocked` 暂停该任务的重放、比对、改写计数；空 commit 且留言以 `BLOCKED:` 开头会被认出并打印；**pull request 上只完整检查这次 diff 碰到的任务**（任务书或 `tasks/TASK-N/`，任一边输出文件都算碰到），其余任务只打 frozen summary，`status: open` 的不一致不能把无关 PR 打红；main 上仍检查全部任务；**`tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，但顶层 glob `tasks/TASK-*.md` 找不到对应任务书 → 红**（把任务书移出 glob 不得让检查变成 no-op 绿灯） |
 | `scope-check` | 分支必须属于已知类别（先匹配 agent 前缀）；repair/ 与 chore/ 不能单靠前缀授权，须 `github.actor` 落在仓库 owner allowlist 上；chore 与 agent 同受 DENY；agent 不得碰 `.cursor/` `.github/` `data/` `scripts/`、`README.md`、`LOOP.md`，也不得改任务书 `tasks/TASK-N.md`，但必须能写 `tasks/TASK-N/` 下面自己的产出 |
 | `history-audit` | 移动已有的栅不得与被它度量的东西同 PR，且正文须有 `BAR-CHANGE:` 并点名每个被移动的栅路径；被度量路径是 files 减去栅路径（闸门脚本 fail-site 净删算移动栅，但不自己锁自己）；`tasks/**/*.sql` 属被度量；任务书 fenced `numbers`/`fixture`/`frame`/`n` 里放宽容差、删名字或删整块算移动栅，收窄容差不算；死路径栅移入 `RETIRED` 块而非删除，live∪RETIRED 的 glob 丢失才算删栅 |
 | `tests` | 有 `tests/test_*.py` 时跑 pytest |
@@ -58,10 +58,10 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 
 ## output-check 实际做了什么
 
-按顺序，任何一条不过就红。**在 pull request 上，下面 2–9 条只作用于这次 diff 碰到的任务**（`tasks/TASK-N.md` 或 `tasks/TASK-N/` 下任何文件，包括只改 `results.json` 或只改 `mine.json`）。没碰到的任务打一行 frozen summary，不把失败并进总账——`status: open` 且两边已经不合的任务（ITERATE）因此不能挡住一条无关的 PR。没有 `--base-ref` 时（main 上的 push）仍走完全部任务。
+按顺序，任何一条不过就红。**在 pull request 上，下面 2–9 条只作用于这次 diff 碰到的任务**（`tasks/TASK-N.md` 或 `tasks/TASK-N/` 下任何文件，包括只改 `results.json` 或只改 `mine.json`）。没碰到的任务打一行 frozen summary，不把失败并进总账——`status: open` 且两边已经不合的任务（ITERATE）因此不能挡住一条无关的 PR。没有 `--base-ref` 时（main 上的 push）仍走完全部任务。任务书发现是顶层 glob `tasks/TASK-*.md`（非递归）。**若 `tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，而对应的 `tasks/TASK-N.md` 不在该 glob 里，这一条对整棵树生效、不受 PR freeze 跳过**（plan §2.6）：把任务书移走不得让检查变成「nothing to check」绿灯。
 
 1. `data/corpus_v2.sqlite` 的 sha256 与 `README.md` 里记的一致。语料不对，后面全部无意义。
-2. 任务书有且只有一行 `status: open` / `closed` / `escalated` / `blocked`，`numbers` 块能解析。可选的 fenced `n` 块与 `frame` 块也在这里解析。`escalated` 与 `blocked` 暂停该任务第 3–9 条（重放、比对、声明 n、恒等式、改写计数）。
+2. 任务书有且只有一行 `status: open` / `closed` / `escalated` / `blocked`，`numbers` 块能解析。可选的 fenced `n` 块与 `frame` 块也在这里解析。`escalated` 与 `blocked` 暂停该任务第 3–9 条（重放、比对、声明 n、恒等式、改写计数）。顶层 glob 找不到任务书、但对应 TASK-N 目录里还有 `results.json` 或 `mine.json`：直接红，不走「nothing to check」。
 3. 两个输出文件的每一行恰好是 `{name, value, n, query}`，名字集合与 `numbers` 块**相等**——少一个和多一个都红；同一文件内不得有重名，也不得有两个数字共用一条算路。算路按 `route()` 解析后的路径计（`sql/../sql/x.sql` 与 `sql/x.sql` 是同一条），不是按 query 字符串。若有 `n` 块，其名字集合必须与 `numbers` 相等；每一行是非负整数常数或 `derived:` 表达式。
 4. 每个 `query` 是下面两种之一：
    - `tasks/TASK-N/<…>.sql`：一条语句，`SELECT` 或 `WITH` 开头，返回恰好一行一列；`EXPLAIN QUERY PLAN` 必须出现对语料表 `videos` / `windows` / `syllables` / `runs` 的 `SCAN` 或 `SEARCH`（`SELECT 12345` 过不了这一关）；同一条语句执行两次结果必须相同；`strip_and_split` 之后不得出现 `random()`、`randomblob()`、`strftime('now')` 族；

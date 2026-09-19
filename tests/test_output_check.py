@@ -1055,3 +1055,174 @@ def test_full_check_task_6_declared_n_and_period_identity(conn, capsys):
     assert "39/39 n declared" in out
     assert "period identity" in out
     assert "frame.videos_expected" in out
+
+
+# --------------------------------------------------------------------------- §2.6 orphan outputs without a matching brief
+
+
+ORPHAN_BRIEF = (
+    "exists but the matching brief tasks/TASK-7.md cannot be found"
+)
+
+
+def test_discover_briefs_is_non_recursive(tmp_path):
+    _write_brief(tmp_path, "6")
+    archive = tmp_path / "tasks" / "archive"
+    archive.mkdir()
+    (archive / "TASK-7.md").write_text(
+        "# TASK-7\n\nstatus: open\n\n```numbers\nn_count  0\n```\n",
+        encoding="utf-8",
+    )
+    got = output_check.discover_briefs(tmp_path)
+    assert [p.name for p in got] == ["TASK-6.md"]
+
+
+def test_discover_briefs_empty_without_tasks_dir(tmp_path):
+    assert output_check.discover_briefs(tmp_path) == []
+
+
+def test_orphan_output_message_is_stable():
+    assert output_check.orphan_output_message("7", "tasks/TASK-7/results.json") == (
+        "TASK-7: tasks/TASK-7/results.json exists but the matching brief "
+        "tasks/TASK-7.md cannot be found"
+    )
+
+
+def test_orphan_messages_when_results_exist_without_brief(tmp_path):
+    _write_worker_output(tmp_path, "7")
+    msgs = output_check.orphan_output_messages(tmp_path, [])
+    assert msgs == [
+        "TASK-7: tasks/TASK-7/results.json exists but the matching brief "
+        "tasks/TASK-7.md cannot be found"
+    ]
+
+
+def test_archived_brief_does_not_count_as_matching(tmp_path):
+    """Probe class: git mv tasks/TASK-N.md tasks/archive/TASK-N.md, outputs stay."""
+    md = _write_brief(tmp_path, "7")
+    _write_worker_output(tmp_path, "7")
+    archive = tmp_path / "tasks" / "archive"
+    archive.mkdir()
+    md.rename(archive / "TASK-7.md")
+    briefs = output_check.discover_briefs(tmp_path)
+    assert briefs == []
+    msgs = output_check.orphan_output_messages(tmp_path, briefs)
+    assert any(ORPHAN_BRIEF in m for m in msgs)
+    assert any("results.json" in m for m in msgs)
+
+
+def test_matching_top_level_brief_is_not_an_orphan(tmp_path):
+    _write_brief(tmp_path, "7")
+    _write_worker_output(tmp_path, "7")
+    briefs = output_check.discover_briefs(tmp_path)
+    assert output_check.orphan_output_messages(tmp_path, briefs) == []
+
+
+def test_nested_results_under_task_dir_still_need_top_level_brief(tmp_path):
+    nested = tmp_path / "tasks" / "archive" / "TASK-7" / "results.json"
+    nested.parent.mkdir(parents=True)
+    nested.write_text("[]\n", encoding="utf-8")
+    msgs = output_check.orphan_output_messages(tmp_path, [])
+    assert msgs == [
+        "TASK-7: tasks/archive/TASK-7/results.json exists but the matching brief "
+        "tasks/TASK-7.md cannot be found"
+    ]
+
+
+def test_results_not_under_task_n_dir_are_not_orphans(tmp_path):
+    stray = tmp_path / "tasks" / "misc" / "results.json"
+    stray.parent.mkdir(parents=True)
+    stray.write_text("[]\n", encoding="utf-8")
+    assert output_check.orphan_output_messages(tmp_path, []) == []
+
+
+def test_no_briefs_and_no_outputs_is_nothing_to_check(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text(f"sha256: `{CORPUS_SHA}`\n", encoding="utf-8")
+    (repo / "tasks").mkdir()
+    _init_git(repo)
+    _commit(repo, "empty tasks")
+    code, _ = _run_main(repo)
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "nothing to check" in out
+
+
+def test_hide_brief_leave_results_fails_main(tmp_path, capsys):
+    """Move/hide the brief, leave results.json → RED (plan §2.6)."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text(f"sha256: `{CORPUS_SHA}`\n", encoding="utf-8")
+    md = _write_brief(repo, "7")
+    _write_worker_output(repo, "7")
+    archive = repo / "tasks" / "archive"
+    archive.mkdir()
+    md.rename(archive / "TASK-7.md")
+    _init_git(repo)
+    _commit(repo, "archived brief, results remain")
+
+    code, _ = _run_main(repo)
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert ORPHAN_BRIEF in out
+    assert "output_check: FAIL" in out
+    assert "nothing to check" not in out
+
+
+def test_hide_brief_then_edit_results_is_red_on_pr(tmp_path, capsys):
+    """Measured hole: git mv the brief, then any results.json edit stayed GREEN."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text(f"sha256: `{CORPUS_SHA}`\n", encoding="utf-8")
+    _write_brief(repo, "7")
+    _write_worker_output(repo, "7")
+    _init_git(repo)
+    base = _commit(repo, "brief and results")
+
+    archive = repo / "tasks" / "archive"
+    archive.mkdir()
+    (repo / "tasks" / "TASK-7.md").rename(archive / "TASK-7.md")
+    _touch_results(repo, "7")
+    _commit(repo, "archive brief and edit results")
+
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert ORPHAN_BRIEF in out
+    assert "nothing to check" not in out
+
+
+def test_orphan_outputs_fail_even_when_another_task_is_frozen(tmp_path, capsys):
+    """Orphan check is a tree invariant, not skipped by plan §4.1 freeze."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text(f"sha256: `{CORPUS_SHA}`\n", encoding="utf-8")
+    _write_brief(repo, "6", status="closed")
+    _write_brief(repo, "7")
+    _write_worker_output(repo, "7")
+    _init_git(repo)
+    base = _commit(repo, "TASK-6 brief, TASK-7 with outputs")
+
+    archive = repo / "tasks" / "archive"
+    archive.mkdir()
+    (repo / "tasks" / "TASK-7.md").rename(archive / "TASK-7.md")
+    (repo / "LOOP.md").write_text("loop\n", encoding="utf-8")
+    _commit(repo, "archive TASK-7 brief; unrelated LOOP.md")
+
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert ORPHAN_BRIEF in out
+    assert "TASK-6 [closed]: frozen (not touched by this PR)" in out
+
+
+def test_both_output_files_without_brief_are_listed(tmp_path):
+    _iterating_task(tmp_path, "7")
+    (tmp_path / "tasks" / "TASK-7.md").unlink()
+    msgs = output_check.orphan_output_messages(tmp_path, [])
+    rels = {m.split(": ", 1)[1].split(" exists")[0] for m in msgs}
+    assert rels == {
+        "tasks/TASK-7/results.json",
+        "tasks/TASK-7/mine.json",
+    }
