@@ -9,7 +9,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -99,16 +98,19 @@ def test_join_key_swapped_killed(tmp_path: Path) -> None:
         conn.close()
 
 
-def test_stratum_weights_ones_killed(tmp_path: Path) -> None:
-    patch_FILE = MUT_DIR / "stratum_weights_ones.patch"
+def test_kitagawa_weights_ones_killed(tmp_path: Path) -> None:
+    patch_FILE = MUT_DIR / "kitagawa_weights_ones.patch"
     msg = _header_message(patch_FILE)
     dest = _apply(tmp_path, patch_FILE)
-    weights = _import(dest, "src.weights")
-    N_h = np.array([10.0, 20.0])
-    n_h = np.array([5.0, 8.0])
-    w = weights.stratum_weights(N_h, n_h)
+    bootstrap = _import(dest, "src.bootstrap")
+    sums = {
+        "film_pre": (10.0, 8.0),
+        "film_post": (10.0, 7.0),
+        "other_pre": (30.0, 24.0),
+        "other_post": (20.0, 16.0),
+    }
     with pytest.raises(ValueError, match="^" + re.escape(msg)):
-        weights.assert_stratum_weights(w, N_h, n_h)
+        bootstrap.kitagawa_from_stratum_sums(sums)
 
 
 def test_stratum_seed_master_killed(tmp_path: Path) -> None:
