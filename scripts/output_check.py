@@ -28,7 +28,9 @@ self-report.
 
     tasks/TASK-<N>/sql/<f>.sql   one statement, SELECT or WITH, returning
                                  exactly one row and one column, equal to
-                                 ``value`` within tol
+                                 ``value`` within tol. EXPLAIN QUERY PLAN must
+                                 SCAN or SEARCH a real corpus table
+                                 (videos, windows, syllables, runs)
     derived:<expr>               arithmetic over other declared names, over the
                                  values this script replayed -- never over the
                                  values the agent wrote down
@@ -49,6 +51,8 @@ What this enforces, in order:
                not an implementation. A shared *derivation* is allowed, because
                each of its inputs was replayed on its own.
   replay       every number equals what its own route produces, within tol.
+               A SQL route whose plan never SCAN/SEARCHes a corpus table
+               fails, so two constant SELECTs cannot certify agreement.
   agreement    the two files agree on every value within tol and on every n
                exactly. Any disagreement fails, and both numbers are printed.
   attempts     at most three commits touch one output file: the first and two
@@ -93,6 +97,82 @@ WORKER, VERIFIER = "results.json", "mine.json"
 
 ALLOWED_BINOP = (ast.Add, ast.Sub, ast.Mult, ast.Div)
 ALLOWED_UNARY = (ast.UAdd, ast.USub)
+
+# Real corpus tables. SCAN CONSTANT ROW / sqlite_master / a CTE of the same
+# name is not a touch. SQLite prints aliases (SCAN v), so aliases from FROM/JOIN
+# are resolved before the name is checked.
+CORPUS_TABLES = frozenset({"videos", "windows", "syllables", "runs"})
+_IDENT = re.compile(r'("([^"]+)"|`([^`]+)`|\[([^\]]+)\]|(\w+))')
+_FROM_JOIN = re.compile(r"(?is)\b(?:from|join)\b")
+_AS_KW = re.compile(r"(?is)as\b")
+_PLAN_SCAN = re.compile(
+    r"(?i)\b(?:SCAN|SEARCH)\s+(?:TABLE\s+)?(?:(?:main|temp)\.)?"
+    r"(?P<name>\"[^\"]+\"|`[^`]+`|\[[^\]]+\]|\w+)"
+)
+_PLAN_CTE = re.compile(r"(?i)\b(?:CO-ROUTINE|MATERIALIZE)\s+(\w+)")
+_NOT_ALIAS = frozenset(
+    {
+        "on",
+        "where",
+        "group",
+        "order",
+        "limit",
+        "join",
+        "left",
+        "right",
+        "inner",
+        "cross",
+        "full",
+        "natural",
+        "outer",
+        "using",
+        "union",
+        "except",
+        "intersect",
+        "select",
+        "with",
+        "and",
+        "or",
+        "set",
+        "having",
+        "window",
+        "values",
+        "then",
+        "else",
+        "when",
+        "end",
+        "from",
+        "into",
+        "distinct",
+        "all",
+        "by",
+        "asc",
+        "desc",
+        "offset",
+        "fetch",
+        "only",
+        "rows",
+        "row",
+        "between",
+        "like",
+        "glob",
+        "is",
+        "not",
+        "in",
+        "exists",
+        "case",
+        "cast",
+        "collate",
+        "as",
+        "recursive",
+        "materialized",
+        "returning",
+        "nulls",
+        "filter",
+        "over",
+        "partition",
+    }
+)
 
 
 class Fail(Exception):
@@ -291,6 +371,105 @@ def strip_and_split(text: str) -> list[str]:
     return [s.strip() for s in out if s.strip()]
 
 
+def _mask_strings(text: str) -> str:
+    """Replace string literals with spaces so FROM/JOIN inside quotes is ignored."""
+    out: list[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if c in "'\"":
+            j = i + 1
+            while j < n:
+                if text[j] == c:
+                    if c == "'" and j + 1 < n and text[j + 1] == "'":
+                        j += 2
+                        continue
+                    j += 1
+                    break
+                j += 1
+            out.append(" " * (j - i))
+            i = j
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def _skip_ws(text: str, i: int) -> int:
+    while i < len(text) and text[i].isspace():
+        i += 1
+    return i
+
+
+def _parse_ident(text: str, i: int) -> tuple[str | None, int]:
+    m = _IDENT.match(text, i)
+    if not m:
+        return None, i
+    name = next(g for g in m.groups()[1:] if g is not None)
+    return name, m.end()
+
+
+def from_join_alias_map(stmt: str) -> dict[str, str]:
+    """Map FROM/JOIN table names and their aliases to the unquoted table name."""
+    text = _mask_strings(stmt)
+    out: dict[str, str] = {}
+    for m in _FROM_JOIN.finditer(text):
+        i = m.end()
+        while True:
+            i = _skip_ws(text, i)
+            if i >= len(text) or text[i] == "(":
+                break
+            name, i = _parse_ident(text, i)
+            if name is None:
+                break
+            i2 = _skip_ws(text, i)
+            if i2 < len(text) and text[i2] == ".":
+                name2, i = _parse_ident(text, i2 + 1)
+                if name2 is not None:
+                    name = name2
+                else:
+                    i = i2
+            table = name.lower()
+            i = _skip_ws(text, i)
+            as_m = _AS_KW.match(text, i)
+            alias = None
+            if as_m:
+                i = _skip_ws(text, as_m.end())
+                alias, i = _parse_ident(text, i)
+            else:
+                cand, j = _parse_ident(text, i)
+                if cand is not None and cand.lower() not in _NOT_ALIAS:
+                    alias = cand
+                    i = j
+            out[table] = table
+            if alias:
+                out[alias.lower()] = table
+            i = _skip_ws(text, i)
+            if i < len(text) and text[i] == ",":
+                i += 1
+                continue
+            break
+    return out
+
+
+def plan_touches_corpus(details: list[str], stmt: str) -> bool:
+    """True when EXPLAIN QUERY PLAN SCAN/SEARCHes videos, windows, syllables, or runs."""
+    ctes = {m.group(1).lower() for d in details for m in _PLAN_CTE.finditer(d)}
+    aliases = from_join_alias_map(stmt)
+    for detail in details:
+        m = _PLAN_SCAN.search(detail)
+        if not m:
+            continue
+        raw = m.group("name")
+        name = raw[1:-1] if len(raw) >= 2 and raw[0] in '"[`' else raw
+        name = name.lower()
+        if name in {"constant", "subquery"} or name in ctes:
+            continue
+        if aliases.get(name, name) in CORPUS_TABLES:
+            return True
+    return False
+
+
 def run_sql(conn: sqlite3.Connection, label: str, sql_path: Path, seconds: float) -> float:
     stmts = strip_and_split(sql_path.read_text(encoding="utf-8"))
     if len(stmts) != 1:
@@ -298,6 +477,18 @@ def run_sql(conn: sqlite3.Connection, label: str, sql_path: Path, seconds: float
     stmt = stmts[0]
     if not re.match(r"(?is)^\s*(select|with)\b", stmt):
         raise Fail(f"{label}: {sql_path.name} must begin with SELECT or WITH")
+
+    try:
+        plan_rows = conn.execute("EXPLAIN QUERY PLAN " + stmt).fetchall()
+    except sqlite3.Error as e:
+        raise Fail(f"{label}: {sql_path.name} would not run: {e}")
+    details = [str(r[-1]) for r in plan_rows]
+    if not plan_touches_corpus(details, stmt):
+        plan_txt = "; ".join(details) if details else "(empty)"
+        raise Fail(
+            f"{label}: {sql_path.name} EXPLAIN QUERY PLAN does not SCAN or SEARCH "
+            f"a corpus table (videos, windows, syllables, runs); plan: {plan_txt}"
+        )
 
     deadline = time.monotonic() + seconds
     conn.set_progress_handler(lambda: 1 if time.monotonic() > deadline else 0, 100_000)
