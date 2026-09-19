@@ -33,16 +33,23 @@ CHECK    output-check 先按每个数字自己声明的算路重放它，再比�
 ITERATE  哪几个不一致，就只把那几行发回去，其余不动。并行的其他任务不受影响：
          一条不碰该任务的 PR 不会因为 main 上这份不一致而红。
 STOP     全部一致 → 把任务书改成 status: closed，这一步本身要过 CI。
-         同一个文件被改到第四次 → 停，两套数字一起升级给 Tom。
+         同一个文件被改到第四次 → 停，任务书改成 status: escalated，
+         两套数字一起升级给 Tom。
+         agent 走不下去（不能改闸门）→ 留一条空 commit，留言以 BLOCKED:
+         开头；owner 把任务书改成 status: blocked。
+         escalated 与 blocked 暂停该任务的重放、比对、改写计数。
+         改任务书本身是一次 reset：从那次 commit 起重计改写次数。
+         reopen 就是再写成 status: open。
 ```
 
 上限是**三次**：第一次加两次重试。不是建议，`output-check` 数 commit。
+改写次数从该任务书最近一次改动（reset commit）计起，所以 reopen 不会把上一轮的三次带走。
 
 ## 四道闸门
 
 | 检查 | 管什么 |
 |---|---|
-| `output-check` | 每个数字都能从语料重放出来；SQL 的 `EXPLAIN QUERY PLAN` 必须 `SCAN`/`SEARCH` 语料表；每条语句执行两次必须得到同一个数；规范化后的语句不得出现 `random()` / `randomblob()` / `strftime('now')` 族；两套独立算出的数字必须相等；重写次数有上限；两条分支不得从对方的答案出发；`status: closed` 只有在两边齐、全一致时才允许；**pull request 上只完整检查这次 diff 碰到的任务**（任务书或 `tasks/TASK-N/`，任一边输出文件都算碰到），其余任务只打 frozen summary，`status: open` 的不一致不能把无关 PR 打红；main 上仍检查全部任务 |
+| `output-check` | 每个数字都能从语料重放出来；SQL 的 `EXPLAIN QUERY PLAN` 必须 `SCAN`/`SEARCH` 语料表；每条语句执行两次必须得到同一个数；规范化后的语句不得出现 `random()` / `randomblob()` / `strftime('now')` 族；两套独立算出的数字必须相等；重写次数有上限（从 reset commit 计起）；两条分支不得从对方的答案出发；`status: closed` 只有在两边齐、全一致时才允许；`status: escalated` 与 `status: blocked` 暂停该任务的重放、比对、改写计数；空 commit 且留言以 `BLOCKED:` 开头会被认出并打印；**pull request 上只完整检查这次 diff 碰到的任务**（任务书或 `tasks/TASK-N/`，任一边输出文件都算碰到），其余任务只打 frozen summary，`status: open` 的不一致不能把无关 PR 打红；main 上仍检查全部任务 |
 | `scope-check` | 分支必须属于已知类别（先匹配 agent 前缀）；repair/ 与 chore/ 不能单靠前缀授权，须 `github.actor` 落在仓库 owner allowlist 上；chore 与 agent 同受 DENY；agent 不得碰 `.cursor/` `.github/` `data/` `scripts/`、`README.md`、`LOOP.md`，也不得改任务书 `tasks/TASK-N.md`，但必须能写 `tasks/TASK-N/` 下面自己的产出 |
 | `history-audit` | 移动已有的栅不得与被它度量的东西同 PR，且正文须有 `BAR-CHANGE:` 并点名每个被移动的栅路径；被度量路径是 files 减去栅路径（闸门脚本 fail-site 净删算移动栅，但不自己锁自己）；`tasks/**/*.sql` 属被度量；任务书 fenced `numbers`/`fixture`/`frame`/`n` 里放宽容差、删名字或删整块算移动栅，收窄容差不算；死路径栅移入 `RETIRED` 块而非删除，live∪RETIRED 的 glob 丢失才算删栅 |
 | `tests` | 有 `tests/test_*.py` 时跑 pytest |
@@ -54,7 +61,7 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 按顺序，任何一条不过就红。**在 pull request 上，下面 2–9 条只作用于这次 diff 碰到的任务**（`tasks/TASK-N.md` 或 `tasks/TASK-N/` 下任何文件，包括只改 `results.json` 或只改 `mine.json`）。没碰到的任务打一行 frozen summary，不把失败并进总账——`status: open` 且两边已经不合的任务（ITERATE）因此不能挡住一条无关的 PR。没有 `--base-ref` 时（main 上的 push）仍走完全部任务。
 
 1. `data/corpus_v2.sqlite` 的 sha256 与 `README.md` 里记的一致。语料不对，后面全部无意义。
-2. 任务书有且只有一行 `status: open` 或 `status: closed`，`numbers` 块能解析。
+2. 任务书有且只有一行 `status: open` / `closed` / `escalated` / `blocked`，`numbers` 块能解析。`escalated` 与 `blocked` 暂停该任务第 3–9 条（重放、比对、改写计数）。
 3. 两个输出文件的每一行恰好是 `{name, value, n, query}`，名字集合与 `numbers` 块**相等**——少一个和多一个都红；同一文件内不得有重名，也不得有两个数字共用一条算路。算路按 `route()` 解析后的路径计（`sql/../sql/x.sql` 与 `sql/x.sql` 是同一条），不是按 query 字符串。
 4. 每个 `query` 是下面两种之一：
    - `tasks/TASK-N/<…>.sql`：一条语句，`SELECT` 或 `WITH` 开头，返回恰好一行一列；`EXPLAIN QUERY PLAN` 必须出现对语料表 `videos` / `windows` / `syllables` / `runs` 的 `SCAN` 或 `SEARCH`（`SELECT 12345` 过不了这一关）；同一条语句执行两次结果必须相同；`strip_and_split` 之后不得出现 `random()`、`randomblob()`、`strftime('now')` 族；
@@ -62,8 +69,21 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 5. 同一个 `.sql` 文件不得同时出现在两个文件里；`strip_and_split` 之后的语句文本 sha256 两边也不得相交（把 `sql/` 拷进 `mine_sql/` 过不了这一关）。定义可以共享，**实现不行**。`derived:` 允许两边写成一样，因为它的每个输入都各自被重放过。
 6. 每个数字都等于它自己那条算路跑出来的结果，误差在容差内。`derived:` 用的是**重放出来的**值，不是 agent 自己写下的值——所以「把输入写错、再把推导写成与错输入自洽」这条路是走不通的，两行都会红。
 7. 两套数字每个 `value` 在容差内相等，每个 `n` 完全相等。不一致的把两个数都打出来。
-8. 动过同一个输出文件的 commit 不超过三个。
+8. 动过同一个输出文件的 commit 不超过三个，从该任务书最近一次改动那个 reset commit 计起。`escalated` / `blocked` 不计。
 9. 引入某一边文件的那个 commit，它的树里**没有**另一边的文件。
+
+## 任务书状态
+
+| status | 谁写 | 闸门 |
+|---|---|---|
+| `open` | Tom 开题 | 重放、比对、改写计数 |
+| `closed` | chore 收口 | 同上，且两边必须齐、必须一致 |
+| `escalated` | Tom / chore | 暂停重放、比对、改写计数。改写到顶，两套数字交给 Tom |
+| `blocked` | Tom / chore | 暂停同上。走不下去 |
+
+agent 不能改任务书。它要停的时候留下一条**空 commit**，第一行以 `BLOCKED:` 开头，例如 `BLOCKED: TASK-7 cannot touch scripts/`。这条 commit 与父 commit 同树，merge 之后 git log 里还能看见——这就是 durable marker。`output-check` 认出这种 commit 并打印；真正暂停检查的是任务书上的 `status: blocked` 或 `status: escalated`。
+
+**reset commit**：任何一次改 `tasks/TASK-N.md` 都是一次 reset。改写次数从那次 commit 之后重计。**reopen** 就是 chore 把 `escalated` / `blocked` / `closed` 改回 `open`；这一步本身是一次 reset，所以不会撞上一轮的三次上限。
 
 ## 它证明什么，不证明什么
 
