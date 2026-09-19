@@ -62,6 +62,14 @@ def test_status_only_edit_is_not_a_bar():
     assert history_audit.declaration_bars(PATH, old, new) == []
 
 
+def test_status_blocked_or_escalated_edit_is_not_a_bar():
+    old = BRIEF.read_text(encoding="utf-8")
+    for st in ("blocked", "escalated"):
+        new = old.replace("status: closed", f"status: {st}", 1)
+        assert f"status: {st}" in new
+        assert history_audit.declaration_bars(PATH, old, new) == []
+
+
 def test_widening_a_numbers_tolerance_is_a_bar():
     new = NUMBERS.replace("gap_contract_pp            0.05", "gap_contract_pp            1000000")
     hits = history_audit.declaration_bars(PATH, NUMBERS, new)

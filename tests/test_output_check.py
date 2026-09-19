@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sqlite3
 import subprocess
 import sys
@@ -549,3 +550,229 @@ def test_pr_that_touches_either_output_still_compares(tmp_path, capsys):
     assert code == 1, out
     assert "full-check TASK-7" in out
     assert any("disagree" in line for line in out.splitlines())
+
+
+# --------------------------------------------------------------------------- §4.4
+
+
+BRIEF_STATUS_FAIL = (
+    "needs exactly one line 'status: open', 'status: closed', "
+    "'status: escalated' or 'status: blocked'"
+)
+
+
+def _set_brief_status(md: Path, status: str) -> None:
+    text = md.read_text(encoding="utf-8")
+    md.write_text(
+        re.sub(r"^status:[ \t]*\S+[ \t]*$", f"status: {status}", text, count=1, flags=re.M),
+        encoding="utf-8",
+    )
+
+
+def _empty_commit(repo: Path, message: str) -> str:
+    _git(repo, "commit", "--allow-empty", "-m", message)
+    return _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def _touch_results(repo: Path, n: str) -> None:
+    path = repo / "tasks" / f"TASK-{n}" / "results.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data[0]["n"] = int(data[0]["n"]) + 1
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def test_parse_brief_accepts_blocked_and_escalated(tmp_path):
+    for st in ("open", "closed", "escalated", "blocked"):
+        md = _write_brief(tmp_path, f"s{st}", status=st)
+        got, tol = output_check.parse_brief(md)
+        assert got == st
+        assert "n_count" in tol
+
+
+def test_parse_brief_rejects_uppercase_blocked(tmp_path):
+    md = _write_brief(tmp_path, "7", status="BLOCKED")
+    with pytest.raises(output_check.Fail, match=BRIEF_STATUS_FAIL):
+        output_check.parse_brief(md)
+
+
+def test_parse_brief_rejects_unknown_and_missing_status(tmp_path):
+    md = _write_brief(tmp_path, "7", status="stale")
+    with pytest.raises(output_check.Fail, match=BRIEF_STATUS_FAIL):
+        output_check.parse_brief(md)
+    md.write_text("# TASK-7\n\n```numbers\nn_count  0\n```\n", encoding="utf-8")
+    with pytest.raises(output_check.Fail, match=BRIEF_STATUS_FAIL):
+        output_check.parse_brief(md)
+
+
+def test_blocked_status_suspends_iterate_disagreement(conn, tmp_path, capsys):
+    md = _iterating_task(tmp_path, "7")
+    _set_brief_status(md, "blocked")
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    out = capsys.readouterr().out
+    assert fail == []
+    assert "TASK-7 [blocked]" in out
+    assert "suspended (replay, agreement, and edit-count not run)" in out
+
+
+def test_escalated_status_suspends_iterate_disagreement(conn, tmp_path, capsys):
+    md = _iterating_task(tmp_path, "7")
+    _set_brief_status(md, "escalated")
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    out = capsys.readouterr().out
+    assert fail == []
+    assert "TASK-7 [escalated]" in out
+    assert "suspended" in out
+
+
+def test_open_still_fails_the_same_disagreement(conn, tmp_path):
+    md = _iterating_task(tmp_path, "7")
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    assert fail
+    assert any("disagree" in m for m in fail)
+
+
+def test_frozen_blocked_task_notes_suspended(tmp_path, capsys):
+    md = _iterating_task(tmp_path, "7")
+    _set_brief_status(md, "blocked")
+    output_check.frozen_summary(tmp_path, md)
+    out = capsys.readouterr().out
+    assert "TASK-7 [blocked]: frozen (not touched by this PR)" in out
+    assert out.rstrip().endswith("suspended") or "; suspended" in out
+
+
+def _write_worker_output(repo: Path, n: str = "7") -> None:
+    w_sql = repo / "tasks" / f"TASK-{n}" / "sql" / "count_videos.sql"
+    w_sql.parent.mkdir(parents=True, exist_ok=True)
+    w_sql.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+    _write_rows(
+        repo / "tasks" / f"TASK-{n}" / "results.json",
+        "n_count",
+        567,
+        f"tasks/TASK-{n}/sql/count_videos.sql",
+    )
+
+
+def _repo_n_result_commits(repo: Path, n_commits: int, n: str = "7") -> None:
+    """Brief first, then ``n_commits`` commits that touch results.json."""
+    (repo / "README.md").write_text(f"sha256: `{CORPUS_SHA}`\n", encoding="utf-8")
+    _write_brief(repo, n)
+    _init_git(repo)
+    _commit(repo, "brief")
+    _write_worker_output(repo, n)
+    _commit(repo, "results 1")
+    for i in range(2, n_commits + 1):
+        _touch_results(repo, n)
+        _commit(repo, f"results {i}")
+
+
+def test_fourth_rewrite_fails_while_open(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _repo_n_result_commits(repo, 4)
+    code, _ = _run_main(repo, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert any("rewritten 4 times" in line for line in out.splitlines())
+
+
+def test_escalated_suspends_edit_count_ceiling(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _repo_n_result_commits(repo, 4)
+    _set_brief_status(repo / "tasks" / "TASK-7.md", "escalated")
+    _commit(repo, "escalate")
+
+    code, _ = _run_main(repo, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "TASK-7 [escalated]" in out
+    assert "suspended" in out
+
+
+def test_reset_commit_restarts_edit_count(tmp_path, capsys):
+    """Four rewrites would fail; revising the brief resets the count."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _repo_n_result_commits(repo, 4)
+
+    code_before, _ = _run_main(repo, "--head-ref", "HEAD")
+    out_before = capsys.readouterr().out
+    assert code_before == 1, out_before
+    assert any("rewritten 4 times" in line for line in out_before.splitlines())
+
+    md = repo / "tasks" / "TASK-7.md"
+    md.write_text(md.read_text(encoding="utf-8") + "\n<!-- reset -->\n", encoding="utf-8")
+    reset = _commit(repo, "reset: revise brief")
+    _touch_results(repo, "7")
+    _commit(repo, "results after reset")
+
+    code, _ = _run_main(repo, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "output_check: PASS" in out
+    got = output_check.commits_touching_since(
+        repo, "HEAD", "tasks/TASK-7/results.json", reset
+    )
+    assert len(got) == 1
+
+def test_blocked_empty_commit_is_recognized(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text(f"sha256: `{CORPUS_SHA}`\n", encoding="utf-8")
+    _write_brief(repo, "7", status="blocked")
+    _init_git(repo)
+    _commit(repo, "blocked brief")
+    sha = _empty_commit(repo, "BLOCKED: TASK-7 cannot touch scripts/")
+
+    found = output_check.blocked_empty_commits(repo, "HEAD")
+    assert len(found) == 1
+    assert found[0][0] == sha
+    assert found[0][1].startswith("BLOCKED:")
+
+    code, _ = _run_main(repo, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert f"recognized empty commit {sha[:8]} BLOCKED: TASK-7 cannot touch scripts/" in out
+    assert "TASK-7 [blocked]" in out
+    assert "suspended" in out
+
+
+def test_blocked_subject_with_file_changes_is_not_the_empty_convention(
+    tmp_path, capsys
+):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text(f"sha256: `{CORPUS_SHA}`\n", encoding="utf-8")
+    _write_brief(repo, "7", status="blocked")
+    _init_git(repo)
+    _commit(repo, "blocked brief")
+    md = repo / "tasks" / "TASK-7.md"
+    md.write_text(md.read_text(encoding="utf-8") + "\n<!-- note -->\n", encoding="utf-8")
+    _commit(repo, "BLOCKED: TASK-7 not empty")
+
+    found = output_check.blocked_empty_commits(repo, "HEAD")
+    assert found == []
+    code, _ = _run_main(repo, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "recognized empty commit" not in out
+
+
+def test_blocked_task_on_main_does_not_fail_the_repo(tmp_path, capsys):
+    """Probe class: status: blocked on an iterating task is legal and green."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text(f"sha256: `{CORPUS_SHA}`\n", encoding="utf-8")
+    _iterating_task(repo, "7")
+    _set_brief_status(repo / "tasks" / "TASK-7.md", "blocked")
+    _init_git(repo)
+    _commit(repo, "TASK-7 blocked")
+
+    code, _ = _run_main(repo, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "suspended" in out
+    assert "disagree" not in out
