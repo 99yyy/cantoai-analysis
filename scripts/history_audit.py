@@ -20,6 +20,13 @@ Counting rule for bars that are code: a NET REMOVAL is a bar change (fewer
 checks emitted, fewer counterexample patterns, fewer mutation patches). Adding
 checks is never flagged.
 
+Task briefs ``tasks/TASK-*.md`` declare bars in fenced ``numbers``, ``fixture``,
+``frame``, and ``n`` blocks (plan §3.3). Widening a tolerance, deleting a name,
+or deleting a whole block is a bar move. Tightening a tolerance is not.
+Declared expected values in those blocks are bars under contract rule 6: any
+change of the value, or deleting the name, is a bar move. Adding a name or a
+block is not.
+
 Usage:
   python scripts/history_audit.py --base origin/main --pr-body-file body.txt
 """
@@ -51,6 +58,16 @@ MUTATION_GLOB = "tests/mutations/*.patch"
 MEASURED = ["src/*", "src/**", "sql/*", "sql/**", "data/*", "data/**",
             "scripts/*.py", "scripts/**/*.py"]
 
+# Top-level task briefs only. fnmatch '*' matches a slash, so tasks/TASK-*.md
+# would also hit tasks/TASK-6/open_analysis.md.
+TASK_BRIEF_RE = re.compile(r"^tasks/TASK-[^/]+\.md$")
+DECL_KINDS = ("numbers", "fixture", "frame", "n")
+DECL_FENCE = re.compile(
+    r"^```(" + "|".join(DECL_KINDS) + r")\s*$(.*?)^```\s*$",
+    re.M | re.S,
+)
+TOLERANCE_NAMES = frozenset({"tol", "tolerance"})
+
 
 def run(*args: str) -> str:
     return subprocess.run(args, capture_output=True, text=True, check=True).stdout
@@ -70,6 +87,102 @@ def count_in(ref: str, path: str, pattern: str) -> int:
     except subprocess.CalledProcessError:
         return 0
     return len(re.findall(pattern, text))
+
+
+def file_at(ref: str, path: str) -> str | None:
+    try:
+        return run("git", "show", f"{ref}:{path}")
+    except subprocess.CalledProcessError:
+        return None
+
+
+def _fmt_num(x: float) -> str:
+    if x == int(x) and abs(x) < 1e15:
+        return str(int(x))
+    return repr(x)
+
+
+def _is_tolerance(kind: str, name: str) -> bool:
+    if kind == "numbers":
+        return True
+    n = name.casefold()
+    return n.endswith("_tol") or n in TOLERANCE_NAMES
+
+
+def parse_decl_entries(body: str) -> dict[str, tuple[float, ...]]:
+    """Name -> numeric fields on one declaration line.
+
+    Comment-only and non-numeric lines (frame predicates) are skipped. A name
+    that cannot be parsed is absent, so deleting it looks like a deletion.
+    """
+    out: dict[str, tuple[float, ...]] = {}
+    for raw in body.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        nums: list[float] = []
+        ok = True
+        for p in parts[1:]:
+            try:
+                nums.append(float(p))
+            except ValueError:
+                ok = False
+                break
+        if not ok or not nums:
+            continue
+        name = parts[0]
+        if name not in out:
+            out[name] = tuple(nums)
+    return out
+
+
+def parse_declaration_blocks(text: str) -> dict[str, dict[str, tuple[float, ...]]]:
+    """First fenced block per kind. Later duplicates of the same kind are ignored."""
+    blocks: dict[str, dict[str, tuple[float, ...]]] = {}
+    for m in DECL_FENCE.finditer(text):
+        kind = m.group(1)
+        if kind in blocks:
+            continue
+        blocks[kind] = parse_decl_entries(m.group(2))
+    return blocks
+
+
+def declaration_bars(path: str, old_text: str, new_text: str) -> list[str]:
+    """Bar moves in fenced declaration blocks of a task brief (plan §3.3)."""
+    old_blocks = parse_declaration_blocks(old_text)
+    new_blocks = parse_declaration_blocks(new_text)
+    hits: list[str] = []
+    for kind in DECL_KINDS:
+        was = old_blocks.get(kind)
+        now = new_blocks.get(kind)
+        if not was:
+            continue
+        if now is None:
+            hits.append(f"{path} ```{kind} block deleted")
+            continue
+        for name, old_nums in was.items():
+            new_nums = now.get(name)
+            if new_nums is None:
+                hits.append(f"{path} ```{kind} {name} deleted")
+                continue
+            if old_nums == new_nums:
+                continue
+            if _is_tolerance(kind, name) and len(old_nums) == 1 and len(new_nums) == 1:
+                if new_nums[0] > old_nums[0]:
+                    hits.append(
+                        f"{path} ```{kind} {name} tolerance widened "
+                        f"({_fmt_num(old_nums[0])} -> {_fmt_num(new_nums[0])})"
+                    )
+                continue
+            hits.append(
+                f"{path} ```{kind} {name} "
+                f"({', '.join(_fmt_num(x) for x in old_nums)} -> "
+                f"{', '.join(_fmt_num(x) for x in new_nums)})"
+            )
+    return sorted(hits)
 
 
 def yaml_bar_keys_touched(base: str, path: str) -> list[str]:
@@ -129,6 +242,13 @@ def main() -> int:
     for f in files:
         if match_any(f, BAR_YAML_FILES):
             bars.extend(yaml_bar_keys_touched(args.base, f))
+
+    for f in files:
+        if not TASK_BRIEF_RE.match(f) or f not in base_tree:
+            continue
+        old = file_at(args.base, f) or ""
+        new = file_at("HEAD", f) or ""
+        bars.extend(declaration_bars(f, old, new))
 
     bars = sorted(set(bars))
     measured = sorted(f for f in files if match_any(f, MEASURED))
