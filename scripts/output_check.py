@@ -127,6 +127,22 @@ What this enforces, in order:
                change is a ``repair/`` PR that updates README and the
                stamps together; a live closed task (stamp matches) still
                replays against the new pin.
+  result       ``tasks/TASK-N/RESULT.json`` is the auditor's round outcome,
+               not a worker/verifier file. ``subtype`` is the machine
+               ending; ``verdict`` is the research judgement and is
+               non-null only when subtype is success. Success does not
+               mean the hypothesis is supported. When the file exists on a
+               closed/escalated/blocked task, the schema is enforced and
+               mismatched machine fields fail: success requires both
+               outputs, pairwise agreement within tol, and a live closed
+               brief; out_of_turns requires the post-reset rewrite count
+               to be at cap; corpus_sha must equal the README pin.
+               ``turns_used`` is type-checked only (launch count is not in
+               git; TODO item 4). ``cost_usd`` / ``budget_usd`` /
+               ``val_iterations`` are forbidden. Missing RESULT on a task
+               already terminal is transitional; a PR that newly sets a
+               terminal status must include the file. Present on ``open``
+               fails.
   scope        (pull requests only) only a task whose brief or files under
                ``tasks/TASK-N/`` appear in the PR diff is fully checked.
                Other tasks print a frozen summary and cannot fail the PR:
@@ -186,7 +202,40 @@ DERIVED = "derived:"
 EPS = 1e-9
 MAX_ATTEMPTS = 3
 WORKER, VERIFIER = "results.json", "mine.json"
+RESULT = "RESULT.json"
 SUSPEND_STATUS = frozenset({"escalated", "blocked"})
+TERMINAL_STATUS = frozenset({"closed", "escalated", "blocked"})
+# Auditor-written round outcome. Worker/verifier never write this file.
+# TODO(item 4): turns_used is Cloud Agent launch count (budget 16 including
+# forks) and is not recoverable from git. This script type-checks it and
+# uses rewrite counts (cap MAX_ATTEMPTS) for subtype out_of_turns.
+RESULT_KEYS = (
+    "task",
+    "subtype",
+    "verdict",
+    "hypothesis",
+    "why",
+    "numbers",
+    "turns_used",
+    "turn_cap",
+    "corpus_sha",
+    "forked_from",
+    "fork_depth",
+)
+RESULT_KEY_SET = frozenset(RESULT_KEYS)
+RESULT_NUMBER_KEYS = frozenset({"value", "within_tol"})
+SUBTYPES = frozenset(
+    {
+        "success",
+        "out_of_turns",
+        "out_of_budget",
+        "blocked",
+        "infra_failure",
+        "stale",
+    }
+)
+VERDICTS = frozenset({"supported", "refuted", "inconclusive"})
+FORBIDDEN_RESULT_FIELDS = ("cost_usd", "budget_usd", "val_iterations")
 BLOCKED_SUBJECT_PREFIX = "BLOCKED:"
 # tasks/TASK-N.md or anything under tasks/TASK-N/ (plan §4.1 / §4.3).
 TASK_PATH_RE = re.compile(r"^tasks/TASK-([^/]+)(?:\.md|/)")
@@ -586,12 +635,12 @@ def task_id_from_output_path(path: Path, tasks_root: Path) -> str | None:
 
 
 def output_files_by_task(root: Path) -> dict[str, list[Path]]:
-    """``results.json`` / ``mine.json`` under a TASK-N directory anywhere in tasks/."""
+    """``results.json`` / ``mine.json`` / ``RESULT.json`` under a TASK-N directory."""
     tasks = root / "tasks"
     found: dict[str, list[Path]] = {}
     if not tasks.is_dir():
         return found
-    for name in (WORKER, VERIFIER):
+    for name in (WORKER, VERIFIER, RESULT):
         for path in tasks.rglob(name):
             if not path.is_file():
                 continue
@@ -1674,6 +1723,383 @@ def replay(
     return got
 
 
+# ---------------------------------------------------------------- RESULT.json
+
+
+def is_nonneg_int(v: object) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool) and v >= 0
+
+
+def is_finite_number(v: object) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def status_at(root: Path, rev: str, n: str) -> str | None:
+    """Brief status at ``rev``, or None if the brief is missing or unparsable."""
+    rel = f"tasks/TASK-{n}.md"
+    if not in_tree(root, rev, rel):
+        return None
+    try:
+        text = git(root, "show", f"{rev}:{rel}")
+    except Fail:
+        return None
+    found = STATUS.findall(text)
+    if len(found) != 1:
+        return None
+    return found[0]
+
+
+def newly_stopped(
+    root: Path, n: str, base: str | None, head: str | None, status_now: str
+) -> bool:
+    """True when this PR takes the brief from non-terminal to terminal.
+
+    Transitional: a task already closed/escalated/blocked (TASK-6) is not
+    required to grow ``RESULT.json``. Main (no ``--base-ref``) does not
+    require a missing file either.
+    """
+    if not base or not head:
+        return False
+    if status_now not in TERMINAL_STATUS:
+        return False
+    old = status_at(root, base, n)
+    if old in TERMINAL_STATUS:
+        return False
+    return True
+
+
+def round_reset_for_result(
+    root: Path, rev: str, n: str, status: str
+) -> str | None:
+    """Brief commit that starts the round RESULT's rewrite count talks about.
+
+    Open: the latest brief revision (same as ``reset_commit``). Terminal:
+    the latest brief commit whose status was ``open``, so the stop itself
+    (a brief edit) does not zero the count. No open brief in history:
+    count every output commit.
+    """
+    got = commits_touching(root, rev, f"tasks/TASK-{n}.md")
+    if not got:
+        return None
+    if status not in TERMINAL_STATUS:
+        return got[0]
+    for sha in got:
+        if status_at(root, sha, n) == "open":
+            return sha
+    return None
+
+
+def max_output_rewrites(root: Path, rev: str, n: str, status: str) -> int:
+    """Max worker/verifier rewrite count after the round reset (exclusive)."""
+    since = round_reset_for_result(root, rev, n, status)
+    counts: list[int] = []
+    for k in (WORKER, VERIFIER):
+        rel = f"tasks/TASK-{n}/{k}"
+        counts.append(len(commits_touching_since(root, rev, rel, since)))
+    return max(counts) if counts else 0
+
+
+def load_output_pairs(path: Path) -> dict[str, tuple[float, int]] | None:
+    """``name -> (value, n)`` from a worker/verifier file, or None if unreadable."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    if not isinstance(data, list):
+        return None
+    out: dict[str, tuple[float, int]] = {}
+    for row in data:
+        if not isinstance(row, dict):
+            return None
+        name = row.get("name")
+        value = row.get("value")
+        counted = row.get("n")
+        if not isinstance(name, str) or name in out:
+            return None
+        if not is_finite_number(value) or not is_nonneg_int(counted):
+            return None
+        out[name] = (float(value), counted)
+    return out
+
+
+def outputs_agree(
+    worker: dict[str, tuple[float, int]],
+    verifier: dict[str, tuple[float, int]],
+    tol: dict[str, float],
+) -> bool:
+    names = set(tol)
+    if set(worker) != names or set(verifier) != names:
+        return False
+    for name in names:
+        wv, wn = worker[name]
+        vv, vn = verifier[name]
+        if wn != vn or not close(wv, vv, tol[name]):
+            return False
+    return True
+
+
+def parse_result(
+    path: Path, n: str, declared: dict[str, float], corpus_sha: str
+) -> dict:
+    """Load and type-check RESULT.json. Raises Fail on schema errors."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise Fail(f"TASK-{n}: RESULT.json is not valid JSON: {e}")
+    if not isinstance(data, dict):
+        raise Fail(f"TASK-{n}: RESULT.json top level must be an object")
+
+    forbidden = [f for f in FORBIDDEN_RESULT_FIELDS if f in data]
+    if forbidden:
+        raise Fail(
+            f"TASK-{n}: RESULT.json must not include {', '.join(forbidden)} "
+            f"(dollar budget is gone; val_iterations is deferred)"
+        )
+    extra = sorted(set(data) - RESULT_KEY_SET)
+    missing = sorted(RESULT_KEY_SET - set(data))
+    if extra or missing:
+        bits: list[str] = []
+        if extra:
+            bits.append("unknown keys " + ", ".join(extra))
+        if missing:
+            bits.append("missing " + ", ".join(missing))
+        raise Fail(
+            f"TASK-{n}: RESULT.json keys must be exactly "
+            f"{list(RESULT_KEYS)}; {'; '.join(bits)}"
+        )
+
+    want_task = f"TASK-{n}"
+    if data["task"] != want_task:
+        raise Fail(
+            f"TASK-{n}: RESULT.json task must be {want_task!r}, got {data['task']!r}"
+        )
+
+    subtype = data["subtype"]
+    if subtype not in SUBTYPES:
+        raise Fail(
+            f"TASK-{n}: RESULT.json subtype must be one of "
+            f"{sorted(SUBTYPES)}, got {subtype!r}"
+        )
+
+    verdict = data["verdict"]
+    if subtype == "success":
+        if verdict not in VERDICTS:
+            raise Fail(
+                f"TASK-{n}: RESULT.json verdict must be one of "
+                f"{sorted(VERDICTS)} when subtype is success, got {verdict!r}"
+            )
+    elif verdict is not None:
+        raise Fail(
+            f"TASK-{n}: RESULT.json verdict must be null unless subtype is "
+            f"success, got {verdict!r}"
+        )
+
+    hyp = data["hypothesis"]
+    if not isinstance(hyp, str) or not hyp.strip() or "\n" in hyp:
+        raise Fail(
+            f"TASK-{n}: RESULT.json hypothesis must be one non-empty sentence"
+        )
+    why = data["why"]
+    if not isinstance(why, str) or not why.strip() or "\n" in why:
+        raise Fail(f"TASK-{n}: RESULT.json why must be one non-empty sentence")
+    if re.search(r"\d", why) is None:
+        raise Fail(f"TASK-{n}: RESULT.json why must contain a number")
+
+    numbers = data["numbers"]
+    if not isinstance(numbers, dict):
+        raise Fail(f"TASK-{n}: RESULT.json numbers must be an object")
+    extra_n = sorted(set(numbers) - set(declared))
+    missing_n = sorted(set(declared) - set(numbers))
+    if extra_n or missing_n:
+        bits = []
+        if extra_n:
+            bits.append("not in the numbers block: " + ", ".join(extra_n))
+        if missing_n:
+            bits.append("declared but absent: " + ", ".join(missing_n))
+        raise Fail(f"TASK-{n}: RESULT.json numbers " + "; ".join(bits))
+    for name, entry in numbers.items():
+        if not isinstance(entry, dict) or set(entry) != RESULT_NUMBER_KEYS:
+            got = (
+                sorted(entry) if isinstance(entry, dict) else type(entry).__name__
+            )
+            raise Fail(
+                f"TASK-{n}: RESULT.json numbers.{name} keys must be exactly "
+                f"{sorted(RESULT_NUMBER_KEYS)}, got {got}"
+            )
+        if not is_finite_number(entry["value"]):
+            raise Fail(
+                f"TASK-{n}: RESULT.json numbers.{name}.value must be a number"
+            )
+        if not isinstance(entry["within_tol"], bool):
+            raise Fail(
+                f"TASK-{n}: RESULT.json numbers.{name}.within_tol must be a boolean"
+            )
+
+    # TODO(item 4): turns_used is Cloud Agent launch count; git cannot
+    # derive it yet. Presence and type only.
+    if not is_nonneg_int(data["turns_used"]):
+        raise Fail(
+            f"TASK-{n}: RESULT.json turns_used must be a non-negative integer"
+        )
+    if data["turn_cap"] != MAX_ATTEMPTS:
+        raise Fail(
+            f"TASK-{n}: RESULT.json turn_cap must be {MAX_ATTEMPTS}, "
+            f"got {data['turn_cap']!r}"
+        )
+
+    sha = data["corpus_sha"]
+    if not isinstance(sha, str) or CORPUS_SHA_VALUE.fullmatch(sha) is None:
+        raise Fail(
+            f"TASK-{n}: RESULT.json corpus_sha is not a 64-char lowercase hex "
+            f"sha256: {sha!r}"
+        )
+    if sha != corpus_sha:
+        raise Fail(
+            f"TASK-{n}: RESULT.json corpus_sha is {sha}, README pin is {corpus_sha}"
+        )
+
+    forked = data["forked_from"]
+    if forked is not None and (
+        not isinstance(forked, str) or not forked.strip()
+    ):
+        raise Fail(
+            f"TASK-{n}: RESULT.json forked_from must be null or a string"
+        )
+    if not is_nonneg_int(data["fork_depth"]):
+        raise Fail(
+            f"TASK-{n}: RESULT.json fork_depth must be a non-negative integer"
+        )
+    if forked is None and data["fork_depth"] != 0:
+        raise Fail(
+            f"TASK-{n}: RESULT.json fork_depth must be 0 when forked_from is null"
+        )
+    return data
+
+
+def check_round_result(
+    root: Path,
+    n: str,
+    brief: Brief,
+    task_dir: Path,
+    corpus_sha: str,
+    base: str | None,
+    head: str | None,
+    fail: list[str],
+) -> None:
+    """Validate RESULT.json when present; require it for newly stopped tasks."""
+    path = task_dir / RESULT
+    rel = f"tasks/TASK-{n}/{RESULT}"
+    status = brief.status
+
+    if not path.is_file():
+        if newly_stopped(root, n, base, head, status):
+            fail.append(
+                f"TASK-{n}: status is {status} after this PR but {rel} is "
+                f"missing; the auditor writes RESULT at stop"
+            )
+        return
+
+    try:
+        data = parse_result(path, n, brief.tol, corpus_sha)
+    except Fail as e:
+        fail.append(str(e))
+        return
+
+    if status not in TERMINAL_STATUS:
+        fail.append(
+            f"TASK-{n}: {RESULT} is present but status is {status}; "
+            f"the auditor writes RESULT at stop"
+        )
+        return
+
+    subtype = data["subtype"]
+    print(
+        f"  TASK-{n} [{status}]: {RESULT} subtype={subtype} "
+        f"verdict={data['verdict']!r}"
+    )
+
+    worker_p = task_dir / WORKER
+    verifier_p = task_dir / VERIFIER
+    worker = load_output_pairs(worker_p) if worker_p.is_file() else None
+    verifier = load_output_pairs(verifier_p) if verifier_p.is_file() else None
+    stale = stale_closed(status, brief.corpus_sha, corpus_sha)
+    agreed = (
+        worker is not None
+        and verifier is not None
+        and outputs_agree(worker, verifier, brief.tol)
+    )
+
+    if subtype == "success":
+        if status != "closed" or stale:
+            extra = "; STALE" if stale else ""
+            fail.append(
+                f"TASK-{n}: RESULT.json subtype is success but status is "
+                f"{status}{extra} (success requires a live closed brief)"
+            )
+        if not worker_p.is_file() or worker is None:
+            fail.append(
+                f"TASK-{n}: RESULT.json subtype is success but {WORKER} is missing"
+            )
+        if not verifier_p.is_file() or verifier is None:
+            fail.append(
+                f"TASK-{n}: RESULT.json subtype is success but {VERIFIER} is missing"
+            )
+        if worker is not None and verifier is not None and not agreed:
+            fail.append(
+                f"TASK-{n}: RESULT.json subtype is success but {WORKER} and "
+                f"{VERIFIER} do not agree within tol"
+            )
+        for name, entry in data["numbers"].items():
+            if entry["within_tol"] is not True:
+                fail.append(
+                    f"TASK-{n}: RESULT.json subtype is success but "
+                    f"numbers.{name}.within_tol is false"
+                )
+            claimed = float(entry["value"])
+            t = brief.tol[name]
+            if worker is not None and name in worker:
+                if not close(claimed, worker[name][0], t):
+                    fail.append(
+                        f"TASK-{n}: RESULT.json numbers.{name}.value "
+                        f"{num(claimed)} is not within tol of {WORKER} "
+                        f"{num(worker[name][0])}"
+                    )
+            if verifier is not None and name in verifier:
+                if not close(claimed, verifier[name][0], t):
+                    fail.append(
+                        f"TASK-{n}: RESULT.json numbers.{name}.value "
+                        f"{num(claimed)} is not within tol of {VERIFIER} "
+                        f"{num(verifier[name][0])}"
+                    )
+
+    if subtype == "out_of_turns" and head:
+        try:
+            got = max_output_rewrites(root, head, n, status)
+        except Fail as e:
+            fail.append(str(e))
+        else:
+            if got < MAX_ATTEMPTS:
+                fail.append(
+                    f"TASK-{n}: RESULT.json subtype is out_of_turns but rewrite "
+                    f"count is {got} (cap is {MAX_ATTEMPTS})"
+                )
+    # out_of_turns without --head-ref: rewrite count is not decidable, same
+    # as the existing edit-count gate. TODO(item 4) for launch counts.
+
+    if subtype == "stale" and not stale:
+        fail.append(
+            f"TASK-{n}: RESULT.json subtype is stale but the close stamp "
+            f"matches the README pin"
+        )
+
+    if subtype == "blocked" and status != "blocked":
+        fail.append(
+            f"TASK-{n}: RESULT.json subtype is blocked but status is {status}"
+        )
+    # out_of_budget / infra_failure: allowed subtype values; budget-16 and
+    # infra evidence are not git-derivable yet (item 4 / later).
+
+
 # ---------------------------------------------------------------------- one task
 
 
@@ -1695,6 +2121,11 @@ def check_task(
         return
     status, tol, n_decl, frame, stamp, identities = brief
 
+    task_dir = root / "tasks" / f"TASK-{n}"
+    check_round_result(
+        root, n, brief, task_dir, corpus_sha, base, head, fail
+    )
+
     if status in SUSPEND_STATUS:
         print(
             f"  TASK-{n} [{status}]: {len(tol)} number(s) declared; "
@@ -1706,7 +2137,6 @@ def check_task(
         print(stale_closed_line(n, stamp, corpus_sha))
         return
 
-    task_dir = root / "tasks" / f"TASK-{n}"
     paths = {
         WORKER: task_dir / WORKER,
         VERIFIER: task_dir / VERIFIER,

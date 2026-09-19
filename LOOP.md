@@ -12,7 +12,7 @@
 |---|---|---|---|
 | `worker` | 任务书、语料 | `tasks/TASK-N/results.json` 与产生它的 SQL | `cursor/t<N>-worker-…` |
 | `verifier` | 任务书、语料 | `tasks/TASK-N/mine.json` 与产生它的 SQL | `cursor/t<N>-verifier-…` |
-| `auditor` | 本任务的 commit 与 PR 正文 | `review/TASK-N/audit.md` | `cursor/t<N>-auditor-…` |
+| `auditor` | 本任务的 commit 与 PR 正文 | `review/TASK-N/audit.md` 与 `tasks/TASK-N/RESULT.json` | `cursor/t<N>-auditor-…` |
 
 两个算数的节点交**同一种文件**，形状一样，都不含任何判定字段：
 
@@ -71,17 +71,17 @@ STOP     全部一致 → 把任务书改成 status: closed，并盖上当时 RE
 ./verify              # 与 CI 相同：pytest、output-check、relations；PR 上再跑 scope-check 与 history-audit
 ./verify task 6       # 只跑 TASK-6 的 output-check 与 relations
 ./verify relations 6  # 只跑 TASK-6 的 double / permute / identities
-./verify probe        # 已知必红的探针（常数 SQL、relations 写死分母）；仍绿则 ./verify 自身坏了
+./verify probe        # 已知必红的探针（常数 SQL、relations 写死分母、RESULT 假 out_of_turns）；仍绿则 ./verify 自身坏了
 ```
 
 main 上不跑 scope-check / history-audit（与 CI 一致）。`./verify probe` 在丢弃用的树里跑探针，不以本仓库的绿灯当证据。
 
 ## output-check 实际做了什么
 
-按顺序，任何一条不过就红。**在 pull request 上，下面 2–9 条只作用于这次 diff 碰到的任务**（`tasks/TASK-N.md` 或 `tasks/TASK-N/` 下任何文件，包括只改 `results.json` 或只改 `mine.json`）。没碰到的任务打一行 frozen summary，不把失败并进总账——`status: open` 且两边已经不合的任务（ITERATE）因此不能挡住一条无关的 PR。没有 `--base-ref` 时（main 上的 push）仍走完全部任务。任务书发现是顶层 glob `tasks/TASK-*.md`（非递归）。**若 `tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，而对应的 `tasks/TASK-N.md` 不在该 glob 里，这一条对整棵树生效、不受 PR freeze 跳过**（plan §2.6）：把任务书移走不得让检查变成「nothing to check」绿灯。
+按顺序，任何一条不过就红。**在 pull request 上，下面 2–10 条只作用于这次 diff 碰到的任务**（`tasks/TASK-N.md` 或 `tasks/TASK-N/` 下任何文件，包括只改 `results.json` 或只改 `mine.json`）。没碰到的任务打一行 frozen summary，不把失败并进总账——`status: open` 且两边已经不合的任务（ITERATE）因此不能挡住一条无关的 PR。没有 `--base-ref` 时（main 上的 push）仍走完全部任务。任务书发现是顶层 glob `tasks/TASK-*.md`（非递归）。**若 `tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，而对应的 `tasks/TASK-N.md` 不在该 glob 里，这一条对整棵树生效、不受 PR freeze 跳过**（plan §2.6）：把任务书移走不得让检查变成「nothing to check」绿灯。
 
 1. `data/corpus_v2.sqlite` 的 sha256 与 `README.md` 里记的一致。语料不对，后面全部无意义。
-2. 任务书有且只有一行 `status: open` / `closed` / `escalated` / `blocked`，`numbers` 块能解析。可选一行 `corpus_sha:`（64 位小写 hex，可带反引号）：收口时盖上当时 README 的语料 pin。可选的 fenced `n` 块、`frame` 块与 `identities` 块也在这里解析。`escalated` 与 `blocked` 暂停该任务第 3–9 条（重放、比对、声明 n、恒等式、改写计数）。**`status: closed` 且 stamp 缺失或与当前 README pin 不符 → STALE**：第 3–9 条不跑，不把失败并进总账，也不打印 `N/N number(s) agree`（plan §4.5）。顶层 glob 找不到任务书、但对应 TASK-N 目录里还有 `results.json` 或 `mine.json`：直接红，不走「nothing to check」。
+2. 任务书有且只有一行 `status: open` / `closed` / `escalated` / `blocked`，`numbers` 块能解析。可选一行 `corpus_sha:`（64 位小写 hex，可带反引号）：收口时盖上当时 README 的语料 pin。可选的 fenced `n` 块、`frame` 块与 `identities` 块也在这里解析。`escalated` 与 `blocked` 暂停该任务第 3–9 条（重放、比对、声明 n、恒等式、改写计数）。**`status: closed` 且 stamp 缺失或与当前 README pin 不符 → STALE**：第 3–9 条不跑，不把失败并进总账，也不打印 `N/N number(s) agree`（plan §4.5）。顶层 glob 找不到任务书、但对应 TASK-N 目录里还有 `results.json` 或 `mine.json`：直接红，不走「nothing to check」。第 10 条（RESULT.json）在终态任务上仍跑：STALE/suspended 的 RESULT 对不上机器事实同样红。
 3. 两个输出文件的每一行恰好是 `{name, value, n, query}`，名字集合与 `numbers` 块**相等**——少一个和多一个都红；同一文件内不得有重名，也不得有两个数字共用一条算路。算路按 `route()` 解析后的路径计（`sql/../sql/x.sql` 与 `sql/x.sql` 是同一条），不是按 query 字符串。若有 `n` 块，其名字集合必须与 `numbers` 相等；每一行是非负整数常数或 `derived:` 表达式。
 4. 每个 `query` 是下面两种之一：
    - `tasks/TASK-N/<…>.sql`：一条语句，`SELECT` 或 `WITH` 开头，返回恰好一行一列；`EXPLAIN QUERY PLAN` 必须出现对语料表 `videos` / `windows` / `syllables` / `runs` 的 `SCAN` 或 `SEARCH`（`SELECT 12345` 过不了这一关）；同一条语句执行两次结果必须相同；`strip_and_split` 之后不得出现 `random()`、`randomblob()`、`strftime('now')` 族；
@@ -91,6 +91,7 @@ main 上不跑 scope-check / history-audit（与 CI 一致）。`./verify probe`
 7. 两套数字每个 `value` 在容差内相等，每个 `n` 完全相等。不一致的把两个数都打出来。只两边 `n` 相等不够（plan §2.5）：若有 `n` 块，每个写下的 `n` 还必须等于声明的常数或 `derived:`（代入的是重放值）。两道检查一起做。没有 `n` 块时，声明 n 那一道不激活。若有 `identities` 块，每一行 `<expr> = <expr>  <tol>` 用重放值求；只在**该文件**里每个数字名都是 SQL 算路时才计，否则跳过（不合并两边的字典）。若 `frame` 含 `videos_expected`，且 numbers 声明了 `n_videos_pre`、`n_videos_post`、`n_unassigned_period`，三者重放值之和必须等于 `frame.videos_expected`（容差 `videos_expected_tol`，未写则 0）。RHS 引用 frame 字段，检查代码里不得写死 567。没有 `videos_expected`、或该任务没声明那三个名字：该条不运行。
 8. 动过同一个输出文件的 commit 不超过三个，从该任务书最近一次改动那个 reset commit 计起。`escalated` / `blocked` 不计。
 9. 引入某一边文件的那个 commit，它自己的树和**所有祖先**的树里都没有另一边的文件。两边的引入 commit 不能有祖先关系，必须来自不同分支、不同作者（plan §2.7）。只看引入 commit 自己那一棵树，挡不住「先提交自己的、再 merge 对方」或同一条分支上分三次写出两边。
+10. 若 `tasks/TASK-N/RESULT.json` 存在于 `closed` / `escalated` / `blocked` 任务，按 schema 核对：`subtype` 与 `verdict` 独立，后者只在 `subtype: success` 时非空；`success` 要求两边齐、数字在容差内一致、live closed；`out_of_turns` 要求改写次数已到上限 3；`corpus_sha` 必须等于当前 README pin。`turns_used` 只检查类型（启动次数 git 里没有）。本 PR 新收成终态的任务必须有这份文件；落地前已关闭的任务可以没有。存在于 `open` 则红。没有 `cost_usd` / `budget_usd` / `val_iterations`。
 
 同一 job 里、在 `/tmp/gate/output_check.py`（PR）或 `scripts/output_check.py`（main）之后，另跑 `python scripts/relations.py`。这一步读的是 **HEAD 工作树**，不是 `/tmp/gate`：A1 之后 PR 上的闸门脚本是 base 的拷贝，新加的 `relations.py` 在合入之前 base 看不见。临时语料只写 `$RUNNER_TEMP`（或本地 tempfile），跑完删除，**从不写进 `data/`**。它不做 PR freeze。数字来自重放，不来自 agent 写下的值。
 
@@ -127,7 +128,7 @@ git 作者身份，第 9 条对两边都自然成立。
 两个 agent 不会一致，也不该强求。这部分不进 `numbers` 块，由 Tom 和 `auditor` 判断。
 判断不能自动化。硬把它塞进闸门，只会得到一个假的绿灯。
 
-分支本身就是断点：哪些 commit 在，就说明做到哪一步了。不另设状态文件。
+分支本身就是断点：哪些 commit 在，就说明做到哪一步了。任务书上的 `status` 仍是控制开关。`RESULT.json` 是 auditor 在收口时留下的结构化结局，不替代 `status`，也不由 worker/verifier 写。
 
 ## 收口
 
@@ -141,14 +142,26 @@ keep rate 抄的是 live closed 任务那一行 `N/N number(s) agree`。STALE �
 39/39，不得把 STALE 跳过当成留下了全部数字。
 
 然后放 `auditor`：读这批 commit 的 patch 与每个 PR 的正文，答六个固定问题，每条结论带
-commit sha、文件、行号，给不出就写 UNKNOWN。它只写 `review/TASK-N/audit.md`，不得改
-任何代码、测试、声明或栅。
+commit sha、文件、行号，给不出就写 UNKNOWN。它写 `review/TASK-N/audit.md` 与
+`tasks/TASK-N/RESULT.json`，不得改任何代码、测试、声明或栅。
 
 它的结论**只进 `backlog.md`**，永远不直接变成下一个任务的题目。否则这台专门生产过程
 缺陷的机器会一直吃掉轮次。
 
 收口时在 `backlog.md` 记一行 keep rate：这个任务产出了几个数字，留下了几个。连续低于
 一半，下一个任务不派 agent，自己做。数字来自 live closed 的 `N/N agree`，不是 STALE。
+
+## 轮次结果 `RESULT.json`
+
+`auditor` 在任务停止时写 `tasks/TASK-N/RESULT.json`。`worker` 与 `verifier` 不写这份文件。
+
+`subtype` 是机器结局，`verdict` 是研究判断，二者独立。`subtype: success` 只表示两边齐、数字在容差内一致、CI 事实与「跑完了」相符；**不**表示假说成立。假说是否成立只看 `verdict`：`supported` / `refuted` / `inconclusive`。只有 `subtype` 为 `success` 时 `verdict` 才非空，否则必须是 `null`。
+
+`subtype` 取值：`success`、`out_of_turns`、`out_of_budget`、`blocked`、`infra_failure`、`stale`。没有 `cost_usd` / `budget_usd` / `val_iterations`。`turns_used` / `turn_cap` 记本轮 Cloud Agent 启动次数；本闸门能核对的是 git 里的改写次数（从该轮 `open` 的 reset commit 计，上限 3）。启动次数从 git 还推不出来，类型先钉死，推导留给后续预算项。
+
+`forked_from` 与 `fork_depth` 只是字段；本文件不实现分叉。`out_of_budget` 只是合法 subtype，16 次启动的预算不在这里执行。
+
+本闸门落地前已经 `closed` 的任务可以没有 `RESULT.json`。文件一旦存在，或本 PR 把任务书从非终态收成 `closed` / `escalated` / `blocked`，`output-check` 按上面核对，对不上就红。
 
 ## 语料更换
 
