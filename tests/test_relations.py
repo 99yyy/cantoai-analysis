@@ -423,3 +423,57 @@ def test_temp_cleaned_up(tmp_path, monkeypatch):
 def test_live_task_6_pinned_corpus_sha():
     got = _sha256_file(CORPUS_PATH)
     assert got == CORPUS_SHA
+
+
+def test_unknown_task_flag_fails(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _green_task(repo, corpus)
+    code = _run_main(repo, corpus, "--task", "99")
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "no tasks/TASK-99.md" in out
+    assert "relations: FAIL" in out
+
+
+def test_task_flag_skips_unclassified_other_brief(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _green_task(repo, corpus)
+    (repo / "tasks" / "TASK-8.md").write_text(
+        "# TASK-8\nstatus: open\n```numbers\nsmoke_ok  0\n```\n",
+        encoding="utf-8",
+    )
+    sql8 = repo / "tasks" / "TASK-8" / "sql" / "n.sql"
+    sql8.parent.mkdir(parents=True, exist_ok=True)
+    sql8.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+    (repo / "tasks" / "TASK-8" / "results.json").write_text(
+        json.dumps(
+            [
+                {
+                    "name": "smoke_ok",
+                    "value": 2,
+                    "n": 1,
+                    "query": "tasks/TASK-8/sql/n.sql",
+                }
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    code_all = _run_main(repo, corpus)
+    out_all = capsys.readouterr().out
+    assert code_all == 1, out_all
+    assert "matches no double/permute family" in out_all
+
+    code = _run_main(repo, corpus, "--task", "9")
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "only TASK-9" in out
+    assert "TASK-8" not in out
+    assert "relations: PASS" in out

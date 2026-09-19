@@ -149,6 +149,7 @@ the check passes for both.
 Usage:
     python scripts/output_check.py [--repo-root .]
                                    [--base-ref origin/main --head-ref HEAD]
+                                   [--task N]
 """
 from __future__ import annotations
 
@@ -548,6 +549,27 @@ def discover_briefs(root: Path) -> list[Path]:
 
 def brief_task_id(md: Path) -> str:
     return md.stem.split("-", 1)[1]
+
+
+def normalize_task_id(raw: str) -> str:
+    """``6`` or ``TASK-6`` → ``6``. Empty or path-like values fail."""
+    s = raw.strip()
+    if s.upper().startswith("TASK-"):
+        s = s.split("-", 1)[1]
+    if not s or "/" in s or "\\" in s or s in {".", ".."}:
+        raise Fail(f"task id {raw!r} is not a TASK-N id")
+    return s
+
+
+def filter_briefs(briefs: list[Path], task: str | None) -> list[Path]:
+    """All briefs, or exactly the named TASK-N brief."""
+    if task is None:
+        return briefs
+    n = normalize_task_id(task)
+    picked = [md for md in briefs if brief_task_id(md) == n]
+    if not picked:
+        raise Fail(f"no tasks/TASK-{n}.md")
+    return picked
 
 
 def task_id_from_output_path(path: Path, tasks_root: Path) -> str | None:
@@ -1834,6 +1856,7 @@ def main() -> int:
     ap.add_argument("--corpus", default="data/corpus_v2.sqlite")
     ap.add_argument("--base-ref", default=None)
     ap.add_argument("--head-ref", default=None)
+    ap.add_argument("--task", default=None, metavar="N")
     ap.add_argument("--sql-seconds", type=float, default=60.0)
     args = ap.parse_args()
     root = Path(args.repo_root).resolve()
@@ -1873,7 +1896,15 @@ def main() -> int:
         print("output_check: no refs given; attempts and independence are enforced in CI")
 
     briefs = discover_briefs(root)
-    fail.extend(orphan_output_messages(root, briefs))
+    if args.task is None:
+        fail.extend(orphan_output_messages(root, briefs))
+    else:
+        try:
+            briefs = filter_briefs(briefs, args.task)
+        except Fail as e:
+            print(f"output_check: FAIL\n  {e}")
+            return 1
+        print(f"output_check: only TASK-{brief_task_id(briefs[0])}")
     if not briefs:
         if not fail:
             print("output_check: no tasks/TASK-*.md; nothing to check")
@@ -1888,9 +1919,9 @@ def main() -> int:
     # Plan §4.1: on a pull request, fully check only tasks this diff touches.
     # Untouched tasks (including an open iterating disagreement on main) get a
     # frozen summary and cannot fail this PR. No base ref (push to main) still
-    # walks every task.
+    # walks every task. --task already selected one brief; do not freeze it.
     touched: frozenset[str] | None = None
-    if args.base_ref and args.head_ref:
+    if args.task is None and args.base_ref and args.head_ref:
         try:
             changed = pr_diff_names(root, args.base_ref, args.head_ref)
         except Fail as e:
