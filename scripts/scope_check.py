@@ -51,7 +51,7 @@ DENY = [".cursor/*", ".cursor/**", ".github/*", ".github/**", "data/*", "data/**
 BRIEF_RE = re.compile(r"^tasks/[^/]+\.md$")
 
 CHORE_ALLOW = [
-    "README.md", "SCHEMA.md", "PIPELINE.md", "REPORT.md", "RESEARCH_LOG.md",
+    "README.md", "BACKGROUND.md", "PIPELINE.md", "REPORT.md", "RESEARCH_LOG.md",
     "backlog.md", "LOOP.md", "STOP", "tasks/*", "tasks/**", "docs/*", "docs/**",
 ]
 
