@@ -26,7 +26,7 @@
 
 - 审计：`review/TASK-7/audit.md` — `verdict: supported`（`gap_other_common_pp` 7.3304；worker 整簇 bootstrap 95% CI 不含 0）。结论只记在此，不直接变成下一题。
 - keep rate：产出 10 个数字，留下 10 个（`output-check` 10/10 agree）→ **10/10**。
-- 任务书仍 `status: open`：`cursor[bot]` 不能改 brief（agent `no_brief`），也不能开 `chore/`（actor 不在 owner allowlist）。需要 owner 用 `chore/` 盖 `status: closed` 与 `corpus_sha:`。
+- 任务书仍 `status: open`：`cursor[bot]` 不能改 brief（agent `no_brief`），也不能开 `chore/`（actor 不在 owner allowlist）。需要 owner 用 `chore/` 同时盖 `status: closed`、`corpus_sha:` 与 `RESULT.json`（open 上放 RESULT 会红；关 brief 不带 RESULT 也会红）。
 
 ## LOOP 预算（启动次数，不是美元）
 

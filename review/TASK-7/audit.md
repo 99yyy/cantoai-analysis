@@ -2,9 +2,9 @@
 
 Range: `ae9b293` (brief open, #77) through `a553d03` (worker #79 on main after verifier #78). `origin/main` at this write is `df81b1e` (investigations convention). This audit does not re-judge the 10 `output-check` values; `./verify task 7` on `a553d03` printed `TASK-7 [open]: 10/10 number(s) agree`.
 
-`cursor[bot]` cannot edit `tasks/TASK-7.md` (`scope_check` `no_brief` on agent branches) and cannot use `chore/` (actor is not owner `99yyy`). Brief `status` is still `open`. Coordinator must land `status: closed` and `corpus_sha: 2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f` from an owner-actor `chore/` PR.
+`cursor[bot]` cannot edit `tasks/TASK-7.md` (`scope_check` `no_brief` on agent branches) and cannot use `chore/` (actor is not owner `99yyy`). Brief `status` is still `open`. Coordinator must land `status: closed` and `corpus_sha: 2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f` from an owner-actor `chore/` PR, **together with** `tasks/TASK-7/RESULT.json` (`output-check` rejects RESULT while status is open, and a newly closed brief without RESULT also fails).
 
-Verdict recorded in `tasks/TASK-7/RESULT.json`: **supported**. The brief's falsifier was a video-cluster 95% CI that includes 0; worker `bootstrap.json` reports [4.6207, 10.0956] pp with `ci_unreliable_any=0`, `B=2000`. That interval is open analysis, not a declared number. The auditor did not re-run the bootstrap and did not import `tasks/TASK-7/run_worker.py`.
+Prepared verdict for that RESULT: **supported**. The brief's falsifier was a video-cluster 95% CI that includes 0; worker `bootstrap.json` reports [4.6207, 10.0956] pp with `ci_unreliable_any=0`, `B=2000`. That interval is open analysis, not a declared number. The auditor did not re-run the bootstrap and did not import `tasks/TASK-7/run_worker.py`.
 
 ## Independent recompute (key number)
 
