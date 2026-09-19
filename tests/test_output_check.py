@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import re
@@ -376,11 +377,13 @@ def _write_brief(
     n_block: str | None = None,
     frame_block: str | None = None,
     extra_numbers: str = "",
+    corpus_sha: str | None = None,
 ) -> Path:
     md = root / "tasks" / f"TASK-{n}.md"
     md.parent.mkdir(parents=True, exist_ok=True)
+    stamp = f"corpus_sha: {corpus_sha}\n" if corpus_sha is not None else ""
     body = (
-        f"# TASK-{n}\n\nstatus: {status}\n\n"
+        f"# TASK-{n}\n\nstatus: {status}\n{stamp}\n"
         f"```numbers\n# name  tol\n{name}  0\n{extra_numbers}```\n"
     )
     if n_block is not None:
@@ -430,14 +433,14 @@ def _iterating_task(root: Path, n: str = "7") -> Path:
 def test_check_task_fails_open_iterate_disagreement(conn, tmp_path):
     md = _iterating_task(tmp_path, "7")
     fail: list[str] = []
-    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     assert fail, "full check must fail an iterating disagreement"
     assert any("disagree" in m for m in fail)
 
 
 def test_frozen_summary_does_not_fail_open_iterate_disagreement(tmp_path, capsys):
     md = _iterating_task(tmp_path, "7")
-    output_check.frozen_summary(tmp_path, md)
+    output_check.frozen_summary(tmp_path, md, CORPUS_SHA)
     out = capsys.readouterr().out
     assert "TASK-7 [open]: frozen (not touched by this PR)" in out
     assert "results.json, mine.json" in out
@@ -447,10 +450,10 @@ def test_frozen_summary_open_task_does_not_fail_unrelated_pr(conn, tmp_path):
     """An open iterating task must not redden a PR that does not touch it."""
     md = _iterating_task(tmp_path, "7")
     fail: list[str] = []
-    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     assert fail
     # frozen path is what main() uses when the id is absent from the PR diff
-    output_check.frozen_summary(tmp_path, md)
+    output_check.frozen_summary(tmp_path, md, CORPUS_SHA)
     # check_task's fail list is unchanged by frozen_summary (it has no fail arg)
     assert output_check.task_ids_from_paths(
         ["scripts/output_check.py", "LOOP.md"]
@@ -461,7 +464,7 @@ def test_full_check_task_6_closed_still_agrees(conn):
     """PR-scoped skip must not be the only path that still sees TASK-6."""
     md = ROOT / "tasks" / "TASK-6.md"
     fail: list[str] = []
-    output_check.check_task(ROOT, md, conn, 60.0, None, None, fail)
+    output_check.check_task(ROOT, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     assert fail == []
 
 
@@ -604,6 +607,7 @@ def test_parse_brief_accepts_blocked_and_escalated(tmp_path):
         assert "n_count" in brief.tol
         assert brief.n_decl is None
         assert brief.frame == {}
+        assert brief.corpus_sha is None
 
 
 def test_parse_brief_rejects_uppercase_blocked(tmp_path):
@@ -625,7 +629,7 @@ def test_blocked_status_suspends_iterate_disagreement(conn, tmp_path, capsys):
     md = _iterating_task(tmp_path, "7")
     _set_brief_status(md, "blocked")
     fail: list[str] = []
-    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     out = capsys.readouterr().out
     assert fail == []
     assert "TASK-7 [blocked]" in out
@@ -636,7 +640,7 @@ def test_escalated_status_suspends_iterate_disagreement(conn, tmp_path, capsys):
     md = _iterating_task(tmp_path, "7")
     _set_brief_status(md, "escalated")
     fail: list[str] = []
-    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     out = capsys.readouterr().out
     assert fail == []
     assert "TASK-7 [escalated]" in out
@@ -646,7 +650,7 @@ def test_escalated_status_suspends_iterate_disagreement(conn, tmp_path, capsys):
 def test_open_still_fails_the_same_disagreement(conn, tmp_path):
     md = _iterating_task(tmp_path, "7")
     fail: list[str] = []
-    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     assert fail
     assert any("disagree" in m for m in fail)
 
@@ -654,7 +658,7 @@ def test_open_still_fails_the_same_disagreement(conn, tmp_path):
 def test_frozen_blocked_task_notes_suspended(tmp_path, capsys):
     md = _iterating_task(tmp_path, "7")
     _set_brief_status(md, "blocked")
-    output_check.frozen_summary(tmp_path, md)
+    output_check.frozen_summary(tmp_path, md, CORPUS_SHA)
     out = capsys.readouterr().out
     assert "TASK-7 [blocked]: frozen (not touched by this PR)" in out
     assert out.rstrip().endswith("suspended") or "; suspended" in out
@@ -861,6 +865,7 @@ def test_parse_brief_task_6_n_and_frame():
     )
     assert brief.frame[output_check.VIDEOS_EXPECTED] == 567.0
     assert brief.frame[output_check.VIDEOS_EXPECTED_TOL] == 0.0
+    assert brief.corpus_sha == CORPUS_SHA
 
 
 def test_n_fence_does_not_eat_the_numbers_fence(tmp_path):
@@ -914,7 +919,7 @@ def test_without_n_block_matching_n_of_1_still_passes(conn, tmp_path):
     """Declared-n check is off when the brief has no ```n``` fence."""
     md = _agreeing_videos(tmp_path, row_n=1)
     fail: list[str] = []
-    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     assert fail == []
 
 
@@ -922,7 +927,7 @@ def test_with_n_block_n_of_1_fails_even_when_agents_agree(conn, tmp_path):
     """Probe class: both files n=1, pairwise equal, declared n=567 → RED."""
     md = _agreeing_videos(tmp_path, row_n=1, n_block="n_count  567\n")
     fail: list[str] = []
-    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     hits = [m for m in fail if "brief declares n=567" in m]
     assert len(hits) == 2
     assert any(m.startswith("results.json:n_count: n=1,") for m in hits)
@@ -938,7 +943,7 @@ def test_pairwise_n_still_fires_alongside_declared_n(conn, tmp_path):
     data[0]["n"] = 1
     mine.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     fail: list[str] = []
-    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     assert any("brief declares n=567" in m and m.startswith("mine.json:") for m in fail)
     assert any("worker counted n=567 and verifier n=1" in m for m in fail)
 
@@ -946,12 +951,12 @@ def test_pairwise_n_still_fires_alongside_declared_n(conn, tmp_path):
 def test_derived_n_uses_replayed_value(conn, tmp_path):
     md = _agreeing_videos(tmp_path, row_n=1, n_block="n_count  derived:n_count\n")
     fail: list[str] = []
-    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     assert any("brief declares n=567" in m for m in fail)
 
     md = _agreeing_videos(tmp_path, row_n=567, n_block="n_count  derived:n_count\n")
     fail = []
-    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     assert fail == []
 
 
@@ -1052,7 +1057,7 @@ def test_period_identity_source_does_not_hardcode_567():
 def test_full_check_task_6_declared_n_and_period_identity(conn, capsys):
     md = ROOT / "tasks" / "TASK-6.md"
     fail: list[str] = []
-    output_check.check_task(ROOT, md, conn, 60.0, None, None, fail)
+    output_check.check_task(ROOT, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     out = capsys.readouterr().out
     assert fail == []
     assert "39/39 n declared" in out
@@ -1489,3 +1494,209 @@ def test_check_independence_same_author_message_is_stable(tmp_path):
         "have the same author Agent <agent@example.com>; "
         "the two computations are not independent"
     ]
+
+
+# --------------------------------------------------------------------------- §4.5 closed corpus stamp / STALE
+
+
+WRONG_SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+
+def _set_corpus_sha(md: Path, sha: str | None) -> None:
+    text = re.sub(r"^corpus_sha:[ \t]*.*\n?", "", md.read_text(encoding="utf-8"), flags=re.M)
+    if sha is None:
+        md.write_text(text, encoding="utf-8")
+        return
+    md.write_text(
+        re.sub(
+            r"^status:[ \t]*\S+[ \t]*$",
+            lambda m: m.group(0) + f"\ncorpus_sha: {sha}",
+            text,
+            count=1,
+            flags=re.M,
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_stale_line_does_not_contain_agree():
+    line = output_check.stale_closed_line("6", None, CORPUS_SHA)
+    assert "STALE" in line
+    assert "missing" in line
+    assert "agree" not in line
+    line = output_check.stale_closed_line("6", WRONG_SHA, CORPUS_SHA)
+    assert WRONG_SHA in line
+    assert CORPUS_SHA in line
+    assert "agree" not in line
+
+
+def test_parse_corpus_sha_none_valid_backticks_and_bad(tmp_path):
+    md = _write_brief(tmp_path, "7")
+    assert output_check.parse_brief(md).corpus_sha is None
+
+    md = _write_brief(tmp_path, "7", corpus_sha=CORPUS_SHA)
+    assert output_check.parse_brief(md).corpus_sha == CORPUS_SHA
+
+    md = _write_brief(tmp_path, "7")
+    text = md.read_text(encoding="utf-8")
+    md.write_text(
+        text.replace("status: open\n", f"status: open\ncorpus_sha: `{CORPUS_SHA}`\n"),
+        encoding="utf-8",
+    )
+    assert output_check.parse_brief(md).corpus_sha == CORPUS_SHA
+
+    md = _write_brief(tmp_path, "7", corpus_sha="not-a-hash")
+    with pytest.raises(
+        output_check.Fail,
+        match=r"corpus_sha is not a 64-char lowercase hex sha256",
+    ):
+        output_check.parse_brief(md)
+
+    md = _write_brief(tmp_path, "7", corpus_sha=CORPUS_SHA)
+    md.write_text(
+        md.read_text(encoding="utf-8") + f"\ncorpus_sha: {WRONG_SHA}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(
+        output_check.Fail, match=r"corpus_sha appears 2 times; at most one line"
+    ):
+        output_check.parse_brief(md)
+
+
+def test_task_6_stamp_matches_readme_pin():
+    brief = output_check.parse_brief(ROOT / "tasks" / "TASK-6.md")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    pin = output_check.README_SHA.search(readme)
+    assert pin is not None
+    assert brief.status == "closed"
+    assert brief.corpus_sha == pin.group(1) == CORPUS_SHA
+
+
+def test_closed_missing_stamp_is_stale_skip(conn, tmp_path, capsys):
+    md = _iterating_task(tmp_path, "7")
+    _set_brief_status(md, "closed")
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
+    out = capsys.readouterr().out
+    assert fail == []
+    assert "STALE" in out
+    assert "replay skipped" in out
+    assert "number(s) agree" not in out
+    assert "disagree" not in out
+
+
+def test_closed_wrong_stamp_is_stale_skip(conn, tmp_path, capsys):
+    md = _iterating_task(tmp_path, "7")
+    _set_brief_status(md, "closed")
+    _set_corpus_sha(md, WRONG_SHA)
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
+    out = capsys.readouterr().out
+    assert fail == []
+    assert "STALE" in out
+    assert WRONG_SHA in out
+    assert "number(s) agree" not in out
+
+
+def test_closed_matching_stamp_still_replays(conn, tmp_path, capsys):
+    """A live closed task still participates in red/green."""
+    md = _iterating_task(tmp_path, "7")
+    _set_brief_status(md, "closed")
+    _set_corpus_sha(md, CORPUS_SHA)
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
+    out = capsys.readouterr().out
+    assert fail
+    assert any("disagree" in m for m in fail)
+    assert "STALE" not in out
+
+
+def test_open_task_without_stamp_is_not_stale(conn, tmp_path, capsys):
+    md = _iterating_task(tmp_path, "7")
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
+    out = capsys.readouterr().out
+    assert fail
+    assert "STALE" not in out
+    assert any("disagree" in m for m in fail)
+
+
+def test_frozen_closed_stale_notes_stale(tmp_path, capsys):
+    md = _iterating_task(tmp_path, "7")
+    _set_brief_status(md, "closed")
+    output_check.frozen_summary(tmp_path, md, CORPUS_SHA)
+    out = capsys.readouterr().out
+    assert "TASK-7 [closed]: frozen (not touched by this PR)" in out
+    assert "; STALE" in out
+
+
+def test_closed_stale_mutated_corpus_skips_false_agree_keep_rate(tmp_path, capsys):
+    """Probe: closed task, both files agree on the old count, corpus is new.
+
+    README + a 1-row videos db are the mutated corpus perception. Closed
+    TASK-7 still writes 567 on both sides. Missing/wrong stamp → STALE skip,
+    GREEN, no ``N/N number(s) agree`` (the keep-rate hole). Matching stamp
+    → live replay RED, and still prints ``1/1 number(s) agree``.
+    """
+    tiny = tmp_path / "tiny.sqlite"
+    conn = sqlite3.connect(tiny)
+    try:
+        conn.execute("CREATE TABLE videos (video_id TEXT)")
+        conn.execute("INSERT INTO videos(video_id) VALUES ('v0')")
+        conn.commit()
+    finally:
+        conn.close()
+    digest = hashlib.sha256()
+    digest.update(tiny.read_bytes())
+    tiny_sha = digest.hexdigest()
+    assert tiny_sha != CORPUS_SHA
+
+    def _closed_old_count(repo: Path, stamp: str | None) -> None:
+        (repo / "README.md").write_text(f"sha256: `{tiny_sha}`\n", encoding="utf-8")
+        _write_brief(repo, "7", status="closed", corpus_sha=stamp)
+        w_sql = repo / "tasks" / "TASK-7" / "sql" / "count_videos.sql"
+        v_sql = repo / "tasks" / "TASK-7" / "mine_sql" / "count_videos_as.sql"
+        w_sql.parent.mkdir(parents=True, exist_ok=True)
+        v_sql.parent.mkdir(parents=True, exist_ok=True)
+        w_sql.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+        v_sql.write_text("SELECT COUNT(*) FROM videos AS vid;\n", encoding="utf-8")
+        _write_rows(
+            repo / "tasks" / "TASK-7" / "results.json",
+            "n_count",
+            567,
+            "tasks/TASK-7/sql/count_videos.sql",
+        )
+        _write_rows(
+            repo / "tasks" / "TASK-7" / "mine.json",
+            "n_count",
+            567,
+            "tasks/TASK-7/mine_sql/count_videos_as.sql",
+        )
+
+    for stamp in (None, WRONG_SHA, CORPUS_SHA):
+        repo = tmp_path / f"stale-{stamp or 'missing'}"
+        repo.mkdir()
+        _closed_old_count(repo, stamp)
+        _init_git(repo)
+        _commit(repo, "closed TASK-7 on mutated corpus")
+        code, _ = _run_main(repo, "--corpus", str(tiny), "--head-ref", "HEAD")
+        out = capsys.readouterr().out
+        assert code == 0, out
+        assert "STALE" in out
+        assert "replay skipped" in out
+        assert "number(s) agree" not in out
+        assert "output_check: PASS" in out
+
+    live = tmp_path / "live-matching-stamp"
+    live.mkdir()
+    _closed_old_count(live, tiny_sha)
+    _init_git(live)
+    _commit(live, "closed TASK-7 live on mutated corpus")
+    code, _ = _run_main(live, "--corpus", str(tiny), "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert "STALE" not in out
+    assert "1/1 number(s) agree" in out
+    assert "written as 567" in out
+    assert "output_check: FAIL" in out
+

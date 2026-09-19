@@ -32,7 +32,10 @@ EXECUTE  worker 与 verifier 从同一个 ref 出发，各自从语料算出这�
 CHECK    output-check 先按每个数字自己声明的算路重放它，再比对两套数字。
 ITERATE  哪几个不一致，就只把那几行发回去，其余不动。并行的其他任务不受影响：
          一条不碰该任务的 PR 不会因为 main 上这份不一致而红。
-STOP     全部一致 → 把任务书改成 status: closed，这一步本身要过 CI。
+STOP     全部一致 → 把任务书改成 status: closed，并盖上当时 README 的
+         corpus_sha（语料 pin）。这一步本身要过 CI。
+         stamp 与当前语料 pin 不符（缺或不等）→ 该关闭任务标 STALE，
+         跳过重放，不参与红绿，也不打印 N/N agree（plan §4.5）。
          同一个文件被改到第四次 → 停，任务书改成 status: escalated，
          两套数字一起升级给 Tom。
          agent 走不下去（不能改闸门）→ 留一条空 commit，留言以 BLOCKED:
@@ -49,7 +52,7 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 
 | 检查 | 管什么 |
 |---|---|
-| `output-check` | 每个数字都能从语料重放出来；SQL 的 `EXPLAIN QUERY PLAN` 必须 `SCAN`/`SEARCH` 语料表；每条语句执行两次必须得到同一个数；规范化后的语句不得出现 `random()` / `randomblob()` / `strftime('now')` 族；两套独立算出的数字必须相等；若任务书有 fenced `n` 块，每个 `n` 还必须等于块里声明的常数或 `derived:`（用重放值求），两套 `n` 仍须完全相等，两道检查一起做不是互相替代；若 `frame` 含 `videos_expected` 且 numbers 声明了 `n_videos_pre` / `n_videos_post` / `n_unassigned_period`，三者重放值之和必须等于 `frame.videos_expected`（容差 `videos_expected_tol`，未写则 0），没有 `videos_expected` 时此恒等式不运行；重写次数有上限（从 reset commit 计起）；两条分支不得从对方的答案出发（引入 commit 的整段祖先里都没有另一边的文件；两边引入 commit 无祖先关系、不同分支、不同作者）；`status: closed` 只有在两边齐、全一致时才允许；`status: escalated` 与 `status: blocked` 暂停该任务的重放、比对、改写计数；空 commit 且留言以 `BLOCKED:` 开头会被认出并打印；**pull request 上只完整检查这次 diff 碰到的任务**（任务书或 `tasks/TASK-N/`，任一边输出文件都算碰到），其余任务只打 frozen summary，`status: open` 的不一致不能把无关 PR 打红；main 上仍检查全部任务；**`tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，但顶层 glob `tasks/TASK-*.md` 找不到对应任务书 → 红**（把任务书移出 glob 不得让检查变成 no-op 绿灯） |
+| `output-check` | 每个数字都能从语料重放出来；SQL 的 `EXPLAIN QUERY PLAN` 必须 `SCAN`/`SEARCH` 语料表；每条语句执行两次必须得到同一个数；规范化后的语句不得出现 `random()` / `randomblob()` / `strftime('now')` 族；两套独立算出的数字必须相等；若任务书有 fenced `n` 块，每个 `n` 还必须等于块里声明的常数或 `derived:`（用重放值求），两套 `n` 仍须完全相等，两道检查一起做不是互相替代；若 `frame` 含 `videos_expected` 且 numbers 声明了 `n_videos_pre` / `n_videos_post` / `n_unassigned_period`，三者重放值之和必须等于 `frame.videos_expected`（容差 `videos_expected_tol`，未写则 0），没有 `videos_expected` 时此恒等式不运行；重写次数有上限（从 reset commit 计起）；两条分支不得从对方的答案出发（引入 commit 的整段祖先里都没有另一边的文件；两边引入 commit 无祖先关系、不同分支、不同作者）；`status: closed` 只有在两边齐、全一致时才允许，收口时写入一行 `corpus_sha:`（当时 README 的语料 pin）；关闭任务 stamp 缺失或与当前 pin 不符 → **STALE**，跳过重放/比对/改写计数，不参与红绿，不打印 `N/N number(s) agree`（plan §4.5）；`status: escalated` 与 `status: blocked` 暂停该任务的重放、比对、改写计数；空 commit 且留言以 `BLOCKED:` 开头会被认出并打印；**pull request 上只完整检查这次 diff 碰到的任务**（任务书或 `tasks/TASK-N/`，任一边输出文件都算碰到），其余任务只打 frozen summary，`status: open` 的不一致不能把无关 PR 打红；main 上仍检查全部任务；**`tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，但顶层 glob `tasks/TASK-*.md` 找不到对应任务书 → 红**（把任务书移出 glob 不得让检查变成 no-op 绿灯） |
 | `scope-check` | 分支必须属于已知类别（先匹配 agent 前缀）；repair/ 与 chore/ 不能单靠前缀授权，须 `github.actor` 落在仓库 owner allowlist 上；chore 与 agent 同受 DENY；agent 不得碰 `.cursor/` `.github/` `data/` `scripts/`、`README.md`、`LOOP.md`，也不得改任务书 `tasks/TASK-N.md`，但必须能写 `tasks/TASK-N/` 下面自己的产出 |
 | `history-audit` | 移动已有的栅不得与被它度量的东西同 PR，且正文须有 `BAR-CHANGE:` 并点名每个被移动的栅路径；被度量路径是 files 减去栅路径（闸门脚本 fail-site 净删算移动栅，但不自己锁自己）；`tasks/**/*.sql` 属被度量；任务书 fenced `numbers`/`fixture`/`frame`/`n` 里放宽容差、删名字或删整块算移动栅，收窄容差不算；死路径栅移入 `RETIRED` 块而非删除，live∪RETIRED 的 glob 丢失才算删栅 |
 | `tests` | 有 `tests/test_*.py` 时跑 pytest |
@@ -61,7 +64,7 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 按顺序，任何一条不过就红。**在 pull request 上，下面 2–9 条只作用于这次 diff 碰到的任务**（`tasks/TASK-N.md` 或 `tasks/TASK-N/` 下任何文件，包括只改 `results.json` 或只改 `mine.json`）。没碰到的任务打一行 frozen summary，不把失败并进总账——`status: open` 且两边已经不合的任务（ITERATE）因此不能挡住一条无关的 PR。没有 `--base-ref` 时（main 上的 push）仍走完全部任务。任务书发现是顶层 glob `tasks/TASK-*.md`（非递归）。**若 `tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，而对应的 `tasks/TASK-N.md` 不在该 glob 里，这一条对整棵树生效、不受 PR freeze 跳过**（plan §2.6）：把任务书移走不得让检查变成「nothing to check」绿灯。
 
 1. `data/corpus_v2.sqlite` 的 sha256 与 `README.md` 里记的一致。语料不对，后面全部无意义。
-2. 任务书有且只有一行 `status: open` / `closed` / `escalated` / `blocked`，`numbers` 块能解析。可选的 fenced `n` 块与 `frame` 块也在这里解析。`escalated` 与 `blocked` 暂停该任务第 3–9 条（重放、比对、声明 n、恒等式、改写计数）。顶层 glob 找不到任务书、但对应 TASK-N 目录里还有 `results.json` 或 `mine.json`：直接红，不走「nothing to check」。
+2. 任务书有且只有一行 `status: open` / `closed` / `escalated` / `blocked`，`numbers` 块能解析。可选一行 `corpus_sha:`（64 位小写 hex，可带反引号）：收口时盖上当时 README 的语料 pin。可选的 fenced `n` 块与 `frame` 块也在这里解析。`escalated` 与 `blocked` 暂停该任务第 3–9 条（重放、比对、声明 n、恒等式、改写计数）。**`status: closed` 且 stamp 缺失或与当前 README pin 不符 → STALE**：第 3–9 条不跑，不把失败并进总账，也不打印 `N/N number(s) agree`（plan §4.5）。顶层 glob 找不到任务书、但对应 TASK-N 目录里还有 `results.json` 或 `mine.json`：直接红，不走「nothing to check」。
 3. 两个输出文件的每一行恰好是 `{name, value, n, query}`，名字集合与 `numbers` 块**相等**——少一个和多一个都红；同一文件内不得有重名，也不得有两个数字共用一条算路。算路按 `route()` 解析后的路径计（`sql/../sql/x.sql` 与 `sql/x.sql` 是同一条），不是按 query 字符串。若有 `n` 块，其名字集合必须与 `numbers` 相等；每一行是非负整数常数或 `derived:` 表达式。
 4. 每个 `query` 是下面两种之一：
    - `tasks/TASK-N/<…>.sql`：一条语句，`SELECT` 或 `WITH` 开头，返回恰好一行一列；`EXPLAIN QUERY PLAN` 必须出现对语料表 `videos` / `windows` / `syllables` / `runs` 的 `SCAN` 或 `SEARCH`（`SELECT 12345` 过不了这一关）；同一条语句执行两次结果必须相同；`strip_and_split` 之后不得出现 `random()`、`randomblob()`、`strftime('now')` 族；
@@ -77,7 +80,7 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 | status | 谁写 | 闸门 |
 |---|---|---|
 | `open` | Tom 开题 | 重放、比对、改写计数 |
-| `closed` | chore 收口 | 同上，且两边必须齐、必须一致 |
+| `closed` | chore 收口 | 同上，且两边必须齐、必须一致。收口时写入 `corpus_sha:`（当时 README pin）。stamp 缺失或与当前 pin 不符 → STALE：跳过重放/比对/改写计数，不参与红绿，不打印 N/N agree |
 | `escalated` | Tom / chore | 暂停重放、比对、改写计数。改写到顶，两套数字交给 Tom |
 | `blocked` | Tom / chore | 暂停同上。走不下去 |
 
@@ -110,8 +113,13 @@ git 作者身份，第 9 条对两边都自然成立。
 ## 收口
 
 `worker` 与 `verifier` 都合入、`output-check` 报出全部一致之后，把任务书改成
-`status: closed`——这一步自己也要过 `output-check`，所以两边没齐或有一个数字不一致
-时，改不动。
+`status: closed`，并写一行 `corpus_sha:`，值为当时 `README.md` 里的语料
+sha256——这一步自己也要过 `output-check`，所以两边没齐或有一个数字不一致
+时，改不动。stamp 与当前 pin 一致的关闭任务仍会重放；不一致或缺失则标
+**STALE**，跳过重放，不参与红绿，**不打印** `N/N number(s) agree`。
+
+keep rate 抄的是 live closed 任务那一行 `N/N number(s) agree`。STALE 不是
+39/39，不得把 STALE 跳过当成留下了全部数字。
 
 然后放 `auditor`：读这批 commit 的 patch 与每个 PR 的正文，答六个固定问题，每条结论带
 commit sha、文件、行号，给不出就写 UNKNOWN。它只写 `review/TASK-N/audit.md`，不得改
@@ -121,4 +129,13 @@ commit sha、文件、行号，给不出就写 UNKNOWN。它只写 `review/TASK-
 缺陷的机器会一直吃掉轮次。
 
 收口时在 `backlog.md` 记一行 keep rate：这个任务产出了几个数字，留下了几个。连续低于
-一半，下一个任务不派 agent，自己做。
+一半，下一个任务不派 agent，自己做。数字来自 live closed 的 `N/N agree`，不是 STALE。
+
+## 语料更换
+
+语料变动走 `repair/` PR（agent 碰不了 `data/` 与 `README.md`）：**同一条 PR**
+里改 `data/corpus_v2.sqlite`、`README.md` 的 sha256 pin，以及每份
+`status: closed` 任务书上的 `corpus_sha`。只改 README 不改 stamp，关闭任务
+变成 STALE（跳过重放，不红，也不打 N/N agree）。要让关闭任务继续活着，stamp
+必须改成新 pin，并且数字仍能在新语料上重放——活着的关闭任务不会因为「两边写
+下的值彼此相等」就绿灯，重放对的是新语料。
