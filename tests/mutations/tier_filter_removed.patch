@@ -1,7 +1,7 @@
 # kills: published A+B syllable count is outside the declared interval
 --- a/src/frame.py
 +++ b/src/frame.py
-@@ -42,7 +42,7 @@ def assert_published_count(n: int) -> None:
+@@ -40,7 +40,7 @@
  
  
  def apply_tier_whitelist(df: pd.DataFrame) -> pd.DataFrame:
