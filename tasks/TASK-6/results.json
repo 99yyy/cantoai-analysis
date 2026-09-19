@@ -120,6 +120,18 @@
     "query": "tasks/TASK-6/sql/n_judgeable_other_post.sql"
   },
   {
+    "name": "n_judgeable_unassigned_film_pre",
+    "value": 0,
+    "n": 122208,
+    "query": "derived:n_judgeable_pre - n_judgeable_film_pre - n_judgeable_other_pre"
+  },
+  {
+    "name": "n_judgeable_unassigned_film_post",
+    "value": 0,
+    "n": 42485,
+    "query": "derived:n_judgeable_post - n_judgeable_film_post - n_judgeable_other_post"
+  },
+  {
     "name": "gap_contract_pp",
     "value": 9.049336892013148,
     "n": 139362,

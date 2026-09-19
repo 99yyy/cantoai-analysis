@@ -376,6 +376,7 @@ def _write_brief(
     name: str = "n_count",
     n_block: str | None = None,
     frame_block: str | None = None,
+    identities_block: str | None = None,
     extra_numbers: str = "",
     corpus_sha: str | None = None,
 ) -> Path:
@@ -390,6 +391,8 @@ def _write_brief(
         body += f"\n```n\n{n_block}\n```\n"
     if frame_block is not None:
         body += f"\n```frame\n{frame_block}\n```\n"
+    if identities_block is not None:
+        body += f"\n```identities\n{identities_block}\n```\n"
     md.write_text(body, encoding="utf-8")
     return md
 
@@ -608,6 +611,7 @@ def test_parse_brief_accepts_blocked_and_escalated(tmp_path):
         assert brief.n_decl is None
         assert brief.frame == {}
         assert brief.corpus_sha is None
+        assert brief.identities == ()
 
 
 def test_parse_brief_rejects_uppercase_blocked(tmp_path):
@@ -854,11 +858,13 @@ def _agreeing_videos(
 def test_parse_brief_task_6_n_and_frame():
     brief = output_check.parse_brief(ROOT / "tasks" / "TASK-6.md")
     assert brief.status == "closed"
-    assert len(brief.tol) == 39
+    assert len(brief.tol) == 41
     assert brief.n_decl is not None
     assert set(brief.n_decl) == set(brief.tol)
     assert brief.n_decl["n_videos_pre"] == "567"
     assert brief.n_decl["n_match_pre"] == "derived:n_total_pre"
+    assert brief.n_decl["n_judgeable_unassigned_film_pre"] == "derived:n_total_pre"
+    assert brief.n_decl["n_judgeable_unassigned_film_post"] == "derived:n_total_post"
     assert (
         brief.n_decl["gap_contract_pp"]
         == "derived:n_judgeable_pre + n_judgeable_post"
@@ -866,6 +872,10 @@ def test_parse_brief_task_6_n_and_frame():
     assert brief.frame[output_check.VIDEOS_EXPECTED] == 567.0
     assert brief.frame[output_check.VIDEOS_EXPECTED_TOL] == 0.0
     assert brief.corpus_sha == CORPUS_SHA
+    assert len(brief.identities) == 3
+    assert brief.identities[0].right == "frame.videos_expected"
+    assert "n_judgeable_unassigned_film_pre" in brief.identities[1].left
+    assert "n_judgeable_unassigned_film_post" in brief.identities[2].left
 
 
 def test_n_fence_does_not_eat_the_numbers_fence(tmp_path):
@@ -1060,7 +1070,7 @@ def test_full_check_task_6_declared_n_and_period_identity(conn, capsys):
     output_check.check_task(ROOT, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     out = capsys.readouterr().out
     assert fail == []
-    assert "39/39 n declared" in out
+    assert "41/41 n declared" in out
     assert "period identity" in out
     assert "frame.videos_expected" in out
 
