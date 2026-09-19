@@ -142,7 +142,21 @@ What this enforces, in order:
                ``val_iterations`` are forbidden. Missing RESULT on a task
                already terminal is transitional; a PR that newly sets a
                terminal status must include the file. Present on ``open``
-               fails.
+               fails. ``fork_depth`` is at most 2. A letter-suffix brief
+               must set ``forked_from`` / ``fork_depth`` to the parent id
+               and parent depth + 1; a root RESULT keeps both at null / 0.
+  fork         a brief ``tasks/TASK-N-b.md`` (then ``-c``) is a sibling of
+               ``TASK-N``, not a new measured target. The ``numbers`` and
+               ``n`` fences (and ``frame`` / ``identities`` when present)
+               must be byte-identical to the immediate parent. Changing a
+               tolerance is a new task, not a fork. The child adds
+               ``## Prior Attempts`` quoting the parent RESULT. The parent
+               stays terminal and its RESULT.json is never edited or
+               deleted after the child brief is added. Depth 1 = ``-b``,
+               depth 2 = ``-c``. Opening ``-d`` (depth 3) is blocked, not
+               a third fork. A fork is allowed only when the parent
+               RESULT is ``verdict: refuted`` or ``subtype: out_of_turns``.
+               The Grok Bot ``check-brief`` skill is not this check.
   scope        (pull requests only) only a task whose brief or files under
                ``tasks/TASK-N/`` appear in the PR diff is fully checked.
                Other tasks print a frozen summary and cannot fail the PR:
@@ -241,6 +255,16 @@ BLOCKED_SUBJECT_PREFIX = "BLOCKED:"
 TASK_PATH_RE = re.compile(r"^tasks/TASK-([^/]+)(?:\.md|/)")
 # A TASK-N directory name anywhere under tasks/ (plan §2.6 orphan outputs).
 TASK_DIR_NAME = re.compile(r"^TASK-(.+)$")
+# Letter-suffix forks: TASK-6, TASK-6-b, TASK-6-c. Depth 3 would be -d.
+TASK_ID_RE = re.compile(r"^(\d+)(?:-([a-z]))?$")
+FORKED_FROM_RE = re.compile(r"^TASK-\d+(?:-[bc])?$")
+MAX_FORK_DEPTH = 2
+FORK_LETTER = {1: "b", 2: "c"}
+FORK_DEPTH = {"b": 1, "c": 2}
+FORK_FENCES = ("numbers", "n", "frame", "identities")
+PRIOR_ATTEMPTS_RE = re.compile(r"^## Prior Attempts[ \t]*$", re.M)
+FORK_TRIGGER_VERDICT = "refuted"
+FORK_TRIGGER_SUBTYPE = "out_of_turns"
 
 ALLOWED_BINOP = (ast.Add, ast.Sub, ast.Mult, ast.Div)
 ALLOWED_UNARY = (ast.UAdd, ast.USub)
@@ -598,6 +622,40 @@ def discover_briefs(root: Path) -> list[Path]:
 
 def brief_task_id(md: Path) -> str:
     return md.stem.split("-", 1)[1]
+
+
+class ForkId(NamedTuple):
+    """Filename fork identity. ``letter`` is None on a root TASK-N."""
+
+    root: str
+    letter: str | None
+    depth: int
+    task: str
+    parent: str | None
+
+
+def parse_fork_id(n: str) -> ForkId | None:
+    """Parse ``6``, ``6-b``, ``6-c``, or ``6-d``. None if not that shape."""
+    m = TASK_ID_RE.fullmatch(n)
+    if not m:
+        return None
+    root, letter = m.group(1), m.group(2)
+    if letter is None:
+        return ForkId(root, None, 0, n, None)
+    depth = FORK_DEPTH.get(letter)
+    if depth is None:
+        guessed = ord(letter) - ord("a")
+        return ForkId(root, letter, guessed, n, None)
+    parent = root if depth == 1 else f"{root}-{FORK_LETTER[depth - 1]}"
+    return ForkId(root, letter, depth, n, parent)
+
+
+def child_task_id(fid: ForkId) -> str | None:
+    """Next letter-suffix id, or None when that would exceed ``MAX_FORK_DEPTH``."""
+    nxt = fid.depth + 1
+    if nxt > MAX_FORK_DEPTH or nxt not in FORK_LETTER:
+        return None
+    return f"{fid.root}-{FORK_LETTER[nxt]}"
 
 
 def normalize_task_id(raw: str) -> str:
@@ -989,6 +1047,34 @@ def parse_identities_block(
     if not out:
         raise Fail(f"{label}: the identities block is empty")
     return tuple(out)
+
+
+def fence_interior(text: str, kind: str) -> str | None:
+    """Raw interior of a fenced block, or None when that fence is absent.
+
+    Byte identity of a fork compares this string, including comments and
+    whitespace. The opening fence line's trailing spaces are not part of it.
+    """
+    regex = {
+        "numbers": BLOCK,
+        "n": N_FENCE,
+        "frame": FRAME_FENCE,
+        "identities": IDENTITIES_FENCE,
+    }.get(kind)
+    if regex is None:
+        raise Fail(f"unknown fence kind {kind!r}")
+    m = regex.search(text)
+    return m.group(1) if m else None
+
+
+def prior_attempts_section(text: str) -> str | None:
+    """Body after ``## Prior Attempts`` until the next ``## `` heading."""
+    m = PRIOR_ATTEMPTS_RE.search(text)
+    if not m:
+        return None
+    rest = text[m.end() :]
+    nxt = re.search(r"^## ", rest, re.M)
+    return rest[: nxt.start()] if nxt else rest
 
 
 def as_count(label: str, v: float) -> int:
@@ -1965,13 +2051,28 @@ def parse_result(
         raise Fail(
             f"TASK-{n}: RESULT.json forked_from must be null or a string"
         )
+    if forked is not None and FORKED_FROM_RE.fullmatch(forked) is None:
+        raise Fail(
+            f"TASK-{n}: RESULT.json forked_from must be null or TASK-N / "
+            f"TASK-N-b / TASK-N-c, got {forked!r}"
+        )
     if not is_nonneg_int(data["fork_depth"]):
         raise Fail(
             f"TASK-{n}: RESULT.json fork_depth must be a non-negative integer"
         )
+    if data["fork_depth"] > MAX_FORK_DEPTH:
+        raise Fail(
+            f"TASK-{n}: RESULT.json fork_depth is {data['fork_depth']} "
+            f"(cap is {MAX_FORK_DEPTH}); a third fork is blocked, not TASK-N-d"
+        )
     if forked is None and data["fork_depth"] != 0:
         raise Fail(
             f"TASK-{n}: RESULT.json fork_depth must be 0 when forked_from is null"
+        )
+    if forked is not None and data["fork_depth"] < 1:
+        raise Fail(
+            f"TASK-{n}: RESULT.json fork_depth must be >= 1 when forked_from "
+            f"is set"
         )
     return data
 
@@ -2099,6 +2200,299 @@ def check_round_result(
     # out_of_budget / infra_failure: allowed subtype values; budget-16 and
     # infra evidence are not git-derivable yet (item 4 / later).
 
+    check_result_fork_fields(root, n, data, fail)
+
+
+def check_result_fork_fields(
+    root: Path, n: str, data: dict, fail: list[str]
+) -> None:
+    """RESULT fork fields must match the brief's letter suffix."""
+    fid = parse_fork_id(n)
+    if fid is None:
+        return
+    if fid.letter is not None and fid.letter not in FORK_DEPTH:
+        fail.append(fork_depth_exceeded_message(n, fid))
+        return
+    if fid.depth == 0:
+        if data["forked_from"] is not None or data["fork_depth"] != 0:
+            fail.append(
+                f"TASK-{n}: RESULT.json forked_from must be null and "
+                f"fork_depth 0 on a root task"
+            )
+        return
+    want_from = f"TASK-{fid.parent}"
+    if data["forked_from"] != want_from:
+        fail.append(
+            f"TASK-{n}: RESULT.json forked_from must be {want_from!r}, "
+            f"got {data['forked_from']!r}"
+        )
+    if data["fork_depth"] != fid.depth:
+        fail.append(
+            f"TASK-{n}: RESULT.json fork_depth must be {fid.depth}, "
+            f"got {data['fork_depth']}"
+        )
+    parent_PATH = root / "tasks" / f"TASK-{fid.parent}" / RESULT
+    if not parent_PATH.is_file():
+        return
+    try:
+        parent = json.loads(parent_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return
+    if not isinstance(parent, dict):
+        return
+    pdepth = parent.get("fork_depth")
+    if not is_nonneg_int(pdepth):
+        return
+    if data["fork_depth"] != pdepth + 1:
+        fail.append(
+            f"TASK-{n}: RESULT.json fork_depth must be parent "
+            f"TASK-{fid.parent} depth {pdepth} + 1, got {data['fork_depth']}"
+        )
+
+
+def fork_depth_exceeded_message(n: str, fid: ForkId) -> str:
+    return (
+        f"TASK-{n}: fork suffix -{fid.letter} is not allowed "
+        f"(depth 1 = -b, depth 2 = -c); a third fork must be blocked, "
+        f"not open TASK-{fid.root}-d"
+    )
+
+
+def fork_trigger_ok(subtype: object, verdict: object) -> bool:
+    if subtype == FORK_TRIGGER_SUBTYPE:
+        return True
+    return subtype == "success" and verdict == FORK_TRIGGER_VERDICT
+
+
+def load_result_object(path: Path) -> dict | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def check_fence_identity(
+    child_n: str, parent_n: str, child_text: str, parent_text: str, fail: list[str]
+) -> None:
+    """Byte-identical numbers/n/frame/identities vs the immediate parent."""
+    for kind in FORK_FENCES:
+        got = fence_interior(child_text, kind)
+        want = fence_interior(parent_text, kind)
+        if got == want:
+            continue
+        if kind in {"numbers", "n"}:
+            boundary = (
+                "same numbers+tolerances is a fork, changing them is a new task"
+            )
+        else:
+            boundary = (
+                f"changing ```{kind} redefines the measured set; that is a "
+                f"new task, not a fork"
+            )
+        if got is None:
+            fail.append(
+                f"TASK-{child_n}: ```{kind} fence is missing; parent "
+                f"TASK-{parent_n} has one; {boundary}"
+            )
+        elif want is None:
+            fail.append(
+                f"TASK-{child_n}: ```{kind} fence is present; parent "
+                f"TASK-{parent_n} has none; {boundary}"
+            )
+        else:
+            fail.append(
+                f"TASK-{child_n}: ```{kind} fence is not byte-identical to "
+                f"parent TASK-{parent_n}; {boundary}"
+            )
+
+
+def check_prior_attempts(
+    child_n: str, parent_n: str, child_text: str, parent: dict, fail: list[str]
+) -> None:
+    section = prior_attempts_section(child_text)
+    if section is None:
+        fail.append(
+            f"TASK-{child_n}: brief has no '## Prior Attempts' section"
+        )
+        return
+    parent_task = f"TASK-{parent_n}"
+    if parent_task not in section:
+        fail.append(
+            f"TASK-{child_n}: Prior Attempts must name parent {parent_task}"
+        )
+    hyp = parent.get("hypothesis")
+    if isinstance(hyp, str) and hyp.strip() and hyp.strip() not in section:
+        fail.append(
+            f"TASK-{child_n}: Prior Attempts must quote the parent hypothesis"
+        )
+    why = parent.get("why")
+    if isinstance(why, str) and why.strip() and why.strip() not in section:
+        fail.append(
+            f"TASK-{child_n}: Prior Attempts must quote the parent why"
+        )
+    verdict = parent.get("verdict")
+    subtype = parent.get("subtype")
+    if verdict is not None:
+        token = str(verdict)
+        label = "verdict"
+    else:
+        token = str(subtype) if subtype is not None else ""
+        label = "subtype"
+    if token and token not in section:
+        fail.append(
+            f"TASK-{child_n}: Prior Attempts must record parent {label} {token}"
+        )
+    numbers = parent.get("numbers")
+    found = False
+    if isinstance(numbers, dict):
+        for name, entry in numbers.items():
+            if not isinstance(name, str):
+                continue
+            value = None
+            if isinstance(entry, dict) and "value" in entry:
+                value = entry["value"]
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                continue
+            if name in section and num(float(value)) in section:
+                found = True
+                break
+    if not found:
+        fail.append(
+            f"TASK-{child_n}: Prior Attempts must include a key number "
+            f"from the parent RESULT"
+        )
+
+
+def check_parent_result_immutable(
+    root: Path, parent_n: str, child_n: str, head: str | None, fail: list[str]
+) -> None:
+    """Parent RESULT must exist and must not change after the child brief is added."""
+    rel = f"tasks/TASK-{parent_n}/{RESULT}"
+    path = root / "tasks" / f"TASK-{parent_n}" / RESULT
+    if not path.is_file():
+        fail.append(
+            f"TASK-{child_n}: parent {rel} is missing; parent RESULT.json "
+            f"is never deleted"
+        )
+        return
+    if not head:
+        return
+    child_rel = f"tasks/TASK-{child_n}.md"
+    try:
+        if not in_tree(root, head, rel):
+            fail.append(
+                f"TASK-{child_n}: parent {rel} is missing at {head}; "
+                f"parent RESULT.json is never deleted"
+            )
+            return
+        child_sha = first_added(root, head, child_rel)
+    except Fail as e:
+        fail.append(str(e))
+        return
+    if child_sha is None:
+        return
+    try:
+        touches = commits_touching(root, head, rel)
+    except Fail as e:
+        fail.append(str(e))
+        return
+    for sha in touches:
+        try:
+            after = is_ancestor(root, child_sha, sha)
+        except Fail as e:
+            fail.append(str(e))
+            return
+        if after:
+            fail.append(
+                f"TASK-{child_n}: parent {rel} was edited or deleted after "
+                f"the fork (commit {sha[:8]}); parent RESULT.json is immutable"
+            )
+            return
+
+
+def check_fork(
+    root: Path,
+    n: str,
+    md: Path,
+    brief: Brief,
+    head: str | None,
+    fail: list[str],
+) -> None:
+    """Enforce sibling-brief identity. Runs even when the child has no outputs."""
+    fid = parse_fork_id(n)
+    if fid is None:
+        return
+    if fid.letter is not None and fid.letter not in FORK_DEPTH:
+        fail.append(fork_depth_exceeded_message(n, fid))
+        return
+    if fid.depth > 0:
+        check_fork_child(root, fid, md, head, fail)
+        print(
+            f"  TASK-{n} [{brief.status}]: fork of TASK-{fid.parent} "
+            f"depth {fid.depth}"
+        )
+        return
+    child = child_task_id(fid)
+    if child is None:
+        return
+    child_md = root / "tasks" / f"TASK-{child}.md"
+    if child_md.is_file() and brief.status == "open":
+        fail.append(
+            f"TASK-{n}: status is open while fork TASK-{child} exists; "
+            f"the parent round stays closed or escalated"
+        )
+
+
+def check_fork_child(
+    root: Path, fid: ForkId, md: Path, head: str | None, fail: list[str]
+) -> None:
+    parent_n = fid.parent
+    assert parent_n is not None
+    parent_md = root / "tasks" / f"TASK-{parent_n}.md"
+    if not parent_md.is_file():
+        fail.append(
+            f"TASK-{fid.task}: parent tasks/TASK-{parent_n}.md is missing"
+        )
+        return
+    try:
+        parent_brief = parse_brief(parent_md)
+    except Fail as e:
+        fail.append(f"TASK-{fid.task}: parent TASK-{parent_n} {e}")
+        return
+    if parent_brief.status not in TERMINAL_STATUS:
+        fail.append(
+            f"TASK-{fid.task}: parent TASK-{parent_n} status is "
+            f"{parent_brief.status}; the parent round stays closed or escalated"
+        )
+    child_text = md.read_text(encoding="utf-8")
+    parent_text = parent_md.read_text(encoding="utf-8")
+    check_fence_identity(fid.task, parent_n, child_text, parent_text, fail)
+
+    parent_result_PATH = root / "tasks" / f"TASK-{parent_n}" / RESULT
+    if not parent_result_PATH.is_file():
+        fail.append(
+            f"TASK-{fid.task}: parent TASK-{parent_n} has no RESULT.json; "
+            f"a fork needs the parent's round outcome"
+        )
+        return
+    parent = load_result_object(parent_result_PATH)
+    if parent is None:
+        fail.append(
+            f"TASK-{fid.task}: parent TASK-{parent_n}/RESULT.json is not "
+            f"valid JSON"
+        )
+        return
+    if not fork_trigger_ok(parent.get("subtype"), parent.get("verdict")):
+        fail.append(
+            f"TASK-{fid.task}: parent TASK-{parent_n} is "
+            f"{parent.get('subtype')}/{parent.get('verdict')}; a fork is "
+            f"allowed only when verdict is {FORK_TRIGGER_VERDICT} or "
+            f"subtype is {FORK_TRIGGER_SUBTYPE}"
+        )
+    check_prior_attempts(fid.task, parent_n, child_text, parent, fail)
+    check_parent_result_immutable(root, parent_n, fid.task, head, fail)
+
 
 # ---------------------------------------------------------------------- one task
 
@@ -2122,6 +2516,7 @@ def check_task(
     status, tol, n_decl, frame, stamp, identities = brief
 
     task_dir = root / "tasks" / f"TASK-{n}"
+    check_fork(root, n, md, brief, head, fail)
     check_round_result(
         root, n, brief, task_dir, corpus_sha, base, head, fail
     )

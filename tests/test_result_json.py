@@ -405,3 +405,29 @@ def test_already_closed_without_result_stays_green_on_main(tmp_path, capsys):
     assert code == 0, out
     assert "RESULT.json" not in out or "missing" not in out
     assert "output_check: PASS" in out
+
+
+def test_parse_result_fork_depth_above_cap_fails(tmp_path):
+    path = tmp_path / "RESULT.json"
+    _write_result(
+        path,
+        _base_payload(forked_from="TASK-6-c", fork_depth=3),
+    )
+    with pytest.raises(
+        output_check.Fail,
+        match=r"fork_depth is 3 \(cap is 2\); a third fork is blocked",
+    ):
+        output_check.parse_result(path, "7", {"n_count": 0.0}, CORPUS_SHA)
+
+
+def test_parse_result_forked_from_rejects_letter_d(tmp_path):
+    path = tmp_path / "RESULT.json"
+    _write_result(
+        path,
+        _base_payload(n="7-b", forked_from="TASK-6-d", fork_depth=1),
+    )
+    with pytest.raises(
+        output_check.Fail,
+        match=r"forked_from must be null or TASK-N",
+    ):
+        output_check.parse_result(path, "7-b", {"n_count": 0.0}, CORPUS_SHA)

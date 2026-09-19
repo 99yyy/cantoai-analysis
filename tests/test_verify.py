@@ -58,6 +58,8 @@ def test_probe_exits_zero_because_known_red_probes_go_red():
     assert "probe constant-sql went red" in out
     assert "probe relations-literal-denom went red" in out
     assert "probe result-out-of-turns went red" in out
+    assert "probe fork-tolerance went red" in out
+    assert "probe fork-depth-d went red" in out
     assert "verify: probe PASS" in out
 
 
