@@ -81,7 +81,7 @@ def test_agent_is_classified_before_repair_even_on_cursor_r_names():
 def test_chore_owner_may_edit_brief_but_not_github():
     cls = scope_check.classify("chore/t6-x", actor="99yyy", owners=OWNERS)
     assert scope_check.path_blocked("tasks/TASK-6.md", cls) is None
-    assert scope_check.path_blocked("README.md", cls) is None
+    assert scope_check.path_blocked("README.md", cls) == "DENY"
     assert scope_check.path_blocked(".github/workflows/ci.yml", cls) == "DENY"
     assert scope_check.path_blocked("data/corpus_v2.sqlite", cls) == "DENY"
 
@@ -91,3 +91,32 @@ def test_agent_may_not_edit_brief_or_deny_paths():
     assert scope_check.path_blocked("tasks/TASK-6.md", cls) == "DENY"
     assert scope_check.path_blocked(".github/workflows/ci.yml", cls) == "DENY"
     assert scope_check.path_blocked("tasks/TASK-6/results.json", cls) is None
+
+
+def test_agent_may_not_edit_scripts_readme_or_loop():
+    cls = scope_check.classify("cursor/t6-worker-x", actor="agent-bot", owners=OWNERS)
+    assert scope_check.path_blocked("scripts/output_check.py", cls) == "DENY"
+    assert scope_check.path_blocked("scripts/history_audit.py", cls) == "DENY"
+    assert scope_check.path_blocked("scripts/nested/x.py", cls) == "DENY"
+    assert scope_check.path_blocked("README.md", cls) == "DENY"
+    assert scope_check.path_blocked("LOOP.md", cls) == "DENY"
+    assert scope_check.path_blocked("BACKGROUND.md", cls) is None
+
+
+def test_chore_may_not_edit_scripts_readme_or_loop():
+    cls = scope_check.classify("chore/t6-x", actor="99yyy", owners=OWNERS)
+    assert "README.md" not in scope_check.CHORE_ALLOW
+    assert "LOOP.md" not in scope_check.CHORE_ALLOW
+    assert scope_check.path_blocked("scripts/output_check.py", cls) == "DENY"
+    assert scope_check.path_blocked("README.md", cls) == "DENY"
+    assert scope_check.path_blocked("LOOP.md", cls) == "DENY"
+    assert scope_check.path_blocked("BACKGROUND.md", cls) is None
+    assert scope_check.path_blocked("backlog.md", cls) is None
+
+
+def test_repair_owner_may_edit_scripts_readme_and_loop():
+    cls = scope_check.classify("repair/loop-3-2-x", actor="99yyy", owners=OWNERS)
+    assert cls.deny == []
+    assert scope_check.path_blocked("scripts/output_check.py", cls) is None
+    assert scope_check.path_blocked("README.md", cls) is None
+    assert scope_check.path_blocked("LOOP.md", cls) is None
