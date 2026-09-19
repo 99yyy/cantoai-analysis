@@ -8,8 +8,8 @@ the only file here that explains rather than instructs. Read it first.
 | file | answers |
 |---|---|
 | `BACKGROUND.md` | what this is, what the columns mean, which words to use |
-| `.cursor/rules/analysis-contract.mdc` | the rules. It overrides every other file, including this one |
-| `LOOP.md` | how work moves: who computes, who checks, what merges |
+| `.cursor/rules/analysis-contract.mdc` | analysis assertions. It overrides every task brief |
+| `LOOP.md` | the only execution playbook: who computes, who checks, what merges. If other docs conflict, LOOP.md wins |
 | `tasks/TASK-N.md` | what you owe, and the tolerance on each number |
 | `README.md` | the corpus path and its sha256 |
 
