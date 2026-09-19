@@ -1,0 +1,238 @@
+{
+  "git_sha": "07f4754b0e39bc897e60e5c08a937b87c303afb9",
+  "inputs": {
+    "data/corpus_v2.sqlite": {
+      "sha256": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+      "tables": {
+        "videos": {
+          "rows": 567,
+          "columns": [
+            "video_id",
+            "title",
+            "upload_date",
+            "n_windows",
+            "speech_s"
+          ]
+        },
+        "windows": {
+          "rows": 4911,
+          "columns": [
+            "uid",
+            "video_id",
+            "idx",
+            "start",
+            "end",
+            "dur",
+            "start_sample",
+            "end_sample",
+            "boundary_start",
+            "boundary_end",
+            "lang",
+            "text_raw",
+            "text_norm",
+            "text_clean",
+            "flag_hai",
+            "flag_simp",
+            "flag_sing",
+            "flag_boiler",
+            "chars_per_sec",
+            "aligned",
+            "coverage",
+            "first_s",
+            "in_range",
+            "max_zero_run",
+            "tone_shift_suspect",
+            "n_syllables",
+            "tier",
+            "text_human"
+          ]
+        },
+        "syllables": {
+          "rows": 171867,
+          "columns": [
+            "syl_id",
+            "uid",
+            "video_id",
+            "pos",
+            "c0",
+            "char",
+            "start",
+            "end",
+            "dur",
+            "win_start",
+            "jp_default",
+            "jp_ctx",
+            "jp_candidates",
+            "n_cand",
+            "prev_char",
+            "next_char",
+            "ctx",
+            "tier",
+            "jp_realized",
+            "jp_match",
+            "review_prior",
+            "verification_status",
+            "verification_note"
+          ]
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "step": "load_videos",
+      "rule": "videos full table",
+      "group": "all",
+      "rows_before": 567,
+      "rows_after": 567
+    },
+    {
+      "step": "load_windows",
+      "rule": "windows full table",
+      "group": "all",
+      "rows_before": 4911,
+      "rows_after": 4911
+    },
+    {
+      "step": "load_syllables",
+      "rule": "syllables full table",
+      "group": "all",
+      "rows_before": 171867,
+      "rows_after": 171867
+    },
+    {
+      "step": "join_syllables_windows",
+      "rule": "inner uid",
+      "group": "all",
+      "rows_before": 171867,
+      "rows_after": 171867,
+      "unmatched_left": 0
+    },
+    {
+      "step": "tier_whitelist",
+      "rule": "windows.tier IN ('A','B')",
+      "group": "all",
+      "rows_before": 171867,
+      "rows_after": 164693
+    },
+    {
+      "step": "join_published_videos",
+      "rule": "inner video_id",
+      "group": "all",
+      "rows_before": 164693,
+      "rows_after": 164693,
+      "unmatched_left": 0
+    },
+    {
+      "step": "period_assign",
+      "rule": "four-digit year <=2024 vs >=2025",
+      "group": "pre",
+      "rows_before": 164693,
+      "rows_after": 122208
+    },
+    {
+      "step": "period_assign",
+      "rule": "four-digit year <=2024 vs >=2025",
+      "group": "post",
+      "rows_before": 164693,
+      "rows_after": 42485
+    },
+    {
+      "step": "period_assign",
+      "rule": "not a four-digit year",
+      "group": "unassigned_period",
+      "rows_before": 164693,
+      "rows_after": 0
+    },
+    {
+      "step": "drop_empty_title",
+      "rule": "title nonempty (unassigned_film is empty title)",
+      "group": "pre",
+      "rows_before": 122208,
+      "rows_after": 122208
+    },
+    {
+      "step": "drop_film_proxy",
+      "rule": "title-proxy film markers; other is nonempty title with none of them",
+      "group": "pre",
+      "rows_before": 122208,
+      "rows_after": 104036
+    },
+    {
+      "step": "keep_common_char",
+      "rule": "char frequency >= 10 on full syllables table, all tiers",
+      "group": "pre",
+      "rows_before": 104036,
+      "rows_after": 100428
+    },
+    {
+      "step": "keep_judgeable",
+      "rule": "jp_realized nonempty and dur > 0",
+      "group": "pre",
+      "rows_before": 100428,
+      "rows_after": 86194
+    },
+    {
+      "step": "drop_empty_title",
+      "rule": "title nonempty (unassigned_film is empty title)",
+      "group": "post",
+      "rows_before": 42485,
+      "rows_after": 42485
+    },
+    {
+      "step": "drop_film_proxy",
+      "rule": "title-proxy film markers; other is nonempty title with none of them",
+      "group": "post",
+      "rows_before": 42485,
+      "rows_after": 20637
+    },
+    {
+      "step": "keep_common_char",
+      "rule": "char frequency >= 10 on full syllables table, all tiers",
+      "group": "post",
+      "rows_before": 20637,
+      "rows_after": 19821
+    },
+    {
+      "step": "keep_judgeable",
+      "rule": "jp_realized nonempty and dur > 0",
+      "group": "post",
+      "rows_before": 19821,
+      "rows_after": 16508
+    }
+  ],
+  "agreement_counts": {
+    "other_common_pre": {
+      "n_total": 100428,
+      "n_match": 76582,
+      "n_judgeable": 86194,
+      "n_empty_realized": 837,
+      "n_dur_le_0": 13655,
+      "n_empty_and_zerodur": 258
+    },
+    "other_common_post": {
+      "n_total": 19821,
+      "n_match": 13457,
+      "n_judgeable": 16508,
+      "n_empty_realized": 345,
+      "n_dur_le_0": 3089,
+      "n_empty_and_zerodur": 121
+    }
+  },
+  "stratum_sizes": {
+    "pre": {
+      "N_h": 391,
+      "G_h": 391,
+      "n_h_judgeable": 86194,
+      "n_h_match": 76582,
+      "n_h_videos_with_judgeable": 330
+    },
+    "post": {
+      "N_h": 176,
+      "G_h": 176,
+      "n_h_judgeable": 16508,
+      "n_h_match": 13457,
+      "n_h_videos_with_judgeable": 116
+    }
+  }
+}
