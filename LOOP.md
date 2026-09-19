@@ -41,7 +41,7 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 
 | 检查 | 管什么 |
 |---|---|
-| `output-check` | 每个数字都能从语料重放出来；两套独立算出的数字必须相等；重写次数有上限；两条分支不得从对方的答案出发；`status: closed` 只有在两边齐、全一致时才允许 |
+| `output-check` | 每个数字都能从语料重放出来；SQL 的 `EXPLAIN QUERY PLAN` 必须 `SCAN`/`SEARCH` 语料表；两套独立算出的数字必须相等；重写次数有上限；两条分支不得从对方的答案出发；`status: closed` 只有在两边齐、全一致时才允许 |
 | `scope-check` | 分支必须属于已知类别（先匹配 agent 前缀）；repair/ 与 chore/ 不能单靠前缀授权，须 `github.actor` 落在仓库 owner allowlist 上；chore 与 agent 同受 DENY；agent 不得碰 `.cursor/` `.github/` `data/`，也不得改任务书 `tasks/TASK-N.md`，但必须能写 `tasks/TASK-N/` 下面自己的产出 |
 | `history-audit` | 移动已有的栅不得与被它度量的东西同 PR，且正文须有 `BAR-CHANGE:` |
 | `tests` | 有 `tests/test_*.py` 时跑 pytest |
@@ -56,7 +56,7 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 2. 任务书有且只有一行 `status: open` 或 `status: closed`，`numbers` 块能解析。
 3. 两个输出文件的每一行恰好是 `{name, value, n, query}`，名字集合与 `numbers` 块**相等**——少一个和多一个都红；同一文件内不得有重名，也不得有两个数字共用一条算路。
 4. 每个 `query` 是下面两种之一：
-   - `tasks/TASK-N/<…>.sql`：一条语句，`SELECT` 或 `WITH` 开头，返回恰好一行一列；
+   - `tasks/TASK-N/<…>.sql`：一条语句，`SELECT` 或 `WITH` 开头，返回恰好一行一列；`EXPLAIN QUERY PLAN` 必须出现对语料表 `videos` / `windows` / `syllables` / `runs` 的 `SCAN` 或 `SEARCH`（`SELECT 12345` 过不了这一关）；
    - `derived:<expr>`：只用其他已声明的数字名、数字、`+ - * /` 和括号。
 5. 同一个 `.sql` 文件不得同时出现在两个文件里。定义可以共享，**实现不行**。`derived:` 允许两边写成一样，因为它的每个输入都各自被重放过。
 6. 每个数字都等于它自己那条算路跑出来的结果，误差在容差内。`derived:` 用的是**重放出来的**值，不是 agent 自己写下的值——所以「把输入写错、再把推导写成与错输入自洽」这条路是走不通的，两行都会红。
