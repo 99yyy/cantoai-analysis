@@ -53,10 +53,15 @@ jobs:
         with:
           python-version: "3.12"
       - name: Every branch must belong to a known class
+        env:
+          SCOPE_ACTOR: ${{ github.actor }}
+          SCOPE_OWNERS: ${{ github.repository_owner }}
         run: |
           python scripts/scope_check.py \
             --branch "${{ github.head_ref }}" \
-            --base "origin/${{ github.base_ref }}"
+            --base "origin/${{ github.base_ref }}" \
+            --actor "$SCOPE_ACTOR" \
+            --owners "$SCOPE_OWNERS"
 
   history-audit:
     if: github.event_name == 'pull_request'

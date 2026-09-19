@@ -13,18 +13,28 @@ unrecognised branch name is how commit 15ea35a reached main: it changed three
 declared expected values after contract-check had already gone red on the same
 branch, and nothing looked at it because the branch name matched no pattern.
 
+Match order is load-bearing (plan §3.1): AGENT_RE first, then REPAIR_RE, then
+CHORE_RE. A worker branch must not be classified as repair or chore because
+its name also matches a later prefix.
+
+repair and chore are not authorized by prefix. CI passes github.actor and the
+repository-owner allowlist; those two must match. Prefix alone is how
+cursor/repair-… and repair/… used to take deny=[] and rewrite briefs, corpus,
+CI, and the contract.
+
 What each class may touch:
 
     agent   anything except DENY and the task briefs; it writes its outputs
             under tasks/TASK-N/, which is allowed
-    chore   only CHORE_ALLOW, which already excludes everything in DENY
-    repair  anything, but the prefix makes it visible in the history
+    chore   only CHORE_ALLOW, and never DENY (same deny list as agent)
+    repair  anything, once the actor is a repository owner
 
 Per-scope path lists are not checked here. They belong to a task declaration,
 and until one exists again they are a matter for review.
 
 Usage:
-    python scripts/scope_check.py --branch "$HEAD_REF" --base origin/main
+    python scripts/scope_check.py --branch "$HEAD_REF" --base origin/main \\
+        --actor "$GITHUB_ACTOR" --owners "$OWNER_ALLOWLIST"
 """
 from __future__ import annotations
 
@@ -33,6 +43,7 @@ import fnmatch
 import re
 import subprocess
 import sys
+from typing import NamedTuple
 
 AGENT_RE = re.compile(r"^(?:cursor|box)/[rt](?P<task>\d+)-(?P<scope>[a-z0-9_]+)-")
 REPAIR_RE = re.compile(r"^(?:repair/|cursor/repair-)")
@@ -56,6 +67,13 @@ CHORE_ALLOW = [
 ]
 
 
+class BranchClass(NamedTuple):
+    name: str
+    allow: list[str] | None
+    deny: list[str]
+    no_brief: bool
+
+
 def run(*args: str) -> str:
     return subprocess.run(args, capture_output=True, text=True, check=True).stdout
 
@@ -68,33 +86,86 @@ def match_any(path: str, globs: list[str]) -> bool:
     return any(fnmatch.fnmatch(path, g) for g in globs)
 
 
+def parse_owners(raw: str | None) -> frozenset[str]:
+    if not raw:
+        return frozenset()
+    return frozenset(p.strip().casefold() for p in raw.split(",") if p.strip())
+
+
+def actor_is_owner(actor: str | None, owners: frozenset[str]) -> bool:
+    if not actor or not owners:
+        return False
+    return actor.strip().casefold() in owners
+
+
+def classify(branch: str, actor: str | None, owners: frozenset[str]) -> BranchClass:
+    """Return the branch class. AGENT_RE is matched first (plan §3.1)."""
+    if AGENT_RE.match(branch):
+        return BranchClass("agent", None, DENY, True)
+    if REPAIR_RE.match(branch):
+        if not actor_is_owner(actor, owners):
+            raise ValueError(
+                f"scope_check: FAIL branch {branch!r} class repair is not authorized "
+                f"for actor {actor!r}"
+            )
+        return BranchClass("repair", None, [], False)
+    if CHORE_RE.match(branch):
+        if not actor_is_owner(actor, owners):
+            raise ValueError(
+                f"scope_check: FAIL branch {branch!r} class chore is not authorized "
+                f"for actor {actor!r}"
+            )
+        return BranchClass("chore", CHORE_ALLOW, DENY, False)
+    raise ValueError(f"scope_check: FAIL branch {branch!r} matches no branch class")
+
+
+def path_blocked(path: str, cls: BranchClass) -> str | None:
+    if match_any(path, cls.deny) or (cls.no_brief and BRIEF_RE.match(path)):
+        return "DENY"
+    if cls.allow is not None and not match_any(path, cls.allow):
+        return "OUT"
+    return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--branch", required=True)
     ap.add_argument("--base", required=True)
+    ap.add_argument("--actor", required=True)
+    ap.add_argument(
+        "--owners",
+        required=True,
+        help="comma-separated GitHub logins allowed to use repair/ and chore/",
+    )
     args = ap.parse_args()
 
     branch = args.branch.strip()
-    if REPAIR_RE.match(branch):
-        cls, allow, deny, no_brief = "repair", None, [], False
-    elif CHORE_RE.match(branch):
-        cls, allow, deny, no_brief = "chore", CHORE_ALLOW, [], False
-    elif AGENT_RE.match(branch):
-        cls, allow, deny, no_brief = "agent", None, DENY, True
-    else:
-        print(f"scope_check: FAIL branch {branch!r} matches no branch class")
-        print("  allowed prefixes: cursor/t<N>-<scope>-, box/t<N>-<scope>-, chore/, repair/")
+    actor = args.actor.strip()
+    owners = parse_owners(args.owners)
+    try:
+        cls = classify(branch, actor, owners)
+    except ValueError as e:
+        print(str(e))
+        if "matches no branch class" in str(e):
+            print("  allowed prefixes: cursor/t<N>-<scope>-, box/t<N>-<scope>-, chore/, repair/")
+        else:
+            print("  repair/ and chore/ require --actor on the --owners allowlist")
+            print("  allowed prefixes: cursor/t<N>-<scope>-, box/t<N>-<scope>-, chore/, repair/")
         return 1
 
     files = changed(args.base)
-    print(f"scope_check: branch={branch} class={cls} files={len(files)}")
+    print(
+        f"scope_check: branch={branch} class={cls.name} actor={actor!r} "
+        f"files={len(files)}"
+    )
 
     bad: list[str] = []
     for f in files:
-        if match_any(f, deny) or (no_brief and BRIEF_RE.match(f)):
+        reason = path_blocked(f, cls)
+        if reason == "DENY":
             print(f"  DENY    {f}")
             bad.append(f)
-        elif allow is not None and not match_any(f, allow):
+        elif reason == "OUT":
             print(f"  OUT     {f}")
             bad.append(f)
         else:
@@ -102,10 +173,10 @@ def main() -> int:
 
     if bad:
         print(f"scope_check: FAIL {len(bad)} file(s) this branch class may not touch")
-        if allow is not None:
-            print(f"  chore/ may touch: {allow}")
+        if cls.allow is not None:
+            print(f"  chore/ may touch: {cls.allow}")
         print(f"  no class but repair/ may touch: {DENY}")
-        if no_brief:
+        if cls.no_brief:
             print("  a task brief tasks/<name>.md is the owner's; an agent writes only under tasks/TASK-N/")
         return 1
 
