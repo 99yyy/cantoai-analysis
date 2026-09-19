@@ -11,8 +11,13 @@ numbers the task owes and the tolerance each one gets, and nothing else:
     gap_all_pp             0.05
     ```
 
-A brief never declares a value. A value in the brief is a value both agents can
-copy, and two agents copying one number is not agreement.
+A brief never declares a *value*. A value in the brief is a value both agents
+can copy, and two agents copying one number is not agreement. The denominator
+``n`` is different (plan §2.5): the brief may nail it in a fenced ``n`` block,
+each row a constant or a ``derived:`` expression, and this script forces the
+written ``n`` to that declaration. Pairwise equality of the two agents' ``n``
+stays; it is not a substitute. Without the fence, ``n`` is still only compared
+across the two files.
 
 Two agents answer it. Neither writes a verdict:
 
@@ -42,14 +47,19 @@ What this enforces, in order:
 
   corpus       the corpus hashes to the value recorded in README.md.
   brief        exactly one ``status: open|closed|escalated|blocked`` line;
-               a parseable block. ``escalated`` and ``blocked`` suspend
-               replay, pairwise agreement, and edit-count for that task
-               (plan §4.4).
+               a parseable ``numbers`` block. ``escalated`` and ``blocked``
+               suspend replay, pairwise agreement, declared-n, identity, and
+               edit-count for that task (plan §4.4). An optional fenced
+               ``n`` block (plan §2.5) and ``frame`` block (plan §6 identity)
+               are parsed here; they are not required of every brief.
   shape        top-level list; every row exactly {name, value, n, query}; the
                name set equals the declared set, so a missing number and an
                extra number both fail; no duplicate name; no duplicate route
                within one file (``route()``-resolved Path, not the raw query
                string: ``sql/../sql/x.sql`` and ``sql/x.sql`` are one file).
+               When a ``n`` fence is present its name set must equal the
+               numbers set; each row is a non-negative integer constant or a
+               ``derived:`` expression.
   route        every SQL path exists, resolves under tasks/TASK-<N>/, and is
                not named by both files; after strip_and_split, no worker
                statement sha256 may equal any verifier statement sha256 (copying
@@ -66,6 +76,20 @@ What this enforces, in order:
                of (abs(random()) % 5) / 100.0 cannot hide inside tol 0.05.
   agreement    the two files agree on every value within tol and on every n
                exactly. Any disagreement fails, and both numbers are printed.
+               Pairwise n equality is not enough (plan §2.5): if a ``n`` fence
+               is present, each written ``n`` must also equal the declared
+               constant or the ``derived:`` expression evaluated over the
+               values this script replayed. Both checks run; neither replaces
+               the other. A brief with no ``n`` fence does not activate the
+               declared-n check.
+  identity     if a ``frame`` fence names ``videos_expected`` and the numbers
+               block declares ``n_videos_pre``, ``n_videos_post`` and
+               ``n_unassigned_period``, their replayed sum must equal
+               ``frame.videos_expected`` (tol ``videos_expected_tol``, 0 if
+               that name is absent). The right-hand side is the frame field,
+               never a literal 567 in this script. No ``videos_expected``, or
+               a task that does not declare those three names: the identity
+               does not run.
   attempts     at most three commits touch one output file after the
                latest brief revision (the reset commit): the first and two
                retries. A fourth is not a retry, it is a loop. Recount
@@ -112,11 +136,17 @@ import sys
 import time
 from collections.abc import Iterable
 from pathlib import Path
+from typing import NamedTuple
 
 BLOCK = re.compile(r"^```numbers\s*$(.*?)^```\s*$", re.M | re.S)
+N_FENCE = re.compile(r"^```n\s*$(.*?)^```\s*$", re.M | re.S)
+FRAME_FENCE = re.compile(r"^```frame\s*$(.*?)^```\s*$", re.M | re.S)
 STATUS = re.compile(
     r"^status:[ \t]*(open|closed|escalated|blocked)[ \t]*$", re.M
 )
+PERIOD_IDENTITY = ("n_videos_pre", "n_videos_post", "n_unassigned_period")
+VIDEOS_EXPECTED = "videos_expected"
+VIDEOS_EXPECTED_TOL = "videos_expected_tol"
 README_SHA = re.compile(r"sha256:\s*`?([0-9a-f]{64})`?")
 ROW_KEYS = {"name", "value", "n", "query"}
 DERIVED = "derived:"
@@ -217,6 +247,15 @@ _NOT_ALIAS = frozenset(
 
 class Fail(Exception):
     """A condition this script exists to catch."""
+
+
+class Brief(NamedTuple):
+    """Parsed task brief. ``n_decl`` is None when the brief has no ``n`` fence."""
+
+    status: str
+    tol: dict[str, float]
+    n_decl: dict[str, str] | None
+    frame: dict[str, float]
 
 
 def close(a: float, b: float, tol: float) -> bool:
@@ -338,24 +377,24 @@ def frozen_summary(root: Path, md: Path) -> None:
     """Print state for a task this PR did not touch; never fail (plan §4.1)."""
     n = md.stem.split("-", 1)[1]
     try:
-        status, tol = parse_brief(md)
+        brief = parse_brief(md)
     except Fail:
         print(f"  TASK-{n}: frozen (not touched by this PR); brief not re-checked")
         return
     task_dir = root / "tasks" / f"TASK-{n}"
     present = [k for k in (WORKER, VERIFIER) if (task_dir / k).is_file()]
     files = ", ".join(present) if present else "no output yet"
-    extra = "; suspended" if status in SUSPEND_STATUS else ""
+    extra = "; suspended" if brief.status in SUSPEND_STATUS else ""
     print(
-        f"  TASK-{n} [{status}]: frozen (not touched by this PR); "
-        f"{len(tol)} number(s) declared; {files}{extra}"
+        f"  TASK-{n} [{brief.status}]: frozen (not touched by this PR); "
+        f"{len(brief.tol)} number(s) declared; {files}{extra}"
     )
 
 
 # ------------------------------------------------------------------------- brief
 
 
-def parse_brief(md: Path) -> tuple[str, dict[str, float]]:
+def parse_brief(md: Path) -> Brief:
     text = md.read_text(encoding="utf-8")
 
     st = STATUS.findall(text)
@@ -390,7 +429,203 @@ def parse_brief(md: Path) -> tuple[str, dict[str, float]]:
         tol[name] = t
     if not tol:
         raise Fail(f"{md.name}: the numbers block is empty")
-    return st[0], tol
+
+    n_decl = parse_n_block(md.name, text)
+    if n_decl is not None:
+        extra = sorted(set(n_decl) - set(tol))
+        missing = sorted(set(tol) - set(n_decl))
+        if extra or missing:
+            bits: list[str] = []
+            if extra:
+                bits.append("not in the numbers block: " + ", ".join(extra))
+            if missing:
+                bits.append(
+                    "declared in numbers but missing from n: " + ", ".join(missing)
+                )
+            raise Fail(f"{md.name}: ```n block " + "; ".join(bits))
+
+    return Brief(st[0], tol, n_decl, parse_frame_block(md.name, text))
+
+
+def parse_n_block(label: str, text: str) -> dict[str, str] | None:
+    """Name -> integer spec or ``derived:<expr>``. None when there is no ``n`` fence.
+
+    The fence is optional. When it is present it must not be empty: each line
+    is a constant non-negative integer or a ``derived:`` expression (plan §2.5).
+    """
+    m = N_FENCE.search(text)
+    if not m:
+        return None
+    out: dict[str, str] = {}
+    for raw in m.group(1).splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.split(None, 1)
+        if len(parts) != 2:
+            raise Fail(f"{label}: n line is not '<name> <int|derived:...>': {line!r}")
+        name, spec = parts
+        if name in out:
+            raise Fail(f"{label}: {name} is declared twice in the n block")
+        if spec.startswith(DERIVED):
+            expr = spec[len(DERIVED) :].strip()
+            if not expr:
+                raise Fail(f"{label}: {name}: derived: is followed by nothing")
+            out[name] = DERIVED + expr
+            continue
+        bits = spec.split()
+        if len(bits) != 1:
+            raise Fail(f"{label}: n line is not '<name> <int|derived:...>': {line!r}")
+        try:
+            v = float(bits[0])
+        except ValueError:
+            raise Fail(
+                f"{label}: {name} n is not a non-negative integer or derived: "
+                f"({bits[0]!r})"
+            )
+        if v < 0 or abs(v - round(v)) > EPS:
+            raise Fail(f"{label}: {name} n must be a non-negative integer, got {v}")
+        out[name] = str(int(round(v)))
+    if not out:
+        raise Fail(f"{label}: the n block is empty")
+    return out
+
+
+def parse_frame_block(label: str, text: str) -> dict[str, float]:
+    """Numeric ``frame`` entries. Predicate lines are skipped. Empty if no fence.
+
+    The identity in ``check_period_identity`` reads ``videos_expected`` from
+    this dict. It does not run when that name is absent, including when the
+    brief has no ``frame`` fence at all (plan §6).
+    """
+    m = FRAME_FENCE.search(text)
+    if not m:
+        return {}
+    out: dict[str, float] = {}
+    for raw in m.group(1).splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        nums: list[float] = []
+        ok = True
+        for p in parts[1:]:
+            try:
+                nums.append(float(p))
+            except ValueError:
+                ok = False
+                break
+        if not ok or len(nums) != 1:
+            continue
+        name = parts[0]
+        if name in out:
+            raise Fail(f"{label}: {name} is declared twice in the frame block")
+        out[name] = nums[0]
+    return out
+
+
+def as_count(label: str, v: float) -> int:
+    """A declared ``n`` must be a non-negative integer after evaluation."""
+    if v < 0 or abs(v - round(v)) > EPS:
+        raise Fail(
+            f"{label}: declared n evaluates to {num(v)}, "
+            f"which is not a non-negative integer"
+        )
+    return int(round(v))
+
+
+def resolve_declared_n(
+    label: str, name: str, spec: str, known: dict[str, float]
+) -> int:
+    """Evaluate one ``n`` fence row over replayed values (never written ones)."""
+    tag = f"{label}:{name}.n"
+    if spec.startswith(DERIVED):
+        expr = spec[len(DERIVED) :].strip()
+        try:
+            v = eval_derived(tag, expr, known)
+        except KeyError as e:
+            raise Fail(
+                f"{tag}: derived expression {expr!r} cannot be resolved -- "
+                f"it names a number that is undeclared, that failed to replay, "
+                f"or that depends on this one ({e.args[0]})"
+            ) from e
+        return as_count(tag, v)
+    return as_count(tag, float(spec))
+
+
+def check_declared_n(
+    label: str,
+    rows: dict[str, dict],
+    n_decl: dict[str, str],
+    replayed: dict[str, float],
+    fail: list[str],
+) -> int:
+    """Force each written ``n`` to the brief's declared value (plan §2.5).
+
+    Returns how many names matched. Pairwise worker/verifier equality is a
+    separate check and still runs.
+    """
+    matched = 0
+    for name in sorted(n_decl):
+        if name not in rows:
+            continue
+        claimed = rows[name]["n"]
+        try:
+            want = resolve_declared_n(label, name, n_decl[name], replayed)
+        except Fail as e:
+            fail.append(str(e))
+            continue
+        if claimed != want:
+            fail.append(
+                f"{label}:{name}: n={claimed}, but the brief declares n={want}"
+            )
+        else:
+            matched += 1
+    return matched
+
+
+def check_period_identity(
+    task_n: str,
+    label: str,
+    declared: dict[str, float],
+    replayed: dict[str, float],
+    frame: dict[str, float],
+    fail: list[str],
+) -> str | None:
+    """``n_videos_pre + n_videos_post + n_unassigned_period = frame.videos_expected``.
+
+    Activates only when ``videos_expected`` is in ``frame`` and all three names
+    are in the numbers block. The right-hand side is the frame field, not a
+    numeric literal. Returns a success note, or None if skipped or failed.
+    """
+    if VIDEOS_EXPECTED not in frame:
+        return None
+    if not all(nm in declared for nm in PERIOD_IDENTITY):
+        return None
+    missing = [nm for nm in PERIOD_IDENTITY if nm not in replayed]
+    if missing:
+        fail.append(
+            f"TASK-{task_n}: {label}: period identity needs replayed "
+            f"{', '.join(PERIOD_IDENTITY)}; missing {', '.join(missing)}"
+        )
+        return None
+    a, b, c = (replayed[nm] for nm in PERIOD_IDENTITY)
+    got = a + b + c
+    want = frame[VIDEOS_EXPECTED]
+    t = frame.get(VIDEOS_EXPECTED_TOL, 0.0)
+    if not close(got, want, t):
+        fail.append(
+            f"TASK-{task_n}: {label}: "
+            f"{PERIOD_IDENTITY[0]} + {PERIOD_IDENTITY[1]} + {PERIOD_IDENTITY[2]} "
+            f"= {num(a)} + {num(b)} + {num(c)} = {num(got)}, "
+            f"but frame.{VIDEOS_EXPECTED} is {num(want)} (tol {t:g})"
+        )
+        return None
+    return (
+        f"{num(a)} + {num(b)} + {num(c)} = {num(got)} = frame.{VIDEOS_EXPECTED}"
+    )
 
 
 def parse_rows(
@@ -942,10 +1177,11 @@ def check_task(
 ) -> None:
     n = md.stem.split("-", 1)[1]
     try:
-        status, tol = parse_brief(md)
+        brief = parse_brief(md)
     except Fail as e:
         fail.append(str(e))
         return
+    status, tol, n_decl, frame = brief
 
     if status in SUSPEND_STATUS:
         print(
@@ -969,6 +1205,7 @@ def check_task(
 
     rows: dict[str, dict[str, dict]] = {}
     routes: dict[str, dict[str, tuple[str, object]]] = {}
+    replayed_by: dict[str, dict[str, float]] = {}
     for k, p in present.items():
         r = parse_rows(p, tol, fail, n, root)
         if r is None:
@@ -982,7 +1219,23 @@ def check_task(
             except Fail as e:
                 fail.append(str(e))
         replayed = replay(k, r, tol, routes[k], conn, seconds, fail)
-        print(f"  TASK-{n} [{status}]: {k} {len(r)} row(s), {len(replayed)} replayed")
+        replayed_by[k] = replayed
+        extra = ""
+        if n_decl is not None:
+            n_ok = check_declared_n(k, r, n_decl, replayed, fail)
+            extra = f", {n_ok}/{len(n_decl)} n declared"
+        print(
+            f"  TASK-{n} [{status}]: {k} {len(r)} row(s), "
+            f"{len(replayed)} replayed{extra}"
+        )
+
+    identity_notes: list[str] = []
+    for k, replayed in replayed_by.items():
+        note = check_period_identity(n, k, tol, replayed, frame, fail)
+        if note:
+            identity_notes.append(note)
+    if identity_notes:
+        print(f"  TASK-{n} [{status}]: period identity {identity_notes[0]}")
 
     # Two agents may share a definition. They may not share an implementation.
     if WORKER in routes and VERIFIER in routes:
