@@ -52,8 +52,10 @@ What this enforces, in order:
                edit-count for that task (plan §4.4). An optional
                ``corpus_sha:`` line (plan §4.5) holds the README pin at
                close; at most one, 64-char lowercase hex. An optional fenced
-               ``n`` block (plan §2.5) and ``frame`` block (plan §6 identity)
-               are parsed here; they are not required of every brief.
+               ``n`` block (plan §2.5), ``frame`` block (plan §6 identity),
+               and ``identities`` block (``<expr> = <expr>  <tol>`` over
+               replayed SQL-routed names) are parsed here; they are not
+               required of every brief.
                Briefs are the top-level glob ``tasks/TASK-*.md`` (not
                recursive). A ``results.json`` or ``mine.json`` under any
                TASK-N directory whose matching ``tasks/TASK-N.md`` is not in
@@ -89,14 +91,16 @@ What this enforces, in order:
                values this script replayed. Both checks run; neither replaces
                the other. A brief with no ``n`` fence does not activate the
                declared-n check.
-  identity     if a ``frame`` fence names ``videos_expected`` and the numbers
-               block declares ``n_videos_pre``, ``n_videos_post`` and
-               ``n_unassigned_period``, their replayed sum must equal
-               ``frame.videos_expected`` (tol ``videos_expected_tol``, 0 if
-               that name is absent). The right-hand side is the frame field,
-               never a literal 567 in this script. No ``videos_expected``, or
-               a task that does not declare those three names: the identity
-               does not run.
+  identity     a fenced ``identities`` block lists ``<expr> = <expr>  <tol>``
+               lines, evaluated with the same AST as ``derived:`` over this
+               file's **replayed** values (never the values the agent wrote,
+               and never a merge of worker+verifier dicts). ``frame.<field>``
+               binds a numeric ``frame`` entry. An identity **counts only
+               when every declared name in it is a SQL route in the file
+               under check**; otherwise it is skipped. A derived name would
+               make ``a + b = a + b`` a tautology on that file. The older
+               ``frame.videos_expected`` period identity still runs when that
+               field is present and the three period names are declared.
   attempts     at most three commits touch one output file after the
                latest brief revision (the reset commit): the first and two
                retries. A fourth is not a retry, it is a loop. Recount
@@ -164,6 +168,7 @@ from typing import NamedTuple
 BLOCK = re.compile(r"^```numbers\s*$(.*?)^```\s*$", re.M | re.S)
 N_FENCE = re.compile(r"^```n\s*$(.*?)^```\s*$", re.M | re.S)
 FRAME_FENCE = re.compile(r"^```frame\s*$(.*?)^```\s*$", re.M | re.S)
+IDENTITIES_FENCE = re.compile(r"^```identities\s*$(.*?)^```\s*$", re.M | re.S)
 STATUS = re.compile(
     r"^status:[ \t]*(open|closed|escalated|blocked)[ \t]*$", re.M
 )
@@ -278,10 +283,20 @@ class Fail(Exception):
     """A condition this script exists to catch."""
 
 
+class Identity(NamedTuple):
+    """One ``<left> = <right>  <tol>`` line from an ``identities`` fence."""
+
+    left: str
+    right: str
+    tol: float
+    line: str
+
+
 class Brief(NamedTuple):
     """Parsed task brief. ``n_decl`` is None when the brief has no ``n`` fence.
 
     ``corpus_sha`` is None when the brief has no ``corpus_sha:`` line.
+    ``identities`` is empty when the brief has no ``identities`` fence.
     """
 
     status: str
@@ -289,6 +304,7 @@ class Brief(NamedTuple):
     n_decl: dict[str, str] | None
     frame: dict[str, float]
     corpus_sha: str | None
+    identities: tuple[Identity, ...]
 
 
 def close(a: float, b: float, tol: float) -> bool:
@@ -684,12 +700,14 @@ def parse_brief(md: Path) -> Brief:
                 )
             raise Fail(f"{md.name}: ```n block " + "; ".join(bits))
 
+    frame = parse_frame_block(md.name, text)
     return Brief(
         st[0],
         tol,
         n_decl,
-        parse_frame_block(md.name, text),
+        frame,
         parse_corpus_sha(md.name, text),
+        parse_identities_block(md.name, text, tol, frame),
     )
 
 
@@ -795,6 +813,113 @@ def parse_frame_block(label: str, text: str) -> dict[str, float]:
     return out
 
 
+def _identity_fail_expr(label: str) -> Fail:
+    return Fail(
+        f"{label}: a derived expression may use only declared names, "
+        f"numbers, + - * / and parentheses"
+    )
+
+
+def _walk_identity_node(
+    node: ast.AST, names: set[str], frame_fields: set[str], label: str
+) -> None:
+    """Collect declared-name ids and ``frame.<field>`` attrs; reject the rest."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
+        return
+    if isinstance(node, ast.Name):
+        names.add(node.id)
+        return
+    if isinstance(node, ast.Attribute):
+        if isinstance(node.value, ast.Name) and node.value.id == "frame":
+            frame_fields.add(node.attr)
+            return
+        raise _identity_fail_expr(label)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ALLOWED_UNARY):
+        _walk_identity_node(node.operand, names, frame_fields, label)
+        return
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ALLOWED_BINOP):
+        _walk_identity_node(node.left, names, frame_fields, label)
+        _walk_identity_node(node.right, names, frame_fields, label)
+        return
+    raise _identity_fail_expr(label)
+
+
+def parse_identity_expr(label: str, expr: str) -> tuple[set[str], set[str]]:
+    """Return (declared-name ids, frame field names) for one identity side."""
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError as e:
+        raise Fail(f"{label}: derived expression does not parse: {e.msg}") from e
+    names: set[str] = set()
+    frame_fields: set[str] = set()
+    _walk_identity_node(tree.body, names, frame_fields, label)
+    return names, frame_fields
+
+
+def parse_identities_block(
+    label: str,
+    text: str,
+    declared: dict[str, float],
+    frame: dict[str, float],
+) -> tuple[Identity, ...]:
+    """``<expr> = <expr>  <tol>`` lines. Empty tuple when there is no fence.
+
+    Every name must be in the numbers block. ``frame.<field>`` must be a
+    numeric entry of the ``frame`` fence. The fence is optional; when it is
+    present it must not be empty.
+    """
+    m = IDENTITIES_FENCE.search(text)
+    if not m:
+        return ()
+    out: list[Identity] = []
+    for raw in m.group(1).splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.rsplit(None, 1)
+        if len(parts) != 2:
+            raise Fail(
+                f"{label}: identities line is not '<expr> = <expr>  <tol>': {line!r}"
+            )
+        eq, tol_raw = parts
+        try:
+            t = float(tol_raw)
+        except ValueError:
+            raise Fail(
+                f"{label}: identities line has a non-numeric tolerance {tol_raw!r}"
+            )
+        if t < 0:
+            raise Fail(f"{label}: identities line has a negative tolerance {t}")
+        if eq.count("=") != 1:
+            raise Fail(
+                f"{label}: identities line is not '<expr> = <expr>  <tol>': {line!r}"
+            )
+        left, right = (p.strip() for p in eq.split("=", 1))
+        if not left or not right:
+            raise Fail(
+                f"{label}: identities line is not '<expr> = <expr>  <tol>': {line!r}"
+            )
+        tag = f"{label}:identities"
+        for expr in (left, right):
+            names, fields = parse_identity_expr(tag, expr)
+            extra = sorted(names - set(declared))
+            if extra:
+                raise Fail(
+                    f"{label}: identities names {extra[0]!r} which is not "
+                    f"in the numbers block"
+                )
+            missing_frame = sorted(f for f in fields if f not in frame)
+            if missing_frame:
+                raise Fail(
+                    f"{label}: identities names frame.{missing_frame[0]} "
+                    f"which is not in the frame block"
+                )
+        out.append(Identity(left, right, t, line))
+    if not out:
+        raise Fail(f"{label}: the identities block is empty")
+    return tuple(out)
+
+
 def as_count(label: str, v: float) -> int:
     """A declared ``n`` must be a non-negative integer after evaluation."""
     if v < 0 or abs(v - round(v)) > EPS:
@@ -895,6 +1020,84 @@ def check_period_identity(
     return (
         f"{num(a)} + {num(b)} + {num(c)} = {num(got)} = frame.{VIDEOS_EXPECTED}"
     )
+
+
+def identity_sql_routed(
+    names: set[str],
+    declared: dict[str, float],
+    routes: dict[str, tuple[str, object]],
+) -> bool:
+    """True when every declared name in ``names`` is a SQL route in this file.
+
+    Per-file: ``routes`` is one agent's map. Do not merge worker and verifier.
+    An identity with no declared names does not count.
+    """
+    declared_names = [nm for nm in names if nm in declared]
+    if not declared_names:
+        return False
+    return all(routes.get(nm, (None, None))[0] == "sql" for nm in declared_names)
+
+
+def check_identities(
+    task_n: str,
+    label: str,
+    identities: tuple[Identity, ...],
+    declared: dict[str, float],
+    replayed: dict[str, float],
+    routes: dict[str, tuple[str, object]],
+    frame: dict[str, float],
+    fail: list[str],
+) -> tuple[list[str], list[str]]:
+    """Evaluate ``identities`` over this file's replayed values only.
+
+    An identity counts only when every declared name in it is a SQL route in
+    ``routes``. Otherwise skip (a derived name would make the line a
+    tautology). Returns (held notes, skipped lines).
+    """
+    held: list[str] = []
+    skipped: list[str] = []
+    for ident in identities:
+        try:
+            left_names, _ = parse_identity_expr(f"{label}:identity", ident.left)
+            right_names, _ = parse_identity_expr(f"{label}:identity", ident.right)
+        except Fail as e:
+            fail.append(f"TASK-{task_n}: {label}: {e}")
+            continue
+        names = left_names | right_names
+        if not identity_sql_routed(names, declared, routes):
+            skipped.append(ident.line)
+            continue
+        missing = [nm for nm in sorted(names) if nm not in replayed]
+        if missing:
+            skipped.append(ident.line)
+            continue
+        try:
+            left_v = eval_derived(
+                f"{label}:identity", ident.left, replayed, frame
+            )
+            right_v = eval_derived(
+                f"{label}:identity", ident.right, replayed, frame
+            )
+        except KeyError as e:
+            fail.append(
+                f"TASK-{task_n}: {label}: identity {ident.left} = {ident.right} "
+                f"cannot be resolved ({e.args[0]})"
+            )
+            continue
+        except Fail as e:
+            fail.append(f"TASK-{task_n}: {label}: {e}")
+            continue
+        if not close(left_v, right_v, ident.tol):
+            fail.append(
+                f"TASK-{task_n}: {label}: identity {ident.left} = {ident.right} "
+                f"-> {num(left_v)} = {num(right_v)} does not hold "
+                f"(tol {ident.tol:g})"
+            )
+            continue
+        held.append(
+            f"{ident.left} = {ident.right} -> {num(left_v)} = {num(right_v)}"
+        )
+    return held, skipped
 
 
 def parse_rows(
@@ -1307,7 +1510,12 @@ def run_sql(conn: sqlite3.Connection, label: str, sql_path: Path, seconds: float
     return first
 
 
-def eval_derived(label: str, expr: str, known: dict[str, float]) -> float:
+def eval_derived(
+    label: str,
+    expr: str,
+    known: dict[str, float],
+    frame: dict[str, float] | None = None,
+) -> float:
     try:
         tree = ast.parse(expr, mode="eval")
     except SyntaxError as e:
@@ -1320,6 +1528,18 @@ def eval_derived(label: str, expr: str, known: dict[str, float]) -> float:
             if node.id not in known:
                 raise KeyError(node.id)
             return known[node.id]
+        if isinstance(node, ast.Attribute):
+            if (
+                isinstance(node.value, ast.Name)
+                and node.value.id == "frame"
+                and frame is not None
+                and node.attr in frame
+            ):
+                return frame[node.attr]
+            raise Fail(
+                f"{label}: a derived expression may use only declared names, "
+                f"numbers, + - * / and parentheses"
+            )
         if isinstance(node, ast.UnaryOp) and isinstance(node.op, ALLOWED_UNARY):
             v = ev(node.operand)
             return -v if isinstance(node.op, ast.USub) else v
@@ -1451,7 +1671,7 @@ def check_task(
     except Fail as e:
         fail.append(str(e))
         return
-    status, tol, n_decl, frame, stamp = brief
+    status, tol, n_decl, frame, stamp, identities = brief
 
     if status in SUSPEND_STATUS:
         print(
@@ -1510,6 +1730,25 @@ def check_task(
             identity_notes.append(note)
     if identity_notes:
         print(f"  TASK-{n} [{status}]: period identity {identity_notes[0]}")
+
+    for k, replayed in replayed_by.items():
+        held, skipped = check_identities(
+            n,
+            k,
+            identities,
+            tol,
+            replayed,
+            routes.get(k, {}),
+            frame,
+            fail,
+        )
+        if skipped:
+            print(
+                f"  TASK-{n} [{status}]: {k} skipped {len(skipped)} identities "
+                f"(not all SQL-routed)"
+            )
+        for h in held:
+            print(f"  TASK-{n} [{status}]: identity {h}")
 
     # Two agents may share a definition. They may not share an implementation.
     if WORKER in routes and VERIFIER in routes:

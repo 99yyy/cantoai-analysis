@@ -45,7 +45,7 @@ def test_task_brief_regex_is_top_level_only():
 def test_real_task_6_numbers_block_has_39_names():
     blocks = history_audit.parse_declaration_blocks(BRIEF.read_text(encoding="utf-8"))
     assert set(blocks) == {"numbers", "n", "frame"}
-    assert len(blocks["numbers"]) == 39
+    assert len(blocks["numbers"]) == 41
     assert blocks["numbers"]["n_videos_pre"] == (0.0,)
     assert blocks["numbers"]["gap_contract_pp"] == (0.05,)
     # derived: n rows are not numeric, so history_audit skips them; the four
@@ -129,7 +129,7 @@ def test_widening_all_numbers_tolerances_is_a_bar():
         lines.append(line)
     new = "".join(lines)
     hits = history_audit.declaration_bars(PATH, old, new)
-    assert len(hits) == 39
+    assert len(hits) == 41
     assert all("tolerance widened" in h and "```numbers" in h for h in hits)
     assert any("n_videos_pre tolerance widened (0 -> 1000000)" in h for h in hits)
 
