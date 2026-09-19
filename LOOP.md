@@ -30,7 +30,8 @@ PLAN     Tom 写 tasks/TASK-N.md：数字名、定义、容差、status: open。
          只写名字、定义、容差，不写值——写了值就等于让两个 agent 抄同一个数。
 EXECUTE  worker 与 verifier 从同一个 ref 出发，各自从语料算出这些数字。
 CHECK    output-check 先按每个数字自己声明的算路重放它，再比对两套数字。
-ITERATE  哪几个不一致，就只把那几行发回去，其余不动。
+ITERATE  哪几个不一致，就只把那几行发回去，其余不动。并行的其他任务不受影响：
+         一条不碰该任务的 PR 不会因为 main 上这份不一致而红。
 STOP     全部一致 → 把任务书改成 status: closed，这一步本身要过 CI。
          同一个文件被改到第四次 → 停，两套数字一起升级给 Tom。
 ```
@@ -41,7 +42,7 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 
 | 检查 | 管什么 |
 |---|---|
-| `output-check` | 每个数字都能从语料重放出来；SQL 的 `EXPLAIN QUERY PLAN` 必须 `SCAN`/`SEARCH` 语料表；每条语句执行两次必须得到同一个数；规范化后的语句不得出现 `random()` / `randomblob()` / `strftime('now')` 族；两套独立算出的数字必须相等；重写次数有上限；两条分支不得从对方的答案出发；`status: closed` 只有在两边齐、全一致时才允许 |
+| `output-check` | 每个数字都能从语料重放出来；SQL 的 `EXPLAIN QUERY PLAN` 必须 `SCAN`/`SEARCH` 语料表；每条语句执行两次必须得到同一个数；规范化后的语句不得出现 `random()` / `randomblob()` / `strftime('now')` 族；两套独立算出的数字必须相等；重写次数有上限；两条分支不得从对方的答案出发；`status: closed` 只有在两边齐、全一致时才允许；**pull request 上只完整检查这次 diff 碰到的任务**（任务书或 `tasks/TASK-N/`，任一边输出文件都算碰到），其余任务只打 frozen summary，`status: open` 的不一致不能把无关 PR 打红；main 上仍检查全部任务 |
 | `scope-check` | 分支必须属于已知类别（先匹配 agent 前缀）；repair/ 与 chore/ 不能单靠前缀授权，须 `github.actor` 落在仓库 owner allowlist 上；chore 与 agent 同受 DENY；agent 不得碰 `.cursor/` `.github/` `data/` `scripts/`、`README.md`、`LOOP.md`，也不得改任务书 `tasks/TASK-N.md`，但必须能写 `tasks/TASK-N/` 下面自己的产出 |
 | `history-audit` | 移动已有的栅不得与被它度量的东西同 PR，且正文须有 `BAR-CHANGE:` 并点名每个被移动的栅路径；被度量路径是 files 减去栅路径（闸门脚本 fail-site 净删算移动栅，但不自己锁自己）；`tasks/**/*.sql` 属被度量；任务书 fenced `numbers`/`fixture`/`frame`/`n` 里放宽容差、删名字或删整块算移动栅，收窄容差不算；死路径栅移入 `RETIRED` 块而非删除，live∪RETIRED 的 glob 丢失才算删栅 |
 | `tests` | 有 `tests/test_*.py` 时跑 pytest |
@@ -50,7 +51,7 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 
 ## output-check 实际做了什么
 
-按顺序，任何一条不过就红：
+按顺序，任何一条不过就红。**在 pull request 上，下面 2–9 条只作用于这次 diff 碰到的任务**（`tasks/TASK-N.md` 或 `tasks/TASK-N/` 下任何文件，包括只改 `results.json` 或只改 `mine.json`）。没碰到的任务打一行 frozen summary，不把失败并进总账——`status: open` 且两边已经不合的任务（ITERATE）因此不能挡住一条无关的 PR。没有 `--base-ref` 时（main 上的 push）仍走完全部任务。
 
 1. `data/corpus_v2.sqlite` 的 sha256 与 `README.md` 里记的一致。语料不对，后面全部无意义。
 2. 任务书有且只有一行 `status: open` 或 `status: closed`，`numbers` 块能解析。

@@ -69,6 +69,13 @@ What this enforces, in order:
                did not have the other agent's file in its tree.
   closed       a brief may say ``status: closed`` only when both files are
                present, complete and in full agreement.
+  scope        (pull requests only) only a task whose brief or files under
+               ``tasks/TASK-N/`` appear in the PR diff is fully checked.
+               Other tasks print a frozen summary and cannot fail the PR:
+               an ``open`` iterating task on main must not redden an
+               unrelated one (plan §4.1). Touching either output file
+               re-runs the comparison (plan §4.3). On main, every task is
+               still fully checked.
 
 On independence, precisely: this proves a branch did not start from a tree that
 already held the other answer, which is how this fails in practice -- the second
@@ -92,6 +99,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+from collections.abc import Iterable
 from pathlib import Path
 
 BLOCK = re.compile(r"^```numbers\s*$(.*?)^```\s*$", re.M | re.S)
@@ -102,6 +110,8 @@ DERIVED = "derived:"
 EPS = 1e-9
 MAX_ATTEMPTS = 3
 WORKER, VERIFIER = "results.json", "mine.json"
+# tasks/TASK-N.md or anything under tasks/TASK-N/ (plan §4.1 / §4.3).
+TASK_PATH_RE = re.compile(r"^tasks/TASK-([^/]+)(?:\.md|/)")
 
 ALLOWED_BINOP = (ast.Add, ast.Sub, ast.Mult, ast.Div)
 ALLOWED_UNARY = (ast.UAdd, ast.USub)
@@ -236,6 +246,44 @@ def first_added(root: Path, rng: str, path: str) -> str | None:
     out = git(root, "log", rng, "--diff-filter=A", "--format=%H", "--", path)
     shas = [l.strip() for l in out.splitlines() if l.strip()]
     return shas[-1] if shas else None
+
+
+def task_ids_from_paths(paths: Iterable[str]) -> frozenset[str]:
+    """Task ids whose brief or ``tasks/TASK-N/`` tree appears in ``paths``.
+
+    Touching either output file counts (plan §4.3): a PR that edits
+    ``results.json`` or ``mine.json`` must re-run the comparison.
+    ``review/TASK-N/`` is not a touch.
+    """
+    out: set[str] = set()
+    for raw in paths:
+        m = TASK_PATH_RE.match(raw.replace("\\", "/"))
+        if m:
+            out.add(m.group(1))
+    return frozenset(out)
+
+
+def pr_diff_names(root: Path, base: str, head: str) -> list[str]:
+    """Repo-relative paths in ``base...head`` (the pull-request triple-dot)."""
+    out = git(root, "diff", "--name-only", f"{base}...{head}")
+    return [l.strip() for l in out.splitlines() if l.strip()]
+
+
+def frozen_summary(root: Path, md: Path) -> None:
+    """Print state for a task this PR did not touch; never fail (plan §4.1)."""
+    n = md.stem.split("-", 1)[1]
+    try:
+        status, tol = parse_brief(md)
+    except Fail:
+        print(f"  TASK-{n}: frozen (not touched by this PR); brief not re-checked")
+        return
+    task_dir = root / "tasks" / f"TASK-{n}"
+    present = [k for k in (WORKER, VERIFIER) if (task_dir / k).is_file()]
+    files = ", ".join(present) if present else "no output yet"
+    print(
+        f"  TASK-{n} [{status}]: frozen (not touched by this PR); "
+        f"{len(tol)} number(s) declared; {files}"
+    )
 
 
 # ------------------------------------------------------------------------- brief
@@ -998,9 +1046,40 @@ def main() -> int:
         return 0
     print(f"output_check: {len(briefs)} task brief(s)")
 
+    # Plan §4.1: on a pull request, fully check only tasks this diff touches.
+    # Untouched tasks (including an open iterating disagreement on main) get a
+    # frozen summary and cannot fail this PR. No base ref (push to main) still
+    # walks every task.
+    touched: frozenset[str] | None = None
+    if args.base_ref and args.head_ref:
+        try:
+            changed = pr_diff_names(root, args.base_ref, args.head_ref)
+        except Fail as e:
+            print(f"output_check: FAIL\n  {e}")
+            return 1
+        touched = task_ids_from_paths(changed)
+        shown = (
+            ", ".join(
+                f"TASK-{t}"
+                for t in sorted(
+                    touched,
+                    key=lambda s: (0, int(s)) if s.isdigit() else (1, s),
+                )
+            )
+            or "none"
+        )
+        print(
+            f"output_check: PR {args.base_ref}...{args.head_ref}; "
+            f"full-check {shown}; other tasks frozen"
+        )
+
     conn = sqlite3.connect(f"file:{corpus}?mode=ro", uri=True)
     try:
         for md in briefs:
+            n = md.stem.split("-", 1)[1]
+            if touched is not None and n not in touched:
+                frozen_summary(root, md)
+                continue
             check_task(root, md, conn, args.sql_seconds, args.base_ref, args.head_ref, fail)
     finally:
         conn.close()
