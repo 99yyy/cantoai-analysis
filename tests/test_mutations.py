@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MUT_DIR = ROOT / "tests" / "mutations"
 CORPUS_PATH = ROOT / "data" / "corpus_v2.sqlite"
 README_PATH = ROOT / "README.md"
+BRIEF_PATH = ROOT / "tasks" / "TASK-6.md"
 
 
 def _header_message(patch_FILE: Path) -> str:
@@ -79,7 +80,7 @@ def test_tier_filter_removed_killed(tmp_path: Path) -> None:
     conn = open_corpus(str(CORPUS_PATH))
     try:
         with pytest.raises(ValueError, match="^" + re.escape(msg)):
-            frame.load_published_frame(conn)
+            frame.load_published_frame(conn, str(BRIEF_PATH), str(README_PATH))
     finally:
         conn.close()
 
@@ -93,7 +94,7 @@ def test_join_key_swapped_killed(tmp_path: Path) -> None:
     conn = open_corpus(str(CORPUS_PATH))
     try:
         with pytest.raises(ValueError, match="^" + re.escape(msg)):
-            frame.load_published_frame(conn)
+            frame.load_published_frame(conn, str(BRIEF_PATH), str(README_PATH))
     finally:
         conn.close()
 
