@@ -41,7 +41,10 @@ it, and CI walks the route.
 What this enforces, in order:
 
   corpus       the corpus hashes to the value recorded in README.md.
-  brief        exactly one ``status: open|closed`` line; a parseable block.
+  brief        exactly one ``status: open|closed|escalated|blocked`` line;
+               a parseable block. ``escalated`` and ``blocked`` suspend
+               replay, pairwise agreement, and edit-count for that task
+               (plan §4.4).
   shape        top-level list; every row exactly {name, value, n, query}; the
                name set equals the declared set, so a missing number and an
                extra number both fail; no duplicate name; no duplicate route
@@ -63,10 +66,18 @@ What this enforces, in order:
                of (abs(random()) % 5) / 100.0 cannot hide inside tol 0.05.
   agreement    the two files agree on every value within tol and on every n
                exactly. Any disagreement fails, and both numbers are printed.
-  attempts     at most three commits touch one output file: the first and two
-               retries. A fourth is not a retry, it is a loop.
+  attempts     at most three commits touch one output file after the
+               latest brief revision (the reset commit): the first and two
+               retries. A fourth is not a retry, it is a loop. Recount
+               starts from that reset, so reopen after a brief edit does
+               not inherit the previous ceiling (plan §4.4).
   independence (pull requests only) the commit that introduced one agent's file
                did not have the other agent's file in its tree.
+  blocked-commit
+               an empty commit whose subject starts with ``BLOCKED:`` is
+               recognized and printed. It is the durable marker when the
+               agent cannot edit the brief; the tree equals the parent, so
+               merge still leaves a git-log trace (plan §4.4).
   closed       a brief may say ``status: closed`` only when both files are
                present, complete and in full agreement.
   scope        (pull requests only) only a task whose brief or files under
@@ -103,13 +114,17 @@ from collections.abc import Iterable
 from pathlib import Path
 
 BLOCK = re.compile(r"^```numbers\s*$(.*?)^```\s*$", re.M | re.S)
-STATUS = re.compile(r"^status:[ \t]*(open|closed)[ \t]*$", re.M)
+STATUS = re.compile(
+    r"^status:[ \t]*(open|closed|escalated|blocked)[ \t]*$", re.M
+)
 README_SHA = re.compile(r"sha256:\s*`?([0-9a-f]{64})`?")
 ROW_KEYS = {"name", "value", "n", "query"}
 DERIVED = "derived:"
 EPS = 1e-9
 MAX_ATTEMPTS = 3
 WORKER, VERIFIER = "results.json", "mine.json"
+SUSPEND_STATUS = frozenset({"escalated", "blocked"})
+BLOCKED_SUBJECT_PREFIX = "BLOCKED:"
 # tasks/TASK-N.md or anything under tasks/TASK-N/ (plan §4.1 / §4.3).
 TASK_PATH_RE = re.compile(r"^tasks/TASK-([^/]+)(?:\.md|/)")
 
@@ -241,6 +256,56 @@ def commits_touching(root: Path, rev: str, path: str) -> list[str]:
     return [l.strip() for l in out.splitlines() if l.strip()]
 
 
+def reset_commit(root: Path, rev: str, n: str) -> str | None:
+    """Latest commit that revised the task brief.
+
+    Recount of output-file rewrites starts from this commit (plan §4.4):
+    ``git log <reset>..<rev>`` does not include the reset itself.
+    """
+    got = commits_touching(root, rev, f"tasks/TASK-{n}.md")
+    return got[0] if got else None
+
+
+def commits_touching_since(
+    root: Path, rev: str, path: str, since: str | None
+) -> list[str]:
+    """Commits that touch ``path`` after ``since`` (exclusive), or all of ``rev``."""
+    rng = f"{since}..{rev}" if since else rev
+    return commits_touching(root, rng, path)
+
+
+def is_empty_commit(root: Path, sha: str) -> bool:
+    """True when ``sha``'s tree equals its first parent's tree (no file changes)."""
+    try:
+        tree = git(root, "rev-parse", f"{sha}^{{tree}}").strip()
+        parent_tree = git(root, "rev-parse", f"{sha}^^{{tree}}").strip()
+    except Fail:
+        return False
+    return tree == parent_tree
+
+
+def blocked_empty_commits(
+    root: Path, rev: str, since: str | None = None
+) -> list[tuple[str, str]]:
+    """Empty commits whose subject starts with ``BLOCKED:`` (plan §4.4)."""
+    rng = f"{since}..{rev}" if since else rev
+    try:
+        out = git(root, "log", rng, "--format=%H %s")
+    except Fail:
+        return []
+    found: list[tuple[str, str]] = []
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        sha, _, subj = line.partition(" ")
+        if not subj.startswith(BLOCKED_SUBJECT_PREFIX):
+            continue
+        if is_empty_commit(root, sha):
+            found.append((sha, subj))
+    return found
+
+
 def first_added(root: Path, rng: str, path: str) -> str | None:
     """The earliest commit in ``rng`` that added ``path``, if any."""
     out = git(root, "log", rng, "--diff-filter=A", "--format=%H", "--", path)
@@ -280,9 +345,10 @@ def frozen_summary(root: Path, md: Path) -> None:
     task_dir = root / "tasks" / f"TASK-{n}"
     present = [k for k in (WORKER, VERIFIER) if (task_dir / k).is_file()]
     files = ", ".join(present) if present else "no output yet"
+    extra = "; suspended" if status in SUSPEND_STATUS else ""
     print(
         f"  TASK-{n} [{status}]: frozen (not touched by this PR); "
-        f"{len(tol)} number(s) declared; {files}"
+        f"{len(tol)} number(s) declared; {files}{extra}"
     )
 
 
@@ -295,8 +361,9 @@ def parse_brief(md: Path) -> tuple[str, dict[str, float]]:
     st = STATUS.findall(text)
     if len(st) != 1:
         raise Fail(
-            f"{md.name}: needs exactly one line 'status: open' or "
-            f"'status: closed'; found {len(st)}"
+            f"{md.name}: needs exactly one line 'status: open', "
+            f"'status: closed', 'status: escalated' or 'status: blocked'; "
+            f"found {len(st)}"
         )
 
     m = BLOCK.search(text)
@@ -880,6 +947,13 @@ def check_task(
         fail.append(str(e))
         return
 
+    if status in SUSPEND_STATUS:
+        print(
+            f"  TASK-{n} [{status}]: {len(tol)} number(s) declared; "
+            f"suspended (replay, agreement, and edit-count not run)"
+        )
+        return
+
     task_dir = root / "tasks" / f"TASK-{n}"
     paths = {
         WORKER: task_dir / WORKER,
@@ -949,18 +1023,24 @@ def check_task(
         missing = sorted(set(paths) - set(present))
         print(f"  TASK-{n} [{status}]: not comparable yet, waiting on {', '.join(missing)}")
 
-    # How many times were these numbers rewritten.
+    # How many times were these numbers rewritten after the brief's reset.
     if head:
+        try:
+            reset = reset_commit(root, head, n)
+        except Fail as e:
+            fail.append(str(e))
+            reset = None
         for k, p in present.items():
             rel = f"tasks/TASK-{n}/{k}"
             try:
-                got = commits_touching(root, head, rel)
+                got = commits_touching_since(root, head, rel, reset)
             except Fail as e:
                 fail.append(str(e))
                 continue
             if len(got) > MAX_ATTEMPTS:
+                where = f" since reset {reset[:8]}" if reset else ""
                 fail.append(
-                    f"TASK-{n}: {k} has been rewritten {len(got)} times "
+                    f"TASK-{n}: {k} has been rewritten {len(got)} times{where} "
                     f"(cap is {MAX_ATTEMPTS}: the first and two retries); "
                     f"escalate both sets of numbers instead of trying again"
                 )
@@ -1083,6 +1163,11 @@ def main() -> int:
             check_task(root, md, conn, args.sql_seconds, args.base_ref, args.head_ref, fail)
     finally:
         conn.close()
+
+    if args.head_ref:
+        recognized = blocked_empty_commits(root, args.head_ref, args.base_ref)
+        for sha, subj in recognized:
+            print(f"output_check: recognized empty commit {sha[:8]} {subj}")
 
     if fail:
         print(f"output_check: FAIL ({len(fail)})")
