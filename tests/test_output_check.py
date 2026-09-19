@@ -167,3 +167,64 @@ def test_distinct_sql_files_are_not_duplicate_routes(tmp_path):
     )
     assert got is not None
     assert fail == []
+
+
+def test_statement_sha256_strips_comments_and_outer_whitespace():
+    a = output_check.statement_sha256("SELECT COUNT(*) FROM videos;\n")
+    b = output_check.statement_sha256(
+        "-- copied from worker\nSELECT COUNT(*) FROM videos;  /* trailing */\n"
+    )
+    c = output_check.statement_sha256("\n  SELECT COUNT(*) FROM videos  \n")
+    assert a == b == c
+    assert len(a) == 64
+
+
+def test_statement_sha256_differs_for_distinct_sql():
+    a = output_check.statement_sha256("SELECT COUNT(*) FROM videos;\n")
+    b = output_check.statement_sha256("SELECT COUNT(*) FROM videos AS vid;\n")
+    assert a != b
+
+
+def test_cross_side_identical_statement_is_a_collision(tmp_path):
+    w = tmp_path / "sql" / "n_videos_pre.sql"
+    v = tmp_path / "mine_sql" / "count_videos_pre.sql"
+    w.parent.mkdir()
+    v.parent.mkdir()
+    w.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+    v.write_text(
+        "-- verifier copy\nSELECT COUNT(*) FROM videos;\n", encoding="utf-8"
+    )
+    h = output_check.statement_sha256("SELECT COUNT(*) FROM videos;\n")
+    msgs = output_check.cross_side_sql_hash_collisions(
+        "6", tmp_path, {w: "n_videos_pre"}, {v: "n_videos_pre"}
+    )
+    assert len(msgs) == 1
+    assert (
+        f"TASK-6: sql/n_videos_pre.sql backs n_videos_pre in results.json and "
+        f"mine_sql/count_videos_pre.sql backs n_videos_pre in mine.json; "
+        f"statement sha256 {h} after strip_and_split; "
+        f"the second computation must be its own"
+    ) == msgs[0]
+
+
+def test_cross_side_distinct_statements_are_not_collisions(tmp_path):
+    w = tmp_path / "sql" / "n_videos_pre.sql"
+    v = tmp_path / "mine_sql" / "count_videos_pre.sql"
+    w.parent.mkdir()
+    v.parent.mkdir()
+    w.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+    v.write_text("SELECT COUNT(*) FROM videos AS vid;\n", encoding="utf-8")
+    msgs = output_check.cross_side_sql_hash_collisions(
+        "6", tmp_path, {w: "n_videos_pre"}, {v: "n_videos_pre"}
+    )
+    assert msgs == []
+
+
+def test_same_path_on_both_sides_is_not_a_hash_collision(tmp_path):
+    p = tmp_path / "sql" / "shared.sql"
+    p.parent.mkdir()
+    p.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+    msgs = output_check.cross_side_sql_hash_collisions(
+        "6", tmp_path, {p: "a"}, {p: "a"}
+    )
+    assert msgs == []
