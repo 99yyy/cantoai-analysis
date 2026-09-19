@@ -1,6 +1,7 @@
 # TASK-7：other×common 格上，发布后一致率下降是否还在
 
-status: open
+status: closed
+corpus_sha: 2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f
 rung: Autopilot
 
 ## 目标
