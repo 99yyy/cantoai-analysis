@@ -1,5 +1,7 @@
 # TASK-7 audit
 
+Path: `tasks/TASK-7/audit.md` (LOOP names `review/TASK-7/audit.md`; that directory is outside chore `CHORE_ALLOW`, and an agent branch cannot edit the brief this Draft close needs).
+
 Range: `ae9b293` (brief open, #77) through `a553d03` (worker #79 on main after verifier #78). This close does not re-judge the 10 `output-check` values; `./verify task 7` on `a553d03` printed `TASK-7 [open]: 10/10 number(s) agree`.
 
 Verdict recorded in `tasks/TASK-7/RESULT.json`: **supported**. The brief's falsifier was a video-cluster 95% CI that includes 0; worker `bootstrap.json` reports [4.6207, 10.0956] pp with `ci_unreliable_any=0`, `B=2000`. That interval is open analysis, not a declared number. The auditor did not re-run the bootstrap and did not import `tasks/TASK-7/run_worker.py`.

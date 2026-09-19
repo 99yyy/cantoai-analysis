@@ -24,7 +24,7 @@
 
 ## TASK-7 收口
 
-- 审计：`review/TASK-7/audit.md` — `verdict: supported`（`gap_other_common_pp` 7.3304；worker 整簇 bootstrap 95% CI 不含 0）。结论只记在此，不直接变成下一题。
+- 审计：`tasks/TASK-7/audit.md` — `verdict: supported`（`gap_other_common_pp` 7.3304；worker 整簇 bootstrap 95% CI 不含 0）。`review/` 不在 chore 的 CHORE_ALLOW 里；agent 分支又不能改任务书，所以 Draft 收口把审计放在任务目录。结论只记在此，不直接变成下一题。
 - keep rate：产出 10 个数字，留下 10 个（`output-check` 10/10 agree）→ **10/10**。
 
 ## LOOP 预算（启动次数，不是美元）
