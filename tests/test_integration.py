@@ -5,15 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.agreement import agreement_counts
-from src.frame import PUBLISHED_N, load_published_frame
+from src.frame import load_published_frame
 from src.groups import assign_groups
 from src.hashing import verify_corpus_hash
+from src.pins import load_frame_counts
 from src.status_io import read_completed_output, sha256_file, write_status
 from src.tables import open_corpus
 
 ROOT = Path(__file__).resolve().parents[1]
 CORPUS_PATH = ROOT / "data" / "corpus_v2.sqlite"
 README_PATH = ROOT / "README.md"
+BRIEF_PATH = ROOT / "tasks" / "TASK-6.md"
 
 
 def test_hash_matches_readme() -> None:
@@ -23,19 +25,23 @@ def test_hash_matches_readme() -> None:
 
 def test_load_published_frame() -> None:
     verify_corpus_hash(str(CORPUS_PATH), str(README_PATH))
+    frame_counts = load_frame_counts(str(BRIEF_PATH), str(README_PATH))
     conn = open_corpus(str(CORPUS_PATH))
     try:
-        loaded = load_published_frame(conn)
+        loaded = load_published_frame(conn, str(BRIEF_PATH), str(README_PATH))
     finally:
         conn.close()
-    assert len(loaded["published"]) == PUBLISHED_N
+    assert len(loaded["published"]) == frame_counts.published_expected
     videos = assign_groups(loaded["videos"])
     assert videos.attrs["n_unassigned_period"] == 0
     assert videos.attrs["n_unassigned_film"] == 0
-    assert videos.attrs["n_period_pre"] + videos.attrs["n_period_post"] == 567
+    assert (
+        videos.attrs["n_period_pre"] + videos.attrs["n_period_post"]
+        == frame_counts.videos_expected
+    )
     published = loaded["published"]
     counts = agreement_counts(published)
-    assert counts["n_total"] == PUBLISHED_N
+    assert counts["n_total"] == frame_counts.published_expected
     assert (
         counts["n_judgeable"]
         == counts["n_total"]

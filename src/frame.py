@@ -6,36 +6,36 @@ import sqlite3
 
 import pandas as pd
 
-from src.joins import checked_merge
+from src.joins import bind_frame_counts, checked_merge
+from src.pins import FrameCounts, load_frame_counts
 from src.tables import load_table
 
-VIDEOS_N = 567
-WINDOWS_N = 4911
-SYLLABLES_N = 171867
-PUBLISHED_N = 164693
+
+def _outside_interval(n: int, expected: int, tol: int) -> bool:
+    return abs(n - expected) > tol
 
 
-def assert_videos_count(n: int) -> None:
-    if n != VIDEOS_N:
-        print(n, VIDEOS_N)
+def assert_videos_count(n: int, expected: int, tol: int) -> None:
+    if _outside_interval(n, expected, tol):
+        print(n, expected, tol)
         raise ValueError("videos row count is outside the declared interval")
 
 
-def assert_windows_count(n: int) -> None:
-    if n != WINDOWS_N:
-        print(n, WINDOWS_N)
+def assert_windows_count(n: int, expected: int, tol: int) -> None:
+    if _outside_interval(n, expected, tol):
+        print(n, expected, tol)
         raise ValueError("windows row count is outside the declared interval")
 
 
-def assert_syllables_count(n: int) -> None:
-    if n != SYLLABLES_N:
-        print(n, SYLLABLES_N)
+def assert_syllables_count(n: int, expected: int, tol: int) -> None:
+    if _outside_interval(n, expected, tol):
+        print(n, expected, tol)
         raise ValueError("syllables row count is outside the declared interval")
 
 
-def assert_published_count(n: int) -> None:
-    if n != PUBLISHED_N:
-        print(n, PUBLISHED_N)
+def assert_published_count(n: int, expected: int, tol: int) -> None:
+    if _outside_interval(n, expected, tol):
+        print(n, expected, tol)
         raise ValueError("published A+B syllable count is outside the declared interval")
 
 
@@ -48,13 +48,23 @@ def assert_tier_matches_window(df: pd.DataFrame) -> None:
         raise ValueError("syllable tier does not match window tier")
 
 
-def load_published_frame(conn: sqlite3.Connection) -> dict:
+def load_published_frame(
+    conn: sqlite3.Connection, brief_PATH: str, readme_PATH: str
+) -> dict:
+    counts = load_frame_counts(brief_PATH, readme_PATH)
+    bind_frame_counts(counts)
+    return _assemble_published_frame(conn, counts)
+
+
+def _assemble_published_frame(conn: sqlite3.Connection, counts: FrameCounts) -> dict:
     videos = load_table(conn, "videos")
-    assert_videos_count(len(videos))
+    assert_videos_count(len(videos), counts.videos_expected, counts.videos_expected_tol)
     windows = load_table(conn, "windows")
-    assert_windows_count(len(windows))
+    assert_windows_count(len(windows), counts.windows_expected, counts.windows_expected_tol)
     syllables = load_table(conn, "syllables")
-    assert_syllables_count(len(syllables))
+    assert_syllables_count(
+        len(syllables), counts.syllables_expected, counts.syllables_expected_tol
+    )
 
     steps = [
         {
@@ -98,7 +108,9 @@ def load_published_frame(conn: sqlite3.Connection) -> dict:
 
     before_tier = len(merged)
     published = apply_tier_whitelist(merged)
-    assert_published_count(len(published))
+    assert_published_count(
+        len(published), counts.published_expected, counts.published_expected_tol
+    )
     steps.append(
         {
             "step": "tier_whitelist",
@@ -116,7 +128,7 @@ def load_published_frame(conn: sqlite3.Connection) -> dict:
             "step": "join_published_videos",
             "rule": "inner video_id",
             "group": "all",
-            "rows_before": PUBLISHED_N,
+            "rows_before": counts.published_expected,
             "rows_after": len(published),
             "unmatched_left": int(published.attrs.get("unmatched_left", 0)),
         }
@@ -126,5 +138,6 @@ def load_published_frame(conn: sqlite3.Connection) -> dict:
         "windows": windows,
         "syllables": syllables,
         "published": published,
+        "counts": counts,
         "steps": steps,
     }

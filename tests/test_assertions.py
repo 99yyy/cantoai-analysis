@@ -24,7 +24,13 @@ from src.frame import (
 )
 from src.groups import assert_no_film_overlap, assert_no_period_overlap
 from src.hashing import readme_sha256, verify_corpus_hash
-from src.joins import checked_merge
+from src.joins import bind_frame_counts, checked_merge, unbind_frame_counts
+from src.pins import (
+    FrameCounts,
+    load_frame_counts,
+    parse_frame_entries,
+    parse_readme_table_sizes,
+)
 from src.measures import (
     assert_no_measure_sentinel,
     assert_status_matches_values,
@@ -36,6 +42,39 @@ from src.status_io import read_completed_output, write_json_atomic, write_status
 from src.tables import quote_ident
 from src.weights import assert_stratum_weights, stratum_weights
 from src.write_results import eval_derived, n_for, run_sql_file
+
+
+def _toy_counts(**over: int) -> FrameCounts:
+    kw = dict(
+        videos_expected=4,
+        windows_expected=4,
+        syllables_expected=4,
+        published_expected=4,
+        videos_expected_tol=0,
+        windows_expected_tol=0,
+        syllables_expected_tol=0,
+        published_expected_tol=0,
+    )
+    kw.update(over)
+    return FrameCounts(**kw)
+
+
+def _brief(tmp_path, frame: str) -> str:
+    path = tmp_path / "TASK.md"
+    path.write_text("status: open\n```frame\n" + frame + "\n```\n", encoding="utf-8")
+    return str(path)
+
+
+def _readme_tables(tmp_path, videos: int, windows: int, syllables: int) -> str:
+    path = tmp_path / "README.md"
+    path.write_text(
+        "Tables: `videos` ({videos}), `windows` ({windows}), "
+        "`syllables` ({syllables}), `runs` (1).\n".format(
+            videos=videos, windows=windows, syllables=syllables
+        ),
+        encoding="utf-8",
+    )
+    return str(path)
 
 
 def test_corpus_sha256_mismatch(tmp_path):
@@ -69,47 +108,107 @@ def test_checked_merge_unknown_join():
         checked_merge(left, right, "not_a_join")
 
 
+def test_checked_merge_unbound():
+    unbind_frame_counts()
+    left = pd.DataFrame({"uid": [1], "x": [0]})
+    right = pd.DataFrame({"uid": [1], "y": [1]})
+    with pytest.raises(
+        ValueError, match=r"^checked_merge expected count is not bound from the frame"
+    ):
+        checked_merge(left, right, "syllables_windows")
+
+
 def test_checked_merge_syllables_windows_count():
+    bind_frame_counts(_toy_counts(syllables_expected=4))
     left = pd.DataFrame({"uid": [1, 2], "x": [0, 1]})
     right = pd.DataFrame({"uid": [1, 2], "y": [0, 1]})
     with pytest.raises(
-        ValueError, match=r"^checked_merge syllables_windows: row count is not 171867"
+        ValueError,
+        match=r"^checked_merge syllables_windows: row count is not the declared expected count",
     ):
         checked_merge(left, right, "syllables_windows")
 
 
 def test_checked_merge_published_videos_count():
+    bind_frame_counts(_toy_counts(published_expected=4))
     left = pd.DataFrame({"video_id": ["a"], "x": [0]})
     right = pd.DataFrame({"video_id": ["a"], "y": [1]})
     with pytest.raises(
         ValueError,
-        match=r"^checked_merge published_syllables_videos: row count is not 164693",
+        match=r"^checked_merge published_syllables_videos: row count is not the declared expected count",
     ):
         checked_merge(left, right, "published_syllables_videos")
 
 
 def test_videos_count():
     with pytest.raises(ValueError, match=r"^videos row count is outside the declared interval"):
-        assert_videos_count(0)
+        assert_videos_count(0, 4, 0)
 
 
 def test_windows_count():
     with pytest.raises(ValueError, match=r"^windows row count is outside the declared interval"):
-        assert_windows_count(0)
+        assert_windows_count(0, 4, 0)
 
 
 def test_syllables_count():
     with pytest.raises(
         ValueError, match=r"^syllables row count is outside the declared interval"
     ):
-        assert_syllables_count(0)
+        assert_syllables_count(0, 4, 0)
 
 
 def test_published_count():
     with pytest.raises(
         ValueError, match=r"^published A\+B syllable count is outside the declared interval"
     ):
-        assert_published_count(0)
+        assert_published_count(0, 4, 0)
+
+
+def test_brief_has_no_frame_fence():
+    with pytest.raises(ValueError, match=r"^task brief has no frame fence"):
+        parse_frame_entries("status: open\n")
+
+
+def test_frame_declares_a_name_twice():
+    text = "```frame\nvideos_expected 4\nvideos_expected 4\n```\n"
+    with pytest.raises(ValueError, match=r"^frame declares a name twice"):
+        parse_frame_entries(text)
+
+
+def test_readme_records_no_table_sizes(tmp_path):
+    readme_FILE = tmp_path / "README.md"
+    readme_FILE.write_text("sha256: `aa`\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"^README.md records no table sizes"):
+        parse_readme_table_sizes(str(readme_FILE))
+
+
+def test_frame_expected_count_not_whole(tmp_path):
+    brief_PATH = _brief(
+        tmp_path,
+        "videos_expected 4.5\nwindows_expected 4\n"
+        "syllables_expected 4\npublished_expected 4\n",
+    )
+    readme_PATH = _readme_tables(tmp_path, 4, 4, 4)
+    with pytest.raises(ValueError, match=r"^frame expected count is not a whole number"):
+        load_frame_counts(brief_PATH, readme_PATH)
+
+
+def test_frame_missing_required_expected_count(tmp_path):
+    brief_PATH = _brief(tmp_path, "videos_expected 4\nwindows_expected 4\n")
+    readme_PATH = _readme_tables(tmp_path, 4, 4, 4)
+    with pytest.raises(ValueError, match=r"^frame is missing a required expected count"):
+        load_frame_counts(brief_PATH, readme_PATH)
+
+
+def test_frame_count_does_not_match_readme(tmp_path):
+    brief_PATH = _brief(
+        tmp_path,
+        "videos_expected 9\nwindows_expected 4\n"
+        "syllables_expected 4\npublished_expected 4\n",
+    )
+    readme_PATH = _readme_tables(tmp_path, 4, 4, 4)
+    with pytest.raises(ValueError, match=r"^frame count does not match README table size"):
+        load_frame_counts(brief_PATH, readme_PATH)
 
 
 def test_tier_mismatch():
@@ -260,7 +359,7 @@ def test_derived_disallowed():
 
 def test_n_for_undeclared():
     with pytest.raises(ValueError, match=r"^n_for received an undeclared number name"):
-        n_for("not_a_number", {})
+        n_for("not_a_number", {}, 0)
 
 
 def test_attach_agreement_ok():
