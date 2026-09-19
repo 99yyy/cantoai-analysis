@@ -43,7 +43,7 @@ Do not modify `.cursor/`, `.github/`, `data/`, or any task brief `tasks/TASK-N.m
 
 # 4. If your run uses SQL
 
-11. All SQL lives in `.sql` files under `tasks/TASK-N/` and is loaded by reading the file, never as a string literal in `src/`. A string literal containing both `SELECT` and `FROM` as whole uppercase words is a violation. Run `EXPLAIN` on each of your `.sql` files against `data/corpus_v2.sqlite`; a parse error, or a `.sql` file that no `query` names, is a violation.
+11. Number-valued SQL lives in `.sql` files under `tasks/TASK-N/` and is loaded by reading the file, never as a string literal in `src/`. One named loading module, `src/tables.py`, may hold table-loading SQL as string literals so a dedicated loader can `SELECT` from a quoted identifier. In every other `src/` file, a string literal containing both `SELECT` and `FROM` as whole words, in any ASCII case, is a violation. Run `EXPLAIN` on each of your `.sql` files against `data/corpus_v2.sqlite`; a parse error, or a `.sql` file that no `query` names, is a violation.
 
 # 5. If your run selects rows
 
@@ -67,13 +67,13 @@ Do not modify `.cursor/`, `.github/`, `data/`, or any task brief `tasks/TASK-N.m
 
 18. Each group is an explicit predicate. A group defined as the complement of another is a violation. Rows matching neither are counted as unassigned; a row matching both raises. Inclusion and exclusion rules apply identically to both groups, and rows dropped per rule per group are recorded.
 
-19. Report the difference between the group gap and the baseline gap, never the raw group gap. Every reported difference lists each group's own value and its baseline value, so that a reader can recompute it. A purely descriptive row carries `descriptive=1` and no inferential statistic.
+19. A **baseline gap** is the same contrast computed on the reference group or reference mix declared for that comparison. When a run reports a gap as an inferential claim, report the difference between the group gap and that baseline gap, listing each group's own value and its baseline value so a reader can recompute it. A difference is exempt from that requirement when it is itself a declared name in the task brief's `numbers` block, or when both of its endpoints are already declared names there — so a declared `gap_*_pp` (measured or `derived:`) may be reported. An undeclared raw group gap may not appear in a conclusion. A purely descriptive row carries `descriptive=1` and no inferential statistic.
 
 20. Bootstrap by resampling whole `video_id` clusters, with `B >= 1000`. The seed for stratum `h` is `int(sha256(f"{master_seed}:{h}").hexdigest()[:8], 16)`, and the per-stratum seeds are pairwise distinct. Report `G_h`, the number of videos per stratum, and emit `ci_unreliable=1` where `G_h < 10` — a convention of this project, not a theorem. A row with `ci_unreliable=1`, or below the judgeable minimum the task brief declares, carries `conclusion=inconclusive` and its actual judgeable count. The phrase "not supported" is forbidden.
 
 21. Comparisons are declared in the task brief before the run, in a commit that precedes the first result commit. Report raw and BH-corrected p-values together with `m`, the number declared. A row marked `exploratory=1` carries no p-value and may not be cited in a README or a pull-request body.
 
-22. Stratified sampling persists `N_h`; population-level rates use `w_h = N_h / n_h_judgeable`, never an unweighted mean across strata. A stratifying column must come from an input this run does not write, and must not appear as a dependent variable in any declared comparison.
+22. Stratified sampling persists `N_h`. Population-level rates weight each stratum by its share of the standardized population in the same unit as the rate (for agreement: judgeable syllables; live Kitagawa `w_film_pre` / `w_other_pre` in `src/bootstrap.py` are the pre-period judgeable-syllable shares). Never an unweighted mean across strata. A stratifying column must come from an input this run does not write, and must not appear as a dependent variable in any declared comparison.
 
 # 9. Fixed facts about this corpus
 

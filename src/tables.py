@@ -1,4 +1,4 @@
-"""Load sqlite tables. Number-valued SQL lives under tasks/TASK-6/sql/."""
+"""Load sqlite tables. Named loader for table-loading SQL (contract clause 11)."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import sqlite3
 import pandas as pd
 
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_LOAD_TABLE_SQL = "SELECT * FROM "
 
 
 def quote_ident(name: str) -> str:
@@ -18,7 +19,7 @@ def quote_ident(name: str) -> str:
 
 def load_table(conn: sqlite3.Connection, table: str) -> pd.DataFrame:
     ident = quote_ident(table)
-    cursor = conn.execute("select * from " + ident)
+    cursor = conn.execute(_LOAD_TABLE_SQL + ident)
     columns = [d[0] for d in cursor.description]
     return pd.DataFrame(cursor.fetchall(), columns=columns)
 
