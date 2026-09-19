@@ -49,7 +49,9 @@ What this enforces, in order:
   brief        exactly one ``status: open|closed|escalated|blocked`` line;
                a parseable ``numbers`` block. ``escalated`` and ``blocked``
                suspend replay, pairwise agreement, declared-n, identity, and
-               edit-count for that task (plan §4.4). An optional fenced
+               edit-count for that task (plan §4.4). An optional
+               ``corpus_sha:`` line (plan §4.5) holds the README pin at
+               close; at most one, 64-char lowercase hex. An optional fenced
                ``n`` block (plan §2.5) and ``frame`` block (plan §6 identity)
                are parsed here; they are not required of every brief.
                Briefs are the top-level glob ``tasks/TASK-*.md`` (not
@@ -111,7 +113,16 @@ What this enforces, in order:
                agent cannot edit the brief; the tree equals the parent, so
                merge still leaves a git-log trace (plan §4.4).
   closed       a brief may say ``status: closed`` only when both files are
-               present, complete and in full agreement.
+               present, complete and in full agreement. Close also stamps
+               ``corpus_sha:`` with the then-current README pin. A closed
+               brief whose stamp is missing or differs from the current
+               corpus sha is STALE: replay, agreement, and edit-count are
+               skipped, the task does not participate in red/green, and
+               this script does not print ``N/N number(s) agree`` (plan
+               §4.5). Keep rate must not copy a STALE line. A corpus
+               change is a ``repair/`` PR that updates README and the
+               stamps together; a live closed task (stamp matches) still
+               replays against the new pin.
   scope        (pull requests only) only a task whose brief or files under
                ``tasks/TASK-N/`` appear in the PR diff is fully checked.
                Other tasks print a frozen summary and cannot fail the PR:
@@ -156,6 +167,10 @@ FRAME_FENCE = re.compile(r"^```frame\s*$(.*?)^```\s*$", re.M | re.S)
 STATUS = re.compile(
     r"^status:[ \t]*(open|closed|escalated|blocked)[ \t]*$", re.M
 )
+# Close stamps the README pin (plan §4.5). Missing or mismatched on a
+# closed brief is STALE, not a parse error; a malformed value is a parse error.
+CORPUS_SHA_LINE = re.compile(r"^corpus_sha:[ \t]*(.*)$", re.M)
+CORPUS_SHA_VALUE = re.compile(r"^`?([0-9a-f]{64})`?$")
 PERIOD_IDENTITY = ("n_videos_pre", "n_videos_post", "n_unassigned_period")
 VIDEOS_EXPECTED = "videos_expected"
 VIDEOS_EXPECTED_TOL = "videos_expected_tol"
@@ -264,12 +279,16 @@ class Fail(Exception):
 
 
 class Brief(NamedTuple):
-    """Parsed task brief. ``n_decl`` is None when the brief has no ``n`` fence."""
+    """Parsed task brief. ``n_decl`` is None when the brief has no ``n`` fence.
+
+    ``corpus_sha`` is None when the brief has no ``corpus_sha:`` line.
+    """
 
     status: str
     tol: dict[str, float]
     n_decl: dict[str, str] | None
     frame: dict[str, float]
+    corpus_sha: str | None
 
 
 def close(a: float, b: float, tol: float) -> bool:
@@ -576,7 +595,21 @@ def orphan_output_messages(root: Path, briefs: list[Path]) -> list[str]:
     return msgs
 
 
-def frozen_summary(root: Path, md: Path) -> None:
+def stale_closed(status: str, stamp: str | None, corpus_sha: str) -> bool:
+    """True when a closed brief's stamp is missing or not the current pin."""
+    return status == "closed" and stamp != corpus_sha
+
+
+def stale_closed_line(n: str, stamp: str | None, corpus_sha: str) -> str:
+    """The STALE skip line. Must not contain ``number(s) agree`` (plan §4.5)."""
+    shown = stamp if stamp is not None else "missing"
+    return (
+        f"  TASK-{n} [closed]: STALE; stamp {shown} != README sha256 "
+        f"{corpus_sha}; replay skipped"
+    )
+
+
+def frozen_summary(root: Path, md: Path, corpus_sha: str) -> None:
     """Print state for a task this PR did not touch; never fail (plan §4.1)."""
     n = md.stem.split("-", 1)[1]
     try:
@@ -587,7 +620,11 @@ def frozen_summary(root: Path, md: Path) -> None:
     task_dir = root / "tasks" / f"TASK-{n}"
     present = [k for k in (WORKER, VERIFIER) if (task_dir / k).is_file()]
     files = ", ".join(present) if present else "no output yet"
-    extra = "; suspended" if brief.status in SUSPEND_STATUS else ""
+    extra = ""
+    if brief.status in SUSPEND_STATUS:
+        extra = "; suspended"
+    elif stale_closed(brief.status, brief.corpus_sha, corpus_sha):
+        extra = "; STALE"
     print(
         f"  TASK-{n} [{brief.status}]: frozen (not touched by this PR); "
         f"{len(brief.tol)} number(s) declared; {files}{extra}"
@@ -647,7 +684,36 @@ def parse_brief(md: Path) -> Brief:
                 )
             raise Fail(f"{md.name}: ```n block " + "; ".join(bits))
 
-    return Brief(st[0], tol, n_decl, parse_frame_block(md.name, text))
+    return Brief(
+        st[0],
+        tol,
+        n_decl,
+        parse_frame_block(md.name, text),
+        parse_corpus_sha(md.name, text),
+    )
+
+
+def parse_corpus_sha(label: str, text: str) -> str | None:
+    """The close stamp, or None when the brief has no ``corpus_sha:`` line.
+
+    More than one line, or a value that is not 64-char lowercase hex (optional
+    backticks), is a parse error. A missing line on a closed brief is STALE
+    later, not a parse error (plan §4.5).
+    """
+    found = CORPUS_SHA_LINE.findall(text)
+    if len(found) > 1:
+        raise Fail(
+            f"{label}: corpus_sha appears {len(found)} times; at most one line"
+        )
+    if not found:
+        return None
+    raw = found[0].strip()
+    m = CORPUS_SHA_VALUE.fullmatch(raw)
+    if not m:
+        raise Fail(
+            f"{label}: corpus_sha is not a 64-char lowercase hex sha256: {raw!r}"
+        )
+    return m.group(1)
 
 
 def parse_n_block(label: str, text: str) -> dict[str, str] | None:
@@ -1377,6 +1443,7 @@ def check_task(
     base: str | None,
     head: str | None,
     fail: list[str],
+    corpus_sha: str,
 ) -> None:
     n = md.stem.split("-", 1)[1]
     try:
@@ -1384,13 +1451,17 @@ def check_task(
     except Fail as e:
         fail.append(str(e))
         return
-    status, tol, n_decl, frame = brief
+    status, tol, n_decl, frame, stamp = brief
 
     if status in SUSPEND_STATUS:
         print(
             f"  TASK-{n} [{status}]: {len(tol)} number(s) declared; "
             f"suspended (replay, agreement, and edit-count not run)"
         )
+        return
+
+    if stale_closed(status, stamp, corpus_sha):
+        print(stale_closed_line(n, stamp, corpus_sha))
         return
 
     task_dir = root / "tasks" / f"TASK-{n}"
@@ -1607,9 +1678,18 @@ def main() -> int:
         for md in briefs:
             n = md.stem.split("-", 1)[1]
             if touched is not None and n not in touched:
-                frozen_summary(root, md)
+                frozen_summary(root, md, want.group(1))
                 continue
-            check_task(root, md, conn, args.sql_seconds, args.base_ref, args.head_ref, fail)
+            check_task(
+                root,
+                md,
+                conn,
+                args.sql_seconds,
+                args.base_ref,
+                args.head_ref,
+                fail,
+                want.group(1),
+            )
     finally:
         conn.close()
 

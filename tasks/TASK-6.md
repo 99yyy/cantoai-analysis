@@ -1,6 +1,7 @@
 # TASK-6：2025 年之后一致率下降，能被解释多少
 
 status: closed
+corpus_sha: 2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f
 
 ## 目标
 
@@ -190,6 +191,6 @@ videos_expected_tol 0
 - `worker`，分支 `cursor/t6-worker-…`：写 `tasks/TASK-6/sql/`、`src/`、`tests/`，交 `tasks/TASK-6/results.json` 与上面那部分开放分析。
 - `verifier`，分支 `cursor/t6-verifier-…`：**不读 worker 的代码、对话、PR**，只读本文件和语料，用自己的 SQL 把这 39 个数字重算一遍，写 `tasks/TASK-6/mine_sql/`，交 `tasks/TASK-6/mine.json`。
 - 不一致的行发回去重算。同一个输出文件最多被改三次——第一次加两次重试，`output-check` 数 commit。仍不一致就停，两套数字一起升级给 Tom。
-- 两个都合入、`output-check` 报出 39 个全一致之后，把本文件的 `status:` 改成 `closed`。改不动就说明还没齐，那是检查在告诉你事实。然后放 `auditor`，写 `review/TASK-6/audit.md`。
+- 两个都合入、`output-check` 报出 39 个全一致之后，把本文件的 `status:` 改成 `closed`，并写入一行 `corpus_sha:`，值为当时 `README.md` 里的语料 sha256。stamp 与当前 pin 不符或缺失时本任务是 STALE：不再重放，不参与红绿，也不打印 39/39 agree。改不动 `closed` 就说明还没齐，那是检查在告诉你事实。然后放 `auditor`，写 `review/TASK-6/audit.md`。
 
 两个 agent 都不能改本文件，但**必须**能写 `tasks/TASK-6/` 下面自己的产出。

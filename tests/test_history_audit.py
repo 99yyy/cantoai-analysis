@@ -82,6 +82,23 @@ def test_status_blocked_or_escalated_edit_is_not_a_bar():
         assert history_audit.declaration_bars(PATH, old, new) == []
 
 
+def test_corpus_sha_stamp_edit_is_not_a_bar():
+    """Plan §4.5: the close stamp is not a fenced declaration bar."""
+    old = BRIEF.read_text(encoding="utf-8")
+    new = re.sub(
+        r"^corpus_sha:[ \t]*\S+[ \t]*$",
+        "corpus_sha: " + ("a" * 64),
+        old,
+        count=1,
+        flags=re.M,
+    )
+    assert "a" * 64 in new
+    assert new != old
+    assert history_audit.declaration_bars(PATH, old, new) == []
+    added = old.replace("status: closed\n", "status: closed\ncorpus_sha: " + ("b" * 64) + "\n", 1)
+    assert history_audit.declaration_bars(PATH, old, added) == []
+
+
 def test_widening_a_numbers_tolerance_is_a_bar():
     new = NUMBERS.replace("gap_contract_pp            0.05", "gap_contract_pp            1000000")
     hits = history_audit.declaration_bars(PATH, NUMBERS, new)
