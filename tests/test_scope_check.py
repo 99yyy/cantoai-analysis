@@ -120,3 +120,23 @@ def test_repair_owner_may_edit_scripts_readme_and_loop():
     assert scope_check.path_blocked("scripts/output_check.py", cls) is None
     assert scope_check.path_blocked("README.md", cls) is None
     assert scope_check.path_blocked("LOOP.md", cls) is None
+
+
+def test_investigations_allowed_on_repair_chore_and_agent():
+    chore = scope_check.classify("chore/notes-x", actor="99yyy", owners=OWNERS)
+    agent = scope_check.classify("cursor/t6-worker-x", actor="agent-bot", owners=OWNERS)
+    repair = scope_check.classify("repair/notes-x", actor="99yyy", owners=OWNERS)
+    paths = (
+        "investigations/README.md",
+        "investigations/post-2025-jyutping-drop/README.md",
+        "investigations/post-2025-jyutping-drop/scripts/.gitkeep",
+    )
+    for path in paths:
+        assert scope_check.path_blocked(path, chore) is None
+        assert scope_check.path_blocked(path, agent) is None
+        assert scope_check.path_blocked(path, repair) is None
+    assert "LOOP.md" not in scope_check.CHORE_ALLOW
+    assert scope_check.path_blocked("LOOP.md", chore) == "DENY"
+    assert scope_check.path_blocked("LOOP.md", agent) == "DENY"
+    assert scope_check.path_blocked("scripts/scope_check.py", chore) == "DENY"
+    assert scope_check.path_blocked("README.md", chore) == "DENY"
