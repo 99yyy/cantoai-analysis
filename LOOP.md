@@ -49,7 +49,7 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 
 | 检查 | 管什么 |
 |---|---|
-| `output-check` | 每个数字都能从语料重放出来；SQL 的 `EXPLAIN QUERY PLAN` 必须 `SCAN`/`SEARCH` 语料表；每条语句执行两次必须得到同一个数；规范化后的语句不得出现 `random()` / `randomblob()` / `strftime('now')` 族；两套独立算出的数字必须相等；若任务书有 fenced `n` 块，每个 `n` 还必须等于块里声明的常数或 `derived:`（用重放值求），两套 `n` 仍须完全相等，两道检查一起做不是互相替代；若 `frame` 含 `videos_expected` 且 numbers 声明了 `n_videos_pre` / `n_videos_post` / `n_unassigned_period`，三者重放值之和必须等于 `frame.videos_expected`（容差 `videos_expected_tol`，未写则 0），没有 `videos_expected` 时此恒等式不运行；重写次数有上限（从 reset commit 计起）；两条分支不得从对方的答案出发；`status: closed` 只有在两边齐、全一致时才允许；`status: escalated` 与 `status: blocked` 暂停该任务的重放、比对、改写计数；空 commit 且留言以 `BLOCKED:` 开头会被认出并打印；**pull request 上只完整检查这次 diff 碰到的任务**（任务书或 `tasks/TASK-N/`，任一边输出文件都算碰到），其余任务只打 frozen summary，`status: open` 的不一致不能把无关 PR 打红；main 上仍检查全部任务；**`tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，但顶层 glob `tasks/TASK-*.md` 找不到对应任务书 → 红**（把任务书移出 glob 不得让检查变成 no-op 绿灯） |
+| `output-check` | 每个数字都能从语料重放出来；SQL 的 `EXPLAIN QUERY PLAN` 必须 `SCAN`/`SEARCH` 语料表；每条语句执行两次必须得到同一个数；规范化后的语句不得出现 `random()` / `randomblob()` / `strftime('now')` 族；两套独立算出的数字必须相等；若任务书有 fenced `n` 块，每个 `n` 还必须等于块里声明的常数或 `derived:`（用重放值求），两套 `n` 仍须完全相等，两道检查一起做不是互相替代；若 `frame` 含 `videos_expected` 且 numbers 声明了 `n_videos_pre` / `n_videos_post` / `n_unassigned_period`，三者重放值之和必须等于 `frame.videos_expected`（容差 `videos_expected_tol`，未写则 0），没有 `videos_expected` 时此恒等式不运行；重写次数有上限（从 reset commit 计起）；两条分支不得从对方的答案出发（引入 commit 的整段祖先里都没有另一边的文件；两边引入 commit 无祖先关系、不同分支、不同作者）；`status: closed` 只有在两边齐、全一致时才允许；`status: escalated` 与 `status: blocked` 暂停该任务的重放、比对、改写计数；空 commit 且留言以 `BLOCKED:` 开头会被认出并打印；**pull request 上只完整检查这次 diff 碰到的任务**（任务书或 `tasks/TASK-N/`，任一边输出文件都算碰到），其余任务只打 frozen summary，`status: open` 的不一致不能把无关 PR 打红；main 上仍检查全部任务；**`tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，但顶层 glob `tasks/TASK-*.md` 找不到对应任务书 → 红**（把任务书移出 glob 不得让检查变成 no-op 绿灯） |
 | `scope-check` | 分支必须属于已知类别（先匹配 agent 前缀）；repair/ 与 chore/ 不能单靠前缀授权，须 `github.actor` 落在仓库 owner allowlist 上；chore 与 agent 同受 DENY；agent 不得碰 `.cursor/` `.github/` `data/` `scripts/`、`README.md`、`LOOP.md`，也不得改任务书 `tasks/TASK-N.md`，但必须能写 `tasks/TASK-N/` 下面自己的产出 |
 | `history-audit` | 移动已有的栅不得与被它度量的东西同 PR，且正文须有 `BAR-CHANGE:` 并点名每个被移动的栅路径；被度量路径是 files 减去栅路径（闸门脚本 fail-site 净删算移动栅，但不自己锁自己）；`tasks/**/*.sql` 属被度量；任务书 fenced `numbers`/`fixture`/`frame`/`n` 里放宽容差、删名字或删整块算移动栅，收窄容差不算；死路径栅移入 `RETIRED` 块而非删除，live∪RETIRED 的 glob 丢失才算删栅 |
 | `tests` | 有 `tests/test_*.py` 时跑 pytest |
@@ -70,7 +70,7 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 6. 每个数字都等于它自己那条算路跑出来的结果，误差在容差内。`derived:` 用的是**重放出来的**值，不是 agent 自己写下的值——所以「把输入写错、再把推导写成与错输入自洽」这条路是走不通的，两行都会红。
 7. 两套数字每个 `value` 在容差内相等，每个 `n` 完全相等。不一致的把两个数都打出来。只两边 `n` 相等不够（plan §2.5）：若有 `n` 块，每个写下的 `n` 还必须等于声明的常数或 `derived:`（代入的是重放值）。两道检查一起做。没有 `n` 块时，声明 n 那一道不激活。若 `frame` 含 `videos_expected`，且 numbers 声明了 `n_videos_pre`、`n_videos_post`、`n_unassigned_period`，三者重放值之和必须等于 `frame.videos_expected`（容差 `videos_expected_tol`，未写则 0）。RHS 引用 frame 字段，检查代码里不得写死 567。没有 `videos_expected`、或该任务没声明那三个名字：恒等式不运行。
 8. 动过同一个输出文件的 commit 不超过三个，从该任务书最近一次改动那个 reset commit 计起。`escalated` / `blocked` 不计。
-9. 引入某一边文件的那个 commit，它的树里**没有**另一边的文件。
+9. 引入某一边文件的那个 commit，它自己的树和**所有祖先**的树里都没有另一边的文件。两边的引入 commit 不能有祖先关系，必须来自不同分支、不同作者（plan §2.7）。只看引入 commit 自己那一棵树，挡不住「先提交自己的、再 merge 对方」或同一条分支上分三次写出两边。
 
 ## 任务书状态
 
@@ -94,10 +94,12 @@ agent 不能改任务书。它要停的时候留下一条**空 commit**，第一
 **两套独立算路**证明这个问题被两条不同的路各问了一遍。它不证明两条都对——两个
 agent 可以同样地错，只是用不同的 SQL 同样地错要难得多。
 
-**第 9 条**证明这条分支不是从一棵已经放着对方答案的树上长出来的。这是现实中它会坏
-掉的方式：第二个 agent 在第一个合入之后才启动，答案就摊在它的工作副本里。它**不**
-证明这个 agent 在运行途中没有去 fetch 对方的分支——CI 里没有任何东西能证明这件事，
-那要靠 `auditor` 读历史。两个 agent 从同一个 ref 启动，第 9 条对两边都自然成立。
+**第 9 条**证明两边的引入 commit 在历史上是分开的：彼此不是祖先、不是同一条
+分支上的两次提交、不是同一个作者，而且引入 commit 的祖先里也没有对方的文件。
+只检查引入 commit 自己的树，等于只挡住最简单的顺序（先 merge 对方，再提交自己）。
+它**仍然不**证明这个 agent 在运行途中没有去 fetch 对方的分支——CI 里没有任何东西
+能证明这件事，那要靠 `auditor` 读历史。两个 agent 从同一个 ref 启动、用不同的
+git 作者身份，第 9 条对两边都自然成立。
 
 **任务书里的开放分析**——比如「标准化之后还剩多少差距」——取决于 agent 自己选的变量，
 两个 agent 不会一致，也不该强求。这部分不进 `numbers` 块，由 Tom 和 `auditor` 判断。
