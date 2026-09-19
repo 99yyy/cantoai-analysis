@@ -52,6 +52,11 @@ What this enforces, in order:
                edit-count for that task (plan §4.4). An optional fenced
                ``n`` block (plan §2.5) and ``frame`` block (plan §6 identity)
                are parsed here; they are not required of every brief.
+               Briefs are the top-level glob ``tasks/TASK-*.md`` (not
+               recursive). A ``results.json`` or ``mine.json`` under any
+               TASK-N directory whose matching ``tasks/TASK-N.md`` is not in
+               that glob fails: hiding the brief must not make this script a
+               no-op exit 0 (plan §2.6).
   shape        top-level list; every row exactly {name, value, n, query}; the
                name set equals the declared set, so a missing number and an
                extra number both fail; no duplicate name; no duplicate route
@@ -157,6 +162,8 @@ SUSPEND_STATUS = frozenset({"escalated", "blocked"})
 BLOCKED_SUBJECT_PREFIX = "BLOCKED:"
 # tasks/TASK-N.md or anything under tasks/TASK-N/ (plan §4.1 / §4.3).
 TASK_PATH_RE = re.compile(r"^tasks/TASK-([^/]+)(?:\.md|/)")
+# A TASK-N directory name anywhere under tasks/ (plan §2.6 orphan outputs).
+TASK_DIR_NAME = re.compile(r"^TASK-(.+)$")
 
 ALLOWED_BINOP = (ast.Add, ast.Sub, ast.Mult, ast.Div)
 ALLOWED_UNARY = (ast.UAdd, ast.USub)
@@ -371,6 +378,79 @@ def pr_diff_names(root: Path, base: str, head: str) -> list[str]:
     """Repo-relative paths in ``base...head`` (the pull-request triple-dot)."""
     out = git(root, "diff", "--name-only", f"{base}...{head}")
     return [l.strip() for l in out.splitlines() if l.strip()]
+
+
+def discover_briefs(root: Path) -> list[Path]:
+    """Top-level ``tasks/TASK-*.md`` only. The glob is not recursive (plan §2.6)."""
+    tasks = root / "tasks"
+    if not tasks.is_dir():
+        return []
+    return sorted(p for p in tasks.glob("TASK-*.md") if p.is_file())
+
+
+def brief_task_id(md: Path) -> str:
+    return md.stem.split("-", 1)[1]
+
+
+def task_id_from_output_path(path: Path, tasks_root: Path) -> str | None:
+    """TASK-N id for an output file, or None if it is not under a TASK-N dir."""
+    try:
+        rel = path.relative_to(tasks_root)
+    except ValueError:
+        return None
+    for part in rel.parts[:-1]:
+        m = TASK_DIR_NAME.fullmatch(part)
+        if m:
+            return m.group(1)
+    return None
+
+
+def output_files_by_task(root: Path) -> dict[str, list[Path]]:
+    """``results.json`` / ``mine.json`` under a TASK-N directory anywhere in tasks/."""
+    tasks = root / "tasks"
+    found: dict[str, list[Path]] = {}
+    if not tasks.is_dir():
+        return found
+    for name in (WORKER, VERIFIER):
+        for path in tasks.rglob(name):
+            if not path.is_file():
+                continue
+            n = task_id_from_output_path(path, tasks)
+            if n is None:
+                continue
+            found.setdefault(n, []).append(path)
+    return found
+
+
+def orphan_output_message(n: str, rel: str) -> str:
+    return (
+        f"TASK-{n}: {rel} exists but the matching brief "
+        f"tasks/TASK-{n}.md cannot be found"
+    )
+
+
+def orphan_output_messages(root: Path, briefs: list[Path]) -> list[str]:
+    """Outputs whose matching top-level brief is not in ``briefs`` (plan §2.6)."""
+    known = {brief_task_id(md) for md in briefs}
+    msgs: list[str] = []
+    by_task = output_files_by_task(root)
+    for n in sorted(
+        by_task,
+        key=lambda s: (0, int(s)) if s.isdigit() else (1, s),
+    ):
+        if n in known:
+            continue
+        files = sorted(
+            {p.resolve() for p in by_task[n]},
+            key=lambda p: p.as_posix(),
+        )
+        for p in files:
+            try:
+                rel = p.relative_to(root).as_posix()
+            except ValueError:
+                rel = p.as_posix()
+            msgs.append(orphan_output_message(n, rel))
+    return msgs
 
 
 def frozen_summary(root: Path, md: Path) -> None:
@@ -1373,11 +1453,18 @@ def main() -> int:
     else:
         print("output_check: no refs given; attempts and independence are enforced in CI")
 
-    briefs = sorted((root / "tasks").glob("TASK-*.md")) if (root / "tasks").is_dir() else []
+    briefs = discover_briefs(root)
+    fail.extend(orphan_output_messages(root, briefs))
     if not briefs:
-        print("output_check: no tasks/TASK-*.md; nothing to check")
-        return 0
-    print(f"output_check: {len(briefs)} task brief(s)")
+        if not fail:
+            print("output_check: no tasks/TASK-*.md; nothing to check")
+            return 0
+        print(
+            "output_check: no tasks/TASK-*.md; "
+            "output files remain without a matching brief"
+        )
+    else:
+        print(f"output_check: {len(briefs)} task brief(s)")
 
     # Plan §4.1: on a pull request, fully check only tasks this diff touches.
     # Untouched tasks (including an open iterating disagreement on main) get a
