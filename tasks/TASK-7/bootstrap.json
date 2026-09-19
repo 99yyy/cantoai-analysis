@@ -1,0 +1,87 @@
+{
+  "population": "the 567 videos of this channel",
+  "comparison": "agree_other_common_pre - agree_other_common_post, other×common cell",
+  "title_proxy": true,
+  "B": 2000,
+  "master_seed": 20260919,
+  "seeds": {
+    "pre": 1656575222,
+    "post": 2660412771
+  },
+  "G_h": {
+    "pre": 391,
+    "post": 176
+  },
+  "N_h": {
+    "pre": 391,
+    "post": 176
+  },
+  "n_h_judgeable": {
+    "pre": 86194,
+    "post": 16508
+  },
+  "n_h_videos_with_judgeable": {
+    "pre": 330,
+    "post": 116
+  },
+  "agree_other_common_pre": 0.8884841172239367,
+  "agree_other_common_post": 0.8151805185364671,
+  "gap_other_common_pp": 7.33035986874696,
+  "gap_ci95_pp": [
+    4.6206509822986535,
+    10.095587484640848
+  ],
+  "p_raw": 0.0,
+  "p_bh": 0.0,
+  "m": 1,
+  "ci_unreliable": {
+    "pre": 0,
+    "post": 0
+  },
+  "ci_unreliable_any": 0,
+  "conclusion": "estimated",
+  "descriptive": 0,
+  "exploratory": 0,
+  "year_video_counts": [
+    {
+      "year": "2021",
+      "n_videos": 9
+    },
+    {
+      "year": "2022",
+      "n_videos": 193
+    },
+    {
+      "year": "2023",
+      "n_videos": 36
+    },
+    {
+      "year": "2024",
+      "n_videos": 153
+    },
+    {
+      "year": "2025",
+      "n_videos": 138
+    },
+    {
+      "year": "2026",
+      "n_videos": 38
+    }
+  ],
+  "counts_pre": {
+    "n_total": 100428,
+    "n_match": 76582,
+    "n_judgeable": 86194,
+    "n_empty_realized": 837,
+    "n_dur_le_0": 13655,
+    "n_empty_and_zerodur": 258
+  },
+  "counts_post": {
+    "n_total": 19821,
+    "n_match": 13457,
+    "n_judgeable": 16508,
+    "n_empty_realized": 345,
+    "n_dur_le_0": 3089,
+    "n_empty_and_zerodur": 121
+  }
+}
