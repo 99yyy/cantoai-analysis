@@ -5,6 +5,8 @@ alwaysApply: true
 
 This file overrides any task brief. A pull request violating any clause is not merged.
 
+Execution flow is LOOP.md.
+
 If a clause cannot be satisfied, stop and write `BLOCKED: <one line>` in the pull-request body. Do not relax a threshold, edit an assertion, or special-case an input in order to get a green result.
 
 **A clause about a thing your run does not produce does not apply to you, and is not an instruction to create that thing.** Most clauses below begin with the condition that switches them on. Build only what your task needs. A repository that lacks a file named here is not a defect to repair.
