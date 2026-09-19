@@ -137,8 +137,17 @@ What this enforces, in order:
                outputs, pairwise agreement within tol, and a live closed
                brief; out_of_turns requires the post-reset rewrite count
                to be at cap; corpus_sha must equal the README pin.
-               ``turns_used`` is type-checked only (launch count is not in
-               git; TODO item 4). ``cost_usd`` / ``budget_usd`` /
+               ``turns_used`` must equal ``len(tasks/TASK-N/launches.json)``
+               for that task: a repo-local ledger of ``{id, role, at}``
+               records the coordinator or auditor appends (worker/verifier
+               do not invent launches). Family total is the sum of those
+               lengths over the root and its ``-b`` / ``-c`` siblings, and
+               must be ``<= 16``. A RESULT whose subtype is not
+               ``out_of_budget`` or ``blocked`` fails when the family is
+               above the cap; ``out_of_budget`` fails when the family is
+               below it. A parent RESULT is not re-judged for later family
+               growth after a child brief exists (parent RESULT is
+               immutable). ``cost_usd`` / ``budget_usd`` /
                ``val_iterations`` are forbidden. Missing RESULT on a task
                already terminal is transitional; a PR that newly sets a
                terminal status must include the file. Present on ``open``
@@ -217,12 +226,13 @@ EPS = 1e-9
 MAX_ATTEMPTS = 3
 WORKER, VERIFIER = "results.json", "mine.json"
 RESULT = "RESULT.json"
+LAUNCHES = "launches.json"
 SUSPEND_STATUS = frozenset({"escalated", "blocked"})
 TERMINAL_STATUS = frozenset({"closed", "escalated", "blocked"})
 # Auditor-written round outcome. Worker/verifier never write this file.
-# TODO(item 4): turns_used is Cloud Agent launch count (budget 16 including
-# forks) and is not recoverable from git. This script type-checks it and
-# uses rewrite counts (cap MAX_ATTEMPTS) for subtype out_of_turns.
+# turns_used is Cloud Agent launch count and equals len(launches.json) for
+# that task. The family (root + -b + -c) shares LAUNCH_BUDGET. Rewrite
+# counts (cap MAX_ATTEMPTS) still decide subtype out_of_turns.
 RESULT_KEYS = (
     "task",
     "subtype",
@@ -250,6 +260,13 @@ SUBTYPES = frozenset(
 )
 VERDICTS = frozenset({"supported", "refuted", "inconclusive"})
 FORBIDDEN_RESULT_FIELDS = ("cost_usd", "budget_usd", "val_iterations")
+LAUNCH_BUDGET = 16
+LAUNCH_RECORD_KEYS = ("id", "role", "at")
+LAUNCH_RECORD_KEY_SET = frozenset(LAUNCH_RECORD_KEYS)
+LAUNCH_ROLES = frozenset(
+    {"worker", "verifier", "auditor", "repair", "coordinator"}
+)
+BUDGET_STOP_SUBTYPES = frozenset({"out_of_budget", "blocked"})
 BLOCKED_SUBJECT_PREFIX = "BLOCKED:"
 # tasks/TASK-N.md or anything under tasks/TASK-N/ (plan §4.1 / §4.3).
 TASK_PATH_RE = re.compile(r"^tasks/TASK-([^/]+)(?:\.md|/)")
@@ -656,6 +673,24 @@ def child_task_id(fid: ForkId) -> str | None:
     if nxt > MAX_FORK_DEPTH or nxt not in FORK_LETTER:
         return None
     return f"{fid.root}-{FORK_LETTER[nxt]}"
+
+
+def family_member_ids(n: str) -> tuple[str, ...]:
+    """Root + ``-b`` + ``-c`` ids that share one launch budget."""
+    fid = parse_fork_id(n)
+    root = fid.root if fid is not None else n
+    return (root, f"{root}-b", f"{root}-c")
+
+
+def has_letter_child_brief(root: Path, n: str) -> bool:
+    """True when a deeper letter-suffix brief exists (parent RESULT is frozen)."""
+    fid = parse_fork_id(n)
+    if fid is None:
+        return False
+    child = child_task_id(fid)
+    if child is None:
+        return False
+    return (root / "tasks" / f"TASK-{child}.md").is_file()
 
 
 def normalize_task_id(raw: str) -> str:
@@ -2021,8 +2056,6 @@ def parse_result(
                 f"TASK-{n}: RESULT.json numbers.{name}.within_tol must be a boolean"
             )
 
-    # TODO(item 4): turns_used is Cloud Agent launch count; git cannot
-    # derive it yet. Presence and type only.
     if not is_nonneg_int(data["turns_used"]):
         raise Fail(
             f"TASK-{n}: RESULT.json turns_used must be a non-negative integer"
@@ -2075,6 +2108,112 @@ def parse_result(
             f"is set"
         )
     return data
+
+
+def parse_launches(path: Path, n: str) -> list[dict]:
+    """Load ``launches.json``. Raises Fail on schema errors."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise Fail(f"TASK-{n}: launches.json is not valid JSON: {e}")
+    if not isinstance(data, list):
+        raise Fail(f"TASK-{n}: launches.json top level must be a list")
+    out: list[dict] = []
+    seen: set[str] = set()
+    for i, rec in enumerate(data):
+        loc = f"launches.json[{i}]"
+        if not isinstance(rec, dict):
+            raise Fail(f"TASK-{n}: {loc} must be an object")
+        extra = sorted(set(rec) - LAUNCH_RECORD_KEY_SET)
+        missing = sorted(LAUNCH_RECORD_KEY_SET - set(rec))
+        if extra or missing:
+            bits: list[str] = []
+            if extra:
+                bits.append("unknown keys " + ", ".join(extra))
+            if missing:
+                bits.append("missing " + ", ".join(missing))
+            raise Fail(
+                f"TASK-{n}: {loc} keys must be exactly "
+                f"{list(LAUNCH_RECORD_KEYS)}; {'; '.join(bits)}"
+            )
+        lid = rec["id"]
+        if not isinstance(lid, str) or not lid.strip():
+            raise Fail(f"TASK-{n}: {loc}.id must be a non-empty string")
+        if lid in seen:
+            raise Fail(f"TASK-{n}: launches.json duplicate id {lid!r}")
+        seen.add(lid)
+        role = rec["role"]
+        if role not in LAUNCH_ROLES:
+            raise Fail(
+                f"TASK-{n}: {loc}.role must be one of "
+                f"{', '.join(sorted(LAUNCH_ROLES))}, got {role!r}"
+            )
+        at = rec["at"]
+        if not isinstance(at, str) or not at.strip():
+            raise Fail(f"TASK-{n}: {loc}.at must be a non-empty string")
+        out.append(rec)
+    return out
+
+
+def family_launch_total(root: Path, n: str, fail: list[str]) -> int | None:
+    """Sum ledger lengths for the fork family. None if a ledger is malformed."""
+    total = 0
+    for member in family_member_ids(n):
+        path = root / "tasks" / f"TASK-{member}" / LAUNCHES
+        if not path.is_file():
+            continue
+        try:
+            total += len(parse_launches(path, member))
+        except Fail as e:
+            fail.append(str(e))
+            return None
+    return total
+
+
+def check_launch_budget(
+    root: Path, n: str, data: dict, fail: list[str]
+) -> None:
+    """RESULT.turns_used equals this task's ledger; family total vs cap 16."""
+    path = root / "tasks" / f"TASK-{n}" / LAUNCHES
+    if not path.is_file():
+        fail.append(
+            f"TASK-{n}: launches.json is missing; the coordinator or auditor "
+            f"appends the ledger and RESULT.turns_used must equal its length"
+        )
+        return
+    try:
+        records = parse_launches(path, n)
+    except Fail as e:
+        fail.append(str(e))
+        return
+    used = data["turns_used"]
+    if used != len(records):
+        fail.append(
+            f"TASK-{n}: RESULT.json turns_used is {used} but launches.json "
+            f"has {len(records)} records"
+        )
+    total = family_launch_total(root, n, fail)
+    if total is None:
+        return
+    print(
+        f"  TASK-{n}: launches {len(records)}, family {total} "
+        f"(cap {LAUNCH_BUDGET})"
+    )
+    subtype = data["subtype"]
+    root_id = family_member_ids(n)[0]
+    if subtype == "out_of_budget" and total < LAUNCH_BUDGET:
+        fail.append(
+            f"TASK-{n}: RESULT.json subtype is out_of_budget but family "
+            f"TASK-{root_id} launches are {total} (cap is {LAUNCH_BUDGET})"
+        )
+    if subtype not in BUDGET_STOP_SUBTYPES and total > LAUNCH_BUDGET:
+        own_over = len(records) > LAUNCH_BUDGET
+        leaf = not has_letter_child_brief(root, n)
+        if own_over or leaf:
+            fail.append(
+                f"TASK-{n}: RESULT.json subtype is {subtype} but family "
+                f"TASK-{root_id} launches are {total} (cap is {LAUNCH_BUDGET})"
+            )
 
 
 def check_round_result(
@@ -2185,7 +2324,9 @@ def check_round_result(
                     f"count is {got} (cap is {MAX_ATTEMPTS})"
                 )
     # out_of_turns without --head-ref: rewrite count is not decidable, same
-    # as the existing edit-count gate. TODO(item 4) for launch counts.
+    # as the existing edit-count gate.
+
+    check_launch_budget(root, n, data, fail)
 
     if subtype == "stale" and not stale:
         fail.append(
@@ -2197,8 +2338,7 @@ def check_round_result(
         fail.append(
             f"TASK-{n}: RESULT.json subtype is blocked but status is {status}"
         )
-    # out_of_budget / infra_failure: allowed subtype values; budget-16 and
-    # infra evidence are not git-derivable yet (item 4 / later).
+    # infra_failure: allowed subtype; evidence is not git-derivable.
 
     check_result_fork_fields(root, n, data, fail)
 
