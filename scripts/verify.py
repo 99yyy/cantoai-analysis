@@ -462,6 +462,112 @@ def probe_relations_literal_denom(tmp_DIR: Path) -> tuple[bool, str]:
     return went_red, out
 
 
+def probe_result_out_of_turns(tmp_DIR: Path) -> tuple[bool, str]:
+    """RESULT subtype out_of_turns while rewrite count is below cap must fail."""
+    repo = tmp_DIR / "result"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    write_mini_corpus(corpus)
+    pin_readme(repo, corpus)
+    sha = sha256_file(corpus)
+    md = repo / "tasks" / "TASK-7.md"
+    md.parent.mkdir(parents=True, exist_ok=True)
+    md.write_text(
+        "# TASK-7\n\nstatus: open\n\n```numbers\nn_count  0\n```\n",
+        encoding="utf-8",
+    )
+
+    def git(*args: str) -> None:
+        subprocess.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    git("init", "-b", "main")
+    git("config", "user.email", "probe@example.com")
+    git("config", "user.name", "probe")
+    git("config", "commit.gpgsign", "false")
+    git("add", "-A")
+    git("commit", "-m", "brief")
+
+    w_sql = repo / "tasks" / "TASK-7" / "sql" / "count_videos.sql"
+    v_sql = repo / "tasks" / "TASK-7" / "mine_sql" / "count_videos_as.sql"
+    w_sql.parent.mkdir(parents=True, exist_ok=True)
+    v_sql.parent.mkdir(parents=True, exist_ok=True)
+    w_sql.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+    v_sql.write_text("SELECT COUNT(*) FROM videos AS vid;\n", encoding="utf-8")
+    rows_w = [
+        {
+            "name": "n_count",
+            "value": 2,
+            "n": 2,
+            "query": "tasks/TASK-7/sql/count_videos.sql",
+        }
+    ]
+    rows_v = [
+        {
+            "name": "n_count",
+            "value": 2,
+            "n": 2,
+            "query": "tasks/TASK-7/mine_sql/count_videos_as.sql",
+        }
+    ]
+    (repo / "tasks" / "TASK-7" / "results.json").write_text(
+        json.dumps(rows_w, indent=2) + "\n", encoding="utf-8"
+    )
+    (repo / "tasks" / "TASK-7" / "mine.json").write_text(
+        json.dumps(rows_v, indent=2) + "\n", encoding="utf-8"
+    )
+    git("add", "-A")
+    git("commit", "-m", "outputs")
+
+    md.write_text(
+        "# TASK-7\n\nstatus: closed\n"
+        f"corpus_sha: {sha}\n\n```numbers\nn_count  0\n```\n",
+        encoding="utf-8",
+    )
+    result = {
+        "task": "TASK-7",
+        "subtype": "out_of_turns",
+        "verdict": None,
+        "hypothesis": "Agreement falls after 2025.",
+        "why": "The rewrite cap is 3.",
+        "numbers": {"n_count": {"value": 2.0, "within_tol": True}},
+        "turns_used": 3,
+        "turn_cap": 3,
+        "corpus_sha": sha,
+        "forked_from": None,
+        "fork_depth": 0,
+    }
+    (repo / "tasks" / "TASK-7" / "RESULT.json").write_text(
+        json.dumps(result, indent=2) + "\n", encoding="utf-8"
+    )
+    git("add", "-A")
+    git("commit", "-m", "close with lying RESULT")
+
+    code, out = run_script_captured(
+        OUTPUT_CHECK,
+        [
+            "--repo-root",
+            str(repo),
+            "--corpus",
+            str(corpus),
+            "--head-ref",
+            "HEAD",
+        ],
+        cwd=repo,
+    )
+    went_red = (
+        code != 0
+        and "out_of_turns" in out
+        and "rewrite count is 1" in out
+        and "cap is 3" in out
+    )
+    return went_red, out
+
+
 def run_probe() -> int:
     tmp_DIR = Path(tempfile.mkdtemp(prefix="verify-probe-"))
     failed = False
@@ -483,6 +589,15 @@ def run_probe() -> int:
             failed = True
         else:
             print("verify: probe relations-literal-denom went red")
+
+        step("probe result-out-of-turns")
+        red, out = probe_result_out_of_turns(tmp_DIR)
+        if not red:
+            print(out)
+            print("verify: probe result-out-of-turns stayed green")
+            failed = True
+        else:
+            print("verify: probe result-out-of-turns went red")
     finally:
         shutil.rmtree(tmp_DIR, ignore_errors=True)
     if failed:
