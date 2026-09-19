@@ -1,0 +1,62 @@
+[
+  {
+    "name": "n_videos_pre",
+    "value": 391,
+    "n": 567,
+    "query": "tasks/TASK-7/mine_sql/n_videos_pre.sql"
+  },
+  {
+    "name": "n_videos_post",
+    "value": 176,
+    "n": 567,
+    "query": "tasks/TASK-7/mine_sql/n_videos_post.sql"
+  },
+  {
+    "name": "n_unassigned_period",
+    "value": 0,
+    "n": 567,
+    "query": "tasks/TASK-7/mine_sql/n_unassigned_period.sql"
+  },
+  {
+    "name": "n_judgeable_other_common_pre",
+    "value": 86194,
+    "n": 86194,
+    "query": "tasks/TASK-7/mine_sql/n_judgeable_other_common_pre.sql"
+  },
+  {
+    "name": "n_judgeable_other_common_post",
+    "value": 16508,
+    "n": 16508,
+    "query": "tasks/TASK-7/mine_sql/n_judgeable_other_common_post.sql"
+  },
+  {
+    "name": "n_match_other_common_pre",
+    "value": 76582,
+    "n": 86194,
+    "query": "tasks/TASK-7/mine_sql/n_match_other_common_pre.sql"
+  },
+  {
+    "name": "n_match_other_common_post",
+    "value": 13457,
+    "n": 16508,
+    "query": "tasks/TASK-7/mine_sql/n_match_other_common_post.sql"
+  },
+  {
+    "name": "agree_other_common_pre",
+    "value": 0.8884841172239367,
+    "n": 86194,
+    "query": "derived:n_match_other_common_pre / n_judgeable_other_common_pre"
+  },
+  {
+    "name": "agree_other_common_post",
+    "value": 0.8151805185364671,
+    "n": 16508,
+    "query": "derived:n_match_other_common_post / n_judgeable_other_common_post"
+  },
+  {
+    "name": "gap_other_common_pp",
+    "value": 7.33035986874696,
+    "n": 102702,
+    "query": "tasks/TASK-7/mine_sql/gap_other_common_pp.sql"
+  }
+]
