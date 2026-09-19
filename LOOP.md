@@ -56,7 +56,7 @@ STOP     全部一致 → 把任务书改成 status: closed，并盖上当时 RE
 
 | 检查 | 管什么 |
 |---|---|
-| `output-check` | 每个数字都能从语料重放出来；SQL 的 `EXPLAIN QUERY PLAN` 必须 `SCAN`/`SEARCH` 语料表；每条语句执行两次必须得到同一个数；规范化后的语句不得出现 `random()` / `randomblob()` / `strftime('now')` 族；两套独立算出的数字必须相等；若任务书有 fenced `n` 块，每个 `n` 还必须等于块里声明的常数或 `derived:`（用重放值求），两套 `n` 仍须完全相等，两道检查一起做不是互相替代；若任务书有 fenced `identities` 块，每一行 `<expr> = <expr>  <tol>` 用与 `derived:` 相同的 AST 在**该文件**重放值上求（不合并 worker+verifier 字典）；`frame.<字段>` 绑定 ```frame``` 块数值；一条恒等式只在该文件里每个数字名都是 SQL 算路时才计，否则跳过；若 `frame` 含 `videos_expected` 且 numbers 声明了 `n_videos_pre` / `n_videos_post` / `n_unassigned_period`，三者重放值之和必须等于 `frame.videos_expected`（容差 `videos_expected_tol`，未写则 0），没有 `videos_expected` 时此条不运行；重写次数有上限（从 reset commit 计起）；两条分支不得从对方的答案出发（引入 commit 的整段祖先里都没有另一边的文件；两边引入 commit 无祖先关系、不同分支、不同作者）；`status: closed` 只有在两边齐、全一致时才允许，收口时写入一行 `corpus_sha:`（当时 README 的语料 pin）；关闭任务 stamp 缺失或与当前 pin 不符 → **STALE**，跳过重放/比对/改写计数，不参与红绿，不打印 `N/N number(s) agree`（plan §4.5）；`status: escalated` 与 `status: blocked` 暂停该任务的重放、比对、改写计数；空 commit 且留言以 `BLOCKED:` 开头会被认出并打印；**pull request 上只完整检查这次 diff 碰到的任务**（任务书或 `tasks/TASK-N/`，任一边输出文件都算碰到），其余任务只打 frozen summary，`status: open` 的不一致不能把无关 PR 打红；main 上仍检查全部任务；**`tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，但顶层 glob `tasks/TASK-*.md` 找不到对应任务书 → 红**（把任务书移出 glob 不得让检查变成 no-op 绿灯）；**同一 job 另跑 `python scripts/relations.py`（HEAD 工作树，不是 `/tmp/gate`）**：把语料拷到 `$RUNNER_TEMP`（从不写进 `data/`），`videos`/`windows`/`syllables` 整表再插一遍（主键加 `dup:` 前缀，`video_id`/`uid` 跟着改；`syllables.char` 同样加前缀，否则 `rare_share_*` 的绝对频次阈值 `< 10` 在翻倍后会动），`n_*` 必须恰好翻倍，`agree_*`/`rare_share_*`/`rate_*_pm`/`gap_*`/`did_*` 必须落在原容差内；再按 `INSERT ... ORDER BY random()` 重建三表，每个声明数字必须与原语料重放一致。A1 之后 PR 上的 `output_check.py` 来自 base，所以这一步必须从本次 checkout 调 `relations.py`，不能塞进 `/tmp/gate/output_check.py`。relations 不做 PR freeze：关掉的任务里写死的分母也必须能把任何 PR 打红 |
+| `output-check` | 每个数字都能从语料重放出来；SQL 的 `EXPLAIN QUERY PLAN` 必须 `SCAN`/`SEARCH` 语料表；每条语句执行两次必须得到同一个数；规范化后的语句不得出现 `random()` / `randomblob()` / `strftime('now')` 族；两套独立算出的数字必须相等；若任务书有 fenced `n` 块，每个 `n` 还必须等于块里声明的常数或 `derived:`（用重放值求），两套 `n` 仍须完全相等，两道检查一起做不是互相替代；若任务书有 fenced `identities` 块，每一行 `<expr> = <expr>  <tol>` 用与 `derived:` 相同的 AST 在**该文件**重放值上求（不合并 worker+verifier 字典）；`frame.<字段>` 绑定 ```frame``` 块数值；一条恒等式只在该文件里每个数字名都是 SQL 算路时才计，否则跳过；若 `frame` 含 `videos_expected` 且 numbers 声明了 `n_videos_pre` / `n_videos_post` / `n_unassigned_period`，三者重放值之和必须等于 `frame.videos_expected`（容差 `videos_expected_tol`，未写则 0），没有 `videos_expected` 时此条不运行；重写次数有上限（从 reset commit 计起）；两条分支不得从对方的答案出发（引入 commit 的整段祖先里都没有另一边的文件；两边引入 commit 无祖先关系、不同分支、不同作者）；`status: closed` 只有在两边齐、全一致时才允许，收口时写入一行 `corpus_sha:`（当时 README 的语料 pin）；关闭任务 stamp 缺失或与当前 pin 不符 → **STALE**，跳过重放/比对/改写计数，不参与红绿，不打印 `N/N number(s) agree`（plan §4.5）；`status: escalated` 与 `status: blocked` 暂停该任务的重放、比对、改写计数；空 commit 且留言以 `BLOCKED:` 开头会被认出并打印；**pull request 上只完整检查这次 diff 碰到的任务**（任务书或 `tasks/TASK-N/`，任一边输出文件都算碰到），其余任务只打 frozen summary，`status: open` 的不一致不能把无关 PR 打红；main 上仍检查全部任务；**`tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，但顶层 glob `tasks/TASK-*.md` 找不到对应任务书 → 红**（把任务书移出 glob 不得让检查变成 no-op 绿灯）；字母后缀兄弟任务书 `TASK-N-b` / `-c` 的 ```numbers``` / ```n``` 必须与父任务书字节级相同（改容差不是分叉），`fork_depth` 上限 2，开 `-d` 红，父 RESULT 在子任务书落地后不得改删；**同一 job 另跑 `python scripts/relations.py`（HEAD 工作树，不是 `/tmp/gate`）**：把语料拷到 `$RUNNER_TEMP`（从不写进 `data/`），`videos`/`windows`/`syllables` 整表再插一遍（主键加 `dup:` 前缀，`video_id`/`uid` 跟着改；`syllables.char` 同样加前缀，否则 `rare_share_*` 的绝对频次阈值 `< 10` 在翻倍后会动），`n_*` 必须恰好翻倍，`agree_*`/`rare_share_*`/`rate_*_pm`/`gap_*`/`did_*` 必须落在原容差内；再按 `INSERT ... ORDER BY random()` 重建三表，每个声明数字必须与原语料重放一致。A1 之后 PR 上的 `output_check.py` 来自 base，所以这一步必须从本次 checkout 调 `relations.py`，不能塞进 `/tmp/gate/output_check.py`。relations 不做 PR freeze：关掉的任务里写死的分母也必须能把任何 PR 打红 |
 | `scope-check` | 分支必须属于已知类别（先匹配 agent 前缀）；repair/ 与 chore/ 不能单靠前缀授权，须 `github.actor` 落在仓库 owner allowlist 上；chore 与 agent 同受 DENY；agent 不得碰 `.cursor/` `.github/` `data/` `scripts/`、`README.md`、`LOOP.md`，也不得改任务书 `tasks/TASK-N.md`，但必须能写 `tasks/TASK-N/` 下面自己的产出 |
 | `history-audit` | 移动已有的栅不得与被它度量的东西同 PR，且正文须有 `BAR-CHANGE:` 并点名每个被移动的栅路径；被度量路径是 files 减去栅路径（闸门脚本 fail-site 净删算移动栅，但不自己锁自己）；`tasks/**/*.sql` 属被度量；任务书 fenced `numbers`/`fixture`/`frame`/`n` 里放宽容差、删名字或删整块算移动栅，收窄容差不算；死路径栅移入 `RETIRED` 块而非删除，live∪RETIRED 的 glob 丢失才算删栅 |
 | `tests` | 有 `tests/test_*.py` 时跑 pytest |
@@ -71,17 +71,17 @@ STOP     全部一致 → 把任务书改成 status: closed，并盖上当时 RE
 ./verify              # 与 CI 相同：pytest、output-check、relations；PR 上再跑 scope-check 与 history-audit
 ./verify task 6       # 只跑 TASK-6 的 output-check 与 relations
 ./verify relations 6  # 只跑 TASK-6 的 double / permute / identities
-./verify probe        # 已知必红的探针（常数 SQL、relations 写死分母、RESULT 假 out_of_turns）；仍绿则 ./verify 自身坏了
+./verify probe        # 已知必红的探针（常数 SQL、relations 写死分母、RESULT 假 out_of_turns、TASK-N-b 改容差、开 -d）；仍绿则 ./verify 自身坏了
 ```
 
 main 上不跑 scope-check / history-audit（与 CI 一致）。`./verify probe` 在丢弃用的树里跑探针，不以本仓库的绿灯当证据。
 
 ## output-check 实际做了什么
 
-按顺序，任何一条不过就红。**在 pull request 上，下面 2–10 条只作用于这次 diff 碰到的任务**（`tasks/TASK-N.md` 或 `tasks/TASK-N/` 下任何文件，包括只改 `results.json` 或只改 `mine.json`）。没碰到的任务打一行 frozen summary，不把失败并进总账——`status: open` 且两边已经不合的任务（ITERATE）因此不能挡住一条无关的 PR。没有 `--base-ref` 时（main 上的 push）仍走完全部任务。任务书发现是顶层 glob `tasks/TASK-*.md`（非递归）。**若 `tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，而对应的 `tasks/TASK-N.md` 不在该 glob 里，这一条对整棵树生效、不受 PR freeze 跳过**（plan §2.6）：把任务书移走不得让检查变成「nothing to check」绿灯。
+按顺序，任何一条不过就红。**在 pull request 上，下面 2–11 条只作用于这次 diff 碰到的任务**（`tasks/TASK-N.md` 或 `tasks/TASK-N/` 下任何文件，包括只改 `results.json` 或只改 `mine.json`）。没碰到的任务打一行 frozen summary，不把失败并进总账——`status: open` 且两边已经不合的任务（ITERATE）因此不能挡住一条无关的 PR。没有 `--base-ref` 时（main 上的 push）仍走完全部任务。任务书发现是顶层 glob `tasks/TASK-*.md`（非递归）。**若 `tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，而对应的 `tasks/TASK-N.md` 不在该 glob 里，这一条对整棵树生效、不受 PR freeze 跳过**（plan §2.6）：把任务书移走不得让检查变成「nothing to check」绿灯。
 
 1. `data/corpus_v2.sqlite` 的 sha256 与 `README.md` 里记的一致。语料不对，后面全部无意义。
-2. 任务书有且只有一行 `status: open` / `closed` / `escalated` / `blocked`，`numbers` 块能解析。可选一行 `corpus_sha:`（64 位小写 hex，可带反引号）：收口时盖上当时 README 的语料 pin。可选的 fenced `n` 块、`frame` 块与 `identities` 块也在这里解析。`escalated` 与 `blocked` 暂停该任务第 3–9 条（重放、比对、声明 n、恒等式、改写计数）。**`status: closed` 且 stamp 缺失或与当前 README pin 不符 → STALE**：第 3–9 条不跑，不把失败并进总账，也不打印 `N/N number(s) agree`（plan §4.5）。顶层 glob 找不到任务书、但对应 TASK-N 目录里还有 `results.json` 或 `mine.json`：直接红，不走「nothing to check」。第 10 条（RESULT.json）在终态任务上仍跑：STALE/suspended 的 RESULT 对不上机器事实同样红。
+2. 任务书有且只有一行 `status: open` / `closed` / `escalated` / `blocked`，`numbers` 块能解析。可选一行 `corpus_sha:`（64 位小写 hex，可带反引号）：收口时盖上当时 README 的语料 pin。可选的 fenced `n` 块、`frame` 块与 `identities` 块也在这里解析。`escalated` 与 `blocked` 暂停该任务第 3–9 条（重放、比对、声明 n、恒等式、改写计数）。**`status: closed` 且 stamp 缺失或与当前 README pin 不符 → STALE**：第 3–9 条不跑，不把失败并进总账，也不打印 `N/N number(s) agree`（plan §4.5）。顶层 glob 找不到任务书、但对应 TASK-N 目录里还有 `results.json` 或 `mine.json`：直接红，不走「nothing to check」。第 10 条（RESULT.json）与第 11 条（分叉身份）在终态任务上仍跑：STALE/suspended 的 RESULT 对不上机器事实同样红，改容差的 `TASK-N-b` 同样红。
 3. 两个输出文件的每一行恰好是 `{name, value, n, query}`，名字集合与 `numbers` 块**相等**——少一个和多一个都红；同一文件内不得有重名，也不得有两个数字共用一条算路。算路按 `route()` 解析后的路径计（`sql/../sql/x.sql` 与 `sql/x.sql` 是同一条），不是按 query 字符串。若有 `n` 块，其名字集合必须与 `numbers` 相等；每一行是非负整数常数或 `derived:` 表达式。
 4. 每个 `query` 是下面两种之一：
    - `tasks/TASK-N/<…>.sql`：一条语句，`SELECT` 或 `WITH` 开头，返回恰好一行一列；`EXPLAIN QUERY PLAN` 必须出现对语料表 `videos` / `windows` / `syllables` / `runs` 的 `SCAN` 或 `SEARCH`（`SELECT 12345` 过不了这一关）；同一条语句执行两次结果必须相同；`strip_and_split` 之后不得出现 `random()`、`randomblob()`、`strftime('now')` 族；
@@ -91,7 +91,8 @@ main 上不跑 scope-check / history-audit（与 CI 一致）。`./verify probe`
 7. 两套数字每个 `value` 在容差内相等，每个 `n` 完全相等。不一致的把两个数都打出来。只两边 `n` 相等不够（plan §2.5）：若有 `n` 块，每个写下的 `n` 还必须等于声明的常数或 `derived:`（代入的是重放值）。两道检查一起做。没有 `n` 块时，声明 n 那一道不激活。若有 `identities` 块，每一行 `<expr> = <expr>  <tol>` 用重放值求；只在**该文件**里每个数字名都是 SQL 算路时才计，否则跳过（不合并两边的字典）。若 `frame` 含 `videos_expected`，且 numbers 声明了 `n_videos_pre`、`n_videos_post`、`n_unassigned_period`，三者重放值之和必须等于 `frame.videos_expected`（容差 `videos_expected_tol`，未写则 0）。RHS 引用 frame 字段，检查代码里不得写死 567。没有 `videos_expected`、或该任务没声明那三个名字：该条不运行。
 8. 动过同一个输出文件的 commit 不超过三个，从该任务书最近一次改动那个 reset commit 计起。`escalated` / `blocked` 不计。
 9. 引入某一边文件的那个 commit，它自己的树和**所有祖先**的树里都没有另一边的文件。两边的引入 commit 不能有祖先关系，必须来自不同分支、不同作者（plan §2.7）。只看引入 commit 自己那一棵树，挡不住「先提交自己的、再 merge 对方」或同一条分支上分三次写出两边。
-10. 若 `tasks/TASK-N/RESULT.json` 存在于 `closed` / `escalated` / `blocked` 任务，按 schema 核对：`subtype` 与 `verdict` 独立，后者只在 `subtype: success` 时非空；`success` 要求两边齐、数字在容差内一致、live closed；`out_of_turns` 要求改写次数已到上限 3；`corpus_sha` 必须等于当前 README pin。`turns_used` 只检查类型（启动次数 git 里没有）。本 PR 新收成终态的任务必须有这份文件；落地前已关闭的任务可以没有。存在于 `open` 则红。没有 `cost_usd` / `budget_usd` / `val_iterations`。
+10. 若 `tasks/TASK-N/RESULT.json` 存在于 `closed` / `escalated` / `blocked` 任务，按 schema 核对：`subtype` 与 `verdict` 独立，后者只在 `subtype: success` 时非空；`success` 要求两边齐、数字在容差内一致、live closed；`out_of_turns` 要求改写次数已到上限 3；`corpus_sha` 必须等于当前 README pin。`turns_used` 只检查类型（启动次数 git 里没有）。本 PR 新收成终态的任务必须有这份文件；落地前已关闭的任务可以没有。存在于 `open` 则红。没有 `cost_usd` / `budget_usd` / `val_iterations`。根任务 `forked_from` 为 null、`fork_depth` 为 0；字母后缀任务必须是父 id 与父 depth+1，且 `fork_depth ≤ 2`。
+11. 若存在 `tasks/TASK-N-b.md`（深度 2 为 `-c`）：```numbers``` 与 ```n``` 围栏（以及父任务书上已有的 ```frame``` / ```identities```）必须与直接父任务书**字节级相同**——改一个容差就红，那是新任务，不是分叉。子任务书必须有 `## Prior Attempts`（父假说、verdict 或 `out_of_turns` 的 subtype、why、父 RESULT 的关键数字）。父任务保持 `closed` 或 `escalated`，父 `RESULT.json` 在子任务书加入之后不得改、不得删。父 RESULT 须为 `verdict: refuted` 或 `subtype: out_of_turns`。开 `-d`（第三次分叉）红，应把该轮标 `blocked` 而不是再开一份任务书。无输出的子任务书也跑这一条。Bot 的 `check-brief` 不在本仓库，不顶替这一关。
 
 同一 job 里、在 `/tmp/gate/output_check.py`（PR）或 `scripts/output_check.py`（main）之后，另跑 `python scripts/relations.py`。这一步读的是 **HEAD 工作树**，不是 `/tmp/gate`：A1 之后 PR 上的闸门脚本是 base 的拷贝，新加的 `relations.py` 在合入之前 base 看不见。临时语料只写 `$RUNNER_TEMP`（或本地 tempfile），跑完删除，**从不写进 `data/`**。它不做 PR freeze。数字来自重放，不来自 agent 写下的值。
 
@@ -159,9 +160,30 @@ commit sha、文件、行号，给不出就写 UNKNOWN。它写 `review/TASK-N/a
 
 `subtype` 取值：`success`、`out_of_turns`、`out_of_budget`、`blocked`、`infra_failure`、`stale`。没有 `cost_usd` / `budget_usd` / `val_iterations`。`turns_used` / `turn_cap` 记本轮 Cloud Agent 启动次数；本闸门能核对的是 git 里的改写次数（从该轮 `open` 的 reset commit 计，上限 3）。启动次数从 git 还推不出来，类型先钉死，推导留给后续预算项。
 
-`forked_from` 与 `fork_depth` 只是字段；本文件不实现分叉。`out_of_budget` 只是合法 subtype，16 次启动的预算不在这里执行。
+`forked_from` 与 `fork_depth` 由分叉规则钉死，见下一节。`out_of_budget` 只是合法 subtype，16 次启动的预算不在这里执行。
 
 本闸门落地前已经 `closed` 的任务可以没有 `RESULT.json`。文件一旦存在，或本 PR 把任务书从非终态收成 `closed` / `escalated` / `blocked`，`output-check` 按上面核对，对不上就红。
+
+## 分叉（同一测量目标，只换假说）
+
+一轮以 `verdict: refuted` 或 `subtype: out_of_turns` 结束时，可以开一份兄弟任务书 `tasks/TASK-N-b.md`（再一次是 `-c`）。测量目标不变，只换假说。`output-check` 执行下面的规则；Grok Bot 的 `check-brief` 在仓库外，不顶替。
+
+边界（最重要）：
+
+> 同一份 `numbers` + 容差（```numbers``` / ```n``` 围栏字节级相同）→ 自动分叉，不必问 Tom。
+> 改 `numbers` 或容差 → 新任务，等 Tom。不是分叉。
+
+触发时：
+
+1. 建 `tasks/TASK-N-b.md`（字母后缀；深度 1 = `b`，深度 2 = `c`）。
+2. ```numbers``` 与 ```n``` 围栏（含其中的容差）必须与父任务书 `TASK-N.md`（或上一封信）**字节级相同**。父任务书上的 ```frame``` / ```identities``` 同样不得改——那些会重定义测量集。
+3. 加 `## Prior Attempts`：父假说、verdict（若是 `out_of_turns` 则记 subtype）、`why` 一行、父 RESULT 的关键数字。
+4. 只有假说 / 叙述可以改，不得改 numbers / n / 容差 / 测量集身份。
+5. 父 `TASK-N` 保持终态（`closed` 或 `out_of_turns` 时的 `escalated`），不重开；父 `RESULT.json` 不得改、不得删。
+6. 子 RESULT：`forked_from` = 父任务 id（`TASK-N` 或 `TASK-N-b`）；`fork_depth` = 父 depth + 1（父为 null/0 则子为 1）。
+7. **`fork_depth ≤ 2`**。第三次分叉必须变成 `blocked`（写进任务书，检查拦住），不得开 `-d`。
+
+本仓库不发明一份活的 `TASK-6-b`；规则用 `tests/` 夹具与 `./verify probe` 钉死。
 
 ## 语料更换
 

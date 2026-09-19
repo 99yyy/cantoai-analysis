@@ -568,6 +568,204 @@ def probe_result_out_of_turns(tmp_DIR: Path) -> tuple[bool, str]:
     return went_red, out
 
 
+PARENT_NUMBERS = "```numbers\nn_count  0\n```\n"
+PARENT_N = "```n\nn_count  2\n```\n"
+MUTATED_NUMBERS = "```numbers\nn_count  1\n```\n"
+FORK_HYPOTHESIS = "Agreement falls after 2025."
+FORK_WHY = "n_count is 2."
+
+
+def _git_in(repo: Path):
+    def git(*args: str) -> None:
+        subprocess.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+    return git
+
+
+def write_closed_parent(repo: Path, sha: str) -> None:
+    """Closed TASK-7 with agreeing videos-count outputs and a refuted RESULT."""
+    md = repo / "tasks" / "TASK-7.md"
+    md.parent.mkdir(parents=True, exist_ok=True)
+    md.write_text(
+        "# TASK-7\n\nstatus: open\n\nThe gap is film share.\n\n"
+        + PARENT_NUMBERS
+        + "\n"
+        + PARENT_N,
+        encoding="utf-8",
+    )
+    git = _git_in(repo)
+    git("init", "-b", "main")
+    git("config", "user.email", "probe@example.com")
+    git("config", "user.name", "probe")
+    git("config", "commit.gpgsign", "false")
+    git("add", "-A")
+    git("commit", "-m", "brief")
+
+    w_sql = repo / "tasks" / "TASK-7" / "sql" / "count_videos.sql"
+    v_sql = repo / "tasks" / "TASK-7" / "mine_sql" / "count_videos_as.sql"
+    w_sql.parent.mkdir(parents=True, exist_ok=True)
+    v_sql.parent.mkdir(parents=True, exist_ok=True)
+    w_sql.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+    v_sql.write_text("SELECT COUNT(*) FROM videos AS vid;\n", encoding="utf-8")
+    rows_w = [
+        {
+            "name": "n_count",
+            "value": 2,
+            "n": 2,
+            "query": "tasks/TASK-7/sql/count_videos.sql",
+        }
+    ]
+    rows_v = [
+        {
+            "name": "n_count",
+            "value": 2,
+            "n": 2,
+            "query": "tasks/TASK-7/mine_sql/count_videos_as.sql",
+        }
+    ]
+    (repo / "tasks" / "TASK-7" / "results.json").write_text(
+        json.dumps(rows_w, indent=2) + "\n", encoding="utf-8"
+    )
+    (repo / "tasks" / "TASK-7" / "mine.json").write_text(
+        json.dumps(rows_v, indent=2) + "\n", encoding="utf-8"
+    )
+    git("add", "-A")
+    git("commit", "-m", "outputs")
+
+    md.write_text(
+        "# TASK-7\n\nstatus: closed\n"
+        f"corpus_sha: {sha}\n\nThe gap is film share.\n\n"
+        + PARENT_NUMBERS
+        + "\n"
+        + PARENT_N,
+        encoding="utf-8",
+    )
+    result = {
+        "task": "TASK-7",
+        "subtype": "success",
+        "verdict": "refuted",
+        "hypothesis": FORK_HYPOTHESIS,
+        "why": FORK_WHY,
+        "numbers": {"n_count": {"value": 2.0, "within_tol": True}},
+        "turns_used": 2,
+        "turn_cap": 3,
+        "corpus_sha": sha,
+        "forked_from": None,
+        "fork_depth": 0,
+    }
+    (repo / "tasks" / "TASK-7" / "RESULT.json").write_text(
+        json.dumps(result, indent=2) + "\n", encoding="utf-8"
+    )
+    git("add", "-A")
+    git("commit", "-m", "close with RESULT")
+
+
+def prior_attempts_block() -> str:
+    return (
+        "## Prior Attempts\n\n"
+        f"- parent: TASK-7\n"
+        f"- hypothesis: {FORK_HYPOTHESIS}\n"
+        f"- verdict: refuted\n"
+        f"- why: {FORK_WHY}\n"
+        f"- n_count: 2\n"
+    )
+
+
+def probe_fork_tolerance(tmp_DIR: Path) -> tuple[bool, str]:
+    """TASK-N-b that changes one numbers tolerance vs parent must fail."""
+    repo = tmp_DIR / "fork-tol"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    write_mini_corpus(corpus)
+    pin_readme(repo, corpus)
+    sha = sha256_file(corpus)
+    write_closed_parent(repo, sha)
+
+    child = repo / "tasks" / "TASK-7-b.md"
+    child.write_text(
+        "# TASK-7-b\n\nstatus: open\n\nThe gap is rare characters.\n\n"
+        + MUTATED_NUMBERS
+        + "\n"
+        + PARENT_N
+        + "\n"
+        + prior_attempts_block(),
+        encoding="utf-8",
+    )
+    git = _git_in(repo)
+    git("add", "-A")
+    git("commit", "-m", "fork with mutated tolerance")
+
+    code, out = run_script_captured(
+        OUTPUT_CHECK,
+        [
+            "--repo-root",
+            str(repo),
+            "--corpus",
+            str(corpus),
+            "--head-ref",
+            "HEAD",
+        ],
+        cwd=repo,
+    )
+    went_red = (
+        code != 0
+        and "not byte-identical" in out
+        and "```numbers" in out
+        and "new task" in out
+    )
+    return went_red, out
+
+
+def probe_fork_depth_d(tmp_DIR: Path) -> tuple[bool, str]:
+    """Opening TASK-N-d when depth would exceed 2 must fail."""
+    repo = tmp_DIR / "fork-d"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    write_mini_corpus(corpus)
+    pin_readme(repo, corpus)
+    sha = sha256_file(corpus)
+    write_closed_parent(repo, sha)
+
+    child = repo / "tasks" / "TASK-7-d.md"
+    child.write_text(
+        "# TASK-7-d\n\nstatus: open\n\nThe gap is rare characters.\n\n"
+        + PARENT_NUMBERS
+        + "\n"
+        + PARENT_N
+        + "\n"
+        + prior_attempts_block(),
+        encoding="utf-8",
+    )
+    git = _git_in(repo)
+    git("add", "-A")
+    git("commit", "-m", "illegal third fork -d")
+
+    code, out = run_script_captured(
+        OUTPUT_CHECK,
+        [
+            "--repo-root",
+            str(repo),
+            "--corpus",
+            str(corpus),
+            "--head-ref",
+            "HEAD",
+        ],
+        cwd=repo,
+    )
+    went_red = (
+        code != 0
+        and "TASK-7-d" in out
+        and "third fork" in out
+        and "not open TASK-7-d" in out
+    )
+    return went_red, out
+
+
 def run_probe() -> int:
     tmp_DIR = Path(tempfile.mkdtemp(prefix="verify-probe-"))
     failed = False
@@ -598,6 +796,24 @@ def run_probe() -> int:
             failed = True
         else:
             print("verify: probe result-out-of-turns went red")
+
+        step("probe fork-tolerance")
+        red, out = probe_fork_tolerance(tmp_DIR)
+        if not red:
+            print(out)
+            print("verify: probe fork-tolerance stayed green")
+            failed = True
+        else:
+            print("verify: probe fork-tolerance went red")
+
+        step("probe fork-depth-d")
+        red, out = probe_fork_depth_d(tmp_DIR)
+        if not red:
+            print(out)
+            print("verify: probe fork-depth-d stayed green")
+            failed = True
+        else:
+            print("verify: probe fork-depth-d went red")
     finally:
         shutil.rmtree(tmp_DIR, ignore_errors=True)
     if failed:
