@@ -47,9 +47,30 @@ def conn():
         c.close()
 
 
-def _write_result(path: Path, payload: dict) -> None:
+def launch_records(count: int) -> list[dict]:
+    roles = ("coordinator", "worker", "verifier", "auditor", "repair")
+    return [
+        {
+            "id": f"L{i + 1}",
+            "role": roles[i % len(roles)],
+            "at": f"2026-01-01T00:00:{i:02d}Z",
+        }
+        for i in range(count)
+    ]
+
+
+def _write_launches(path: Path, count: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(launch_records(count), indent=2) + "\n", encoding="utf-8")
+
+
+def _write_result(path: Path, payload: dict, *, ledger: bool = True) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    if ledger and path.name == "RESULT.json" and path.parent.name.startswith("TASK-"):
+        used = payload.get("turns_used", 0)
+        n = used if isinstance(used, int) and not isinstance(used, bool) else 0
+        _write_launches(path.parent / "launches.json", n)
 
 
 def _base_payload(

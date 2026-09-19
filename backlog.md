@@ -21,3 +21,7 @@
 
 - 审计：`review/TASK-6/audit.md` @ `6530f02` — **FINDINGS: 4**（worker 写了根目录 `pytest.ini`；开放结论把剩余差距归因到 tone/segment 过强；film/other 四格缺 contract-24 六计数进 manifest；`src/` 有 SQL 字符串字面量）。结论只记在此，不直接变成下一题。
 - keep rate：产出 39 个数字，留下 39 个（`output-check` 39/39 agree）→ **39/39**。
+
+## LOOP 预算（启动次数，不是美元）
+
+一轮家族（父任务 + `-b` + `-c`）共享 **16** 次 Cloud Agent 启动。碰到上限是 `subtype: out_of_budget`，停下来报告 Tom。账本是 `tasks/TASK-N/launches.json`，由 coordinator / auditor 追加。同一语料 pin 上关了几道题只在本 backlog 记一笔，不进 RESULT，也不叫 `val_iterations`。

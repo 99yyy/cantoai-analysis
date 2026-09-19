@@ -6,7 +6,11 @@
     ./verify task N          output-check + relations for TASK-N
     ./verify relations N     double/permute/identities for TASK-N
     ./verify probe           known-red probes in a throwaway tree;
-                             exit 0 only if they go red
+                             exit 0 only if they go red (constant SQL,
+                             relations literal denom, lying RESULT
+                             out_of_turns / over-budget success /
+                             out_of_budget under cap, mutated fork
+                             tolerance, opening -d)
 
 Calls the existing scripts. Does not reimplement their rules.
 """
@@ -384,6 +388,21 @@ def pin_readme(repo: Path, corpus: Path) -> None:
     )
 
 
+def write_launches(repo: Path, n: str, count: int) -> None:
+    dest = repo / "tasks" / f"TASK-{n}" / "launches.json"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    roles = ("coordinator", "worker", "verifier", "auditor", "repair")
+    recs = [
+        {
+            "id": f"L{i + 1}",
+            "role": roles[i % len(roles)],
+            "at": f"2026-01-01T00:00:{i:02d}Z",
+        }
+        for i in range(count)
+    ]
+    dest.write_text(json.dumps(recs, indent=2) + "\n", encoding="utf-8")
+
+
 def probe_constant_sql(tmp_DIR: Path) -> tuple[bool, str]:
     """Constant SELECT must fail the corpus-plan gate."""
     repo = tmp_DIR / "constant"
@@ -544,6 +563,7 @@ def probe_result_out_of_turns(tmp_DIR: Path) -> tuple[bool, str]:
     (repo / "tasks" / "TASK-7" / "RESULT.json").write_text(
         json.dumps(result, indent=2) + "\n", encoding="utf-8"
     )
+    write_launches(repo, "7", 3)
     git("add", "-A")
     git("commit", "-m", "close with lying RESULT")
 
@@ -661,6 +681,7 @@ def write_closed_parent(repo: Path, sha: str) -> None:
     (repo / "tasks" / "TASK-7" / "RESULT.json").write_text(
         json.dumps(result, indent=2) + "\n", encoding="utf-8"
     )
+    write_launches(repo, "7", 2)
     git("add", "-A")
     git("commit", "-m", "close with RESULT")
 
@@ -766,6 +787,154 @@ def probe_fork_depth_d(tmp_DIR: Path) -> tuple[bool, str]:
     return went_red, out
 
 
+def _closed_task7_with_result(
+    tmp_DIR: Path, name: str, result: dict, launch_count: int
+) -> Path:
+    repo = tmp_DIR / name
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    write_mini_corpus(corpus)
+    pin_readme(repo, corpus)
+    sha = sha256_file(corpus)
+    result = dict(result)
+    result["corpus_sha"] = sha
+    md = repo / "tasks" / "TASK-7.md"
+    md.parent.mkdir(parents=True, exist_ok=True)
+    md.write_text(
+        "# TASK-7\n\nstatus: open\n\n```numbers\nn_count  0\n```\n",
+        encoding="utf-8",
+    )
+    git = _git_in(repo)
+    git("init", "-b", "main")
+    git("config", "user.email", "probe@example.com")
+    git("config", "user.name", "probe")
+    git("config", "commit.gpgsign", "false")
+    git("add", "-A")
+    git("commit", "-m", "brief")
+
+    w_sql = repo / "tasks" / "TASK-7" / "sql" / "count_videos.sql"
+    v_sql = repo / "tasks" / "TASK-7" / "mine_sql" / "count_videos_as.sql"
+    w_sql.parent.mkdir(parents=True, exist_ok=True)
+    v_sql.parent.mkdir(parents=True, exist_ok=True)
+    w_sql.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+    v_sql.write_text("SELECT COUNT(*) FROM videos AS vid;\n", encoding="utf-8")
+    rows_w = [
+        {
+            "name": "n_count",
+            "value": 2,
+            "n": 2,
+            "query": "tasks/TASK-7/sql/count_videos.sql",
+        }
+    ]
+    rows_v = [
+        {
+            "name": "n_count",
+            "value": 2,
+            "n": 2,
+            "query": "tasks/TASK-7/mine_sql/count_videos_as.sql",
+        }
+    ]
+    (repo / "tasks" / "TASK-7" / "results.json").write_text(
+        json.dumps(rows_w, indent=2) + "\n", encoding="utf-8"
+    )
+    (repo / "tasks" / "TASK-7" / "mine.json").write_text(
+        json.dumps(rows_v, indent=2) + "\n", encoding="utf-8"
+    )
+    git("add", "-A")
+    git("commit", "-m", "outputs")
+
+    md.write_text(
+        "# TASK-7\n\nstatus: closed\n"
+        f"corpus_sha: {sha}\n\n```numbers\nn_count  0\n```\n",
+        encoding="utf-8",
+    )
+    (repo / "tasks" / "TASK-7" / "RESULT.json").write_text(
+        json.dumps(result, indent=2) + "\n", encoding="utf-8"
+    )
+    write_launches(repo, "7", launch_count)
+    git("add", "-A")
+    git("commit", "-m", "close with RESULT")
+    return repo
+
+
+def probe_result_over_budget(tmp_DIR: Path) -> tuple[bool, str]:
+    """RESULT subtype success with family ledger length 17 must fail."""
+    sha_placeholder = "0" * 64
+    result = {
+        "task": "TASK-7",
+        "subtype": "success",
+        "verdict": "refuted",
+        "hypothesis": "Agreement falls after 2025.",
+        "why": "n_count is 2.",
+        "numbers": {"n_count": {"value": 2.0, "within_tol": True}},
+        "turns_used": 17,
+        "turn_cap": 3,
+        "corpus_sha": sha_placeholder,
+        "forked_from": None,
+        "fork_depth": 0,
+    }
+    repo = _closed_task7_with_result(tmp_DIR, "budget-over", result, 17)
+    corpus = repo / "mini.sqlite"
+    code, out = run_script_captured(
+        OUTPUT_CHECK,
+        [
+            "--repo-root",
+            str(repo),
+            "--corpus",
+            str(corpus),
+            "--head-ref",
+            "HEAD",
+        ],
+        cwd=repo,
+    )
+    went_red = (
+        code != 0
+        and "subtype is success" in out
+        and "launches are 17" in out
+        and "cap is 16" in out
+    )
+    return went_red, out
+
+
+def probe_result_out_of_budget_under(tmp_DIR: Path) -> tuple[bool, str]:
+    """RESULT subtype out_of_budget while family ledger length is 2 must fail."""
+    sha_placeholder = "0" * 64
+    result = {
+        "task": "TASK-7",
+        "subtype": "out_of_budget",
+        "verdict": None,
+        "hypothesis": "Agreement falls after 2025.",
+        "why": "The launch cap is 16.",
+        "numbers": {"n_count": {"value": 2.0, "within_tol": True}},
+        "turns_used": 2,
+        "turn_cap": 3,
+        "corpus_sha": sha_placeholder,
+        "forked_from": None,
+        "fork_depth": 0,
+    }
+    repo = _closed_task7_with_result(tmp_DIR, "budget-under", result, 2)
+    corpus = repo / "mini.sqlite"
+    code, out = run_script_captured(
+        OUTPUT_CHECK,
+        [
+            "--repo-root",
+            str(repo),
+            "--corpus",
+            str(corpus),
+            "--head-ref",
+            "HEAD",
+        ],
+        cwd=repo,
+    )
+    went_red = (
+        code != 0
+        and "subtype is out_of_budget" in out
+        and "launches are 2" in out
+        and "cap is 16" in out
+    )
+    return went_red, out
+
+
 def run_probe() -> int:
     tmp_DIR = Path(tempfile.mkdtemp(prefix="verify-probe-"))
     failed = False
@@ -814,6 +983,24 @@ def run_probe() -> int:
             failed = True
         else:
             print("verify: probe fork-depth-d went red")
+
+        step("probe result-over-budget")
+        red, out = probe_result_over_budget(tmp_DIR)
+        if not red:
+            print(out)
+            print("verify: probe result-over-budget stayed green")
+            failed = True
+        else:
+            print("verify: probe result-over-budget went red")
+
+        step("probe result-out-of-budget-under")
+        red, out = probe_result_out_of_budget_under(tmp_DIR)
+        if not red:
+            print(out)
+            print("verify: probe result-out-of-budget-under stayed green")
+            failed = True
+        else:
+            print("verify: probe result-out-of-budget-under went red")
     finally:
         shutil.rmtree(tmp_DIR, ignore_errors=True)
     if failed:

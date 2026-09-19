@@ -71,7 +71,7 @@ STOP     全部一致 → 把任务书改成 status: closed，并盖上当时 RE
 ./verify              # 与 CI 相同：pytest、output-check、relations；PR 上再跑 scope-check 与 history-audit
 ./verify task 6       # 只跑 TASK-6 的 output-check 与 relations
 ./verify relations 6  # 只跑 TASK-6 的 double / permute / identities
-./verify probe        # 已知必红的探针（常数 SQL、relations 写死分母、RESULT 假 out_of_turns、TASK-N-b 改容差、开 -d）；仍绿则 ./verify 自身坏了
+./verify probe        # 已知必红的探针（常数 SQL、relations 写死分母、RESULT 假 out_of_turns、RESULT 假 success 超 16 启动、RESULT 假 out_of_budget 不足 16、TASK-N-b 改容差、开 -d）；仍绿则 ./verify 自身坏了
 ```
 
 main 上不跑 scope-check / history-audit（与 CI 一致）。`./verify probe` 在丢弃用的树里跑探针，不以本仓库的绿灯当证据。
@@ -91,7 +91,7 @@ main 上不跑 scope-check / history-audit（与 CI 一致）。`./verify probe`
 7. 两套数字每个 `value` 在容差内相等，每个 `n` 完全相等。不一致的把两个数都打出来。只两边 `n` 相等不够（plan §2.5）：若有 `n` 块，每个写下的 `n` 还必须等于声明的常数或 `derived:`（代入的是重放值）。两道检查一起做。没有 `n` 块时，声明 n 那一道不激活。若有 `identities` 块，每一行 `<expr> = <expr>  <tol>` 用重放值求；只在**该文件**里每个数字名都是 SQL 算路时才计，否则跳过（不合并两边的字典）。若 `frame` 含 `videos_expected`，且 numbers 声明了 `n_videos_pre`、`n_videos_post`、`n_unassigned_period`，三者重放值之和必须等于 `frame.videos_expected`（容差 `videos_expected_tol`，未写则 0）。RHS 引用 frame 字段，检查代码里不得写死 567。没有 `videos_expected`、或该任务没声明那三个名字：该条不运行。
 8. 动过同一个输出文件的 commit 不超过三个，从该任务书最近一次改动那个 reset commit 计起。`escalated` / `blocked` 不计。
 9. 引入某一边文件的那个 commit，它自己的树和**所有祖先**的树里都没有另一边的文件。两边的引入 commit 不能有祖先关系，必须来自不同分支、不同作者（plan §2.7）。只看引入 commit 自己那一棵树，挡不住「先提交自己的、再 merge 对方」或同一条分支上分三次写出两边。
-10. 若 `tasks/TASK-N/RESULT.json` 存在于 `closed` / `escalated` / `blocked` 任务，按 schema 核对：`subtype` 与 `verdict` 独立，后者只在 `subtype: success` 时非空；`success` 要求两边齐、数字在容差内一致、live closed；`out_of_turns` 要求改写次数已到上限 3；`corpus_sha` 必须等于当前 README pin。`turns_used` 只检查类型（启动次数 git 里没有）。本 PR 新收成终态的任务必须有这份文件；落地前已关闭的任务可以没有。存在于 `open` 则红。没有 `cost_usd` / `budget_usd` / `val_iterations`。根任务 `forked_from` 为 null、`fork_depth` 为 0；字母后缀任务必须是父 id 与父 depth+1，且 `fork_depth ≤ 2`。
+10. 若 `tasks/TASK-N/RESULT.json` 存在于 `closed` / `escalated` / `blocked` 任务，按 schema 核对：`subtype` 与 `verdict` 独立，后者只在 `subtype: success` 时非空；`success` 要求两边齐、数字在容差内一致、live closed；`out_of_turns` 要求改写次数已到上限 3；`corpus_sha` 必须等于当前 README pin。`turns_used` 必须等于该任务 `tasks/TASK-N/launches.json` 的记录数（每条 `{id, role, at}`）；根任务与 `-b`/`-c` 的账本长度之和是这一轮家族的启动次数，上限 16。`subtype` 不是 `out_of_budget` / `blocked` 而家族合计 `> 16` → 红（已有子任务书的父 RESULT 不再按后来的家族增长重判（父 RESULT 分叉后不可改），但父任务自己的账本已经 `> 16` 仍红）；`subtype: out_of_budget` 而家族合计 `< 16` → 红。账本由 coordinator / auditor 追加（记下 worker / verifier / auditor / repair 启动），worker / verifier 不得自造启动记录。本 PR 新收成终态的任务必须有 RESULT（因而也必须有账本）；落地前已关闭的任务可以没有。存在于 `open` 则红。没有 `cost_usd` / `budget_usd` / `val_iterations`。根任务 `forked_from` 为 null、`fork_depth` 为 0；字母后缀任务必须是父 id 与父 depth+1，且 `fork_depth ≤ 2`。
 11. 若存在 `tasks/TASK-N-b.md`（深度 2 为 `-c`）：```numbers``` 与 ```n``` 围栏（以及父任务书上已有的 ```frame``` / ```identities```）必须与直接父任务书**字节级相同**——改一个容差就红，那是新任务，不是分叉。子任务书必须有 `## Prior Attempts`（父假说、verdict 或 `out_of_turns` 的 subtype、why、父 RESULT 的关键数字）。父任务保持 `closed` 或 `escalated`，父 `RESULT.json` 在子任务书加入之后不得改、不得删。父 RESULT 须为 `verdict: refuted` 或 `subtype: out_of_turns`。开 `-d`（第三次分叉）红，应把该轮标 `blocked` 而不是再开一份任务书。无输出的子任务书也跑这一条。Bot 的 `check-brief` 不在本仓库，不顶替这一关。
 
 同一 job 里、在 `/tmp/gate/output_check.py`（PR）或 `scripts/output_check.py`（main）之后，另跑 `python scripts/relations.py`。这一步读的是 **HEAD 工作树**，不是 `/tmp/gate`：A1 之后 PR 上的闸门脚本是 base 的拷贝，新加的 `relations.py` 在合入之前 base 看不见。临时语料只写 `$RUNNER_TEMP`（或本地 tempfile），跑完删除，**从不写进 `data/`**。它不做 PR freeze。数字来自重放，不来自 agent 写下的值。
@@ -158,9 +158,21 @@ commit sha、文件、行号，给不出就写 UNKNOWN。它写 `review/TASK-N/a
 
 `subtype` 是机器结局，`verdict` 是研究判断，二者独立。`subtype: success` 只表示两边齐、数字在容差内一致、CI 事实与「跑完了」相符；**不**表示假说成立。假说是否成立只看 `verdict`：`supported` / `refuted` / `inconclusive`。只有 `subtype` 为 `success` 时 `verdict` 才非空，否则必须是 `null`。
 
-`subtype` 取值：`success`、`out_of_turns`、`out_of_budget`、`blocked`、`infra_failure`、`stale`。没有 `cost_usd` / `budget_usd` / `val_iterations`。`turns_used` / `turn_cap` 记本轮 Cloud Agent 启动次数；本闸门能核对的是 git 里的改写次数（从该轮 `open` 的 reset commit 计，上限 3）。启动次数从 git 还推不出来，类型先钉死，推导留给后续预算项。
+`subtype` 取值：`success`、`out_of_turns`、`out_of_budget`、`blocked`、`infra_failure`、`stale`。没有 `cost_usd` / `budget_usd` / `val_iterations`。`turns_used` 是本任务 Cloud Agent 启动次数，必须等于 `tasks/TASK-N/launches.json` 的 `len`；`turn_cap` 仍是本轮改写上限 3。家族（父任务 + `-b` + `-c`）合计启动次数上限 **16**。碰到上限 → `subtype: out_of_budget`，停下来报告 Tom，agent 不得自行继续。
 
-`forked_from` 与 `fork_depth` 由分叉规则钉死，见下一节。`out_of_budget` 只是合法 subtype，16 次启动的预算不在这里执行。
+`forked_from` 与 `fork_depth` 由分叉规则钉死，见下一节。
+
+## 启动账本 `launches.json`
+
+git 推不出 Cursor 启动次数，所以仓库里必须有一份可核对的账本。`output-check` 读的是文件，不是美元。
+
+- 路径：每个任务一份 `tasks/TASK-N/launches.json`（分叉各自一份；家族合计把父、`-b`、`-c` 的长度加起来）。
+- 形状：`[{id, role, at}, …]`。`id` 在该文件内唯一；`role` 为 `worker` / `verifier` / `auditor` / `repair` / `coordinator`；`at` 非空字符串（时间戳或启动 id）。
+- **谁写**：coordinator 或 auditor 追加（把 worker / verifier / auditor / repair 等启动记进去）。worker / verifier 不得自己编账本。
+- **规则**：`RESULT.turns_used == len(该任务账本)`。家族合计 `> 16` 且 subtype 不是 `out_of_budget` / `blocked` → 红。`subtype: out_of_budget` 且家族合计 `< 16` → 红。
+- 落地前已关闭、没有 RESULT 的任务（TASK-6）不必补账本，也不发明研究 verdict。本闸门之后新收成终态的任务，RESULT 与账本一起要有。
+
+同一语料 pin 上关了几道题，记在 `backlog.md`，不进 RESULT，也不叫 `val_iterations`。
 
 本闸门落地前已经 `closed` 的任务可以没有 `RESULT.json`。文件一旦存在，或本 PR 把任务书从非终态收成 `closed` / `escalated` / `blocked`，`output-check` 按上面核对，对不上就红。
 
