@@ -27,6 +27,10 @@
 对方的任何模块。谁先合入不重要。一个 agent 和检查它的 agent 共享上下文，就是同一个
 agent 假装成两个。
 
+## 调查主题目录
+
+`investigations/` 每个研究问题一个文件夹（kebab-case 主题名），放人写的笔记、探索脚本和索引。任务仍是测量单位：声明数字、SQL、`results.json` / `mine.json`、`RESULT.json` 只进 `tasks/TASK-N/` 与 `review/TASK-N/`，不得只写在调查目录里。调查文件夹不替代任务。
+
 ## 五步
 
 ```

@@ -76,6 +76,8 @@ BRIEF_RE = re.compile(r"^tasks/[^/]+\.md$")
 CHORE_ALLOW = [
     "BACKGROUND.md", "PIPELINE.md", "REPORT.md", "RESEARCH_LOG.md",
     "backlog.md", "STOP", "tasks/*", "tasks/**", "docs/*", "docs/**",
+    # Campaign notes. LOOP.md stays DENY; numbers/RESULT stay under tasks/.
+    "investigations/*", "investigations/**",
 ]
 
 
