@@ -18,7 +18,7 @@ corpus_sha: 2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f
 - **发布集**：`windows.tier IN ('A','B')`。
 - **期间**：`post` 是 `substr(videos.upload_date,1,4)` 为四位数字且 `>= '2025'`；`pre` 是四位数字且 `<= '2024'`。两个谓词都不满足的视频既不进 `pre` 也不进 `post`，其数量记为 `n_unassigned_period`。不得把任何一组定义成另一组的补集（契约第 18 条）。
 - **一致率**：按契约第 24 条。一个音节**可判**当且仅当 `jp_realized` 非空且 `dur > 0`。`n_judgeable` 是可判音节数，`n_match` 是**可判音节里** `jp_match IN ('exact_default','exact_alt')` 的数量，一致率 = `n_match / n_judgeable`。分子必须和分母落在同一批行上，否则它不是一个比率。两项剔除**有交集**，所以 `n_judgeable` 不等于 `n_total` 减那两个剔除数——差的正是同时满足两项的行，单独声明为 `n_empty_and_zerodur_*`。
-- **旧片组**：`film` 是 `title` 非空且包含以下任一者——`粵劇` `任劍輝` `芳艷芬` `李小龍` `林鳳` `吳楚帆` `石堅` `謝賢` `新馬師曾` `白雪仙`；`other` 是 `title` 非空且一个都不包含。`title` 为空的视频两组都不进，其数量记为 `n_unassigned_film`。这是标题代理，不是内容判断，结论里要这么说。
+- **旧片组**：`film` 是 `title` 非空且包含以下任一者——`粵劇` `任劍輝` `芳艷芬` `李小龍` `林鳳` `吳楚帆` `石堅` `謝賢` `新馬師曾` `白雪仙`；`other` 是 `title` 非空且一个都不包含。`title` 为空的视频两组都不进，其**视频**数记为 `n_unassigned_film`。这些视频上的**可判音节**数另记为 `n_judgeable_unassigned_film_pre` / `n_judgeable_unassigned_film_post`（与 `n_judgeable_film_*` / `n_judgeable_other_*` 同一套可判定义）。`n_unassigned_film` 数的是视频，不能当作音节恒等式的第三项。这是标题代理，不是内容判断，结论里要这么说。
 - **稀有字**：该字在**全库全部 tier** 出现少于 10 次。
 - **计数**：契约第 24 条要求每个一致率都附上 `n_total`、`n_match`、`n_judgeable`、`n_empty_realized`、`n_dur_le_0` 与后两者的交集。本轮报告的每个一致率，这些计数都写进 `manifest.json`；其中 pre 与 post 两个总表的六个计数，以及 film/other 四格的 `n_judgeable`，另外声明在下面的 `numbers` 块里由 `output-check` 钉死。
 - **pp** 是百分点，**pm** 是千分之一。
@@ -49,6 +49,8 @@ n_judgeable_film_pre       0
 n_judgeable_film_post      0
 n_judgeable_other_pre      0
 n_judgeable_other_post     0
+n_judgeable_unassigned_film_pre  0
+n_judgeable_unassigned_film_post 0
 gap_contract_pp            0.05
 gap_all_pp                 0.05
 gap_excl_none_pp           0.05
@@ -81,9 +83,10 @@ rate_none_post_pm          0.5
 - `rare_share_*` 是稀有字音节占该期 A+B 音节的比例。
 - `rate_<verdict>_<period>_pm` 是该期 A+B 中该 `jp_match` 取值的千分比，分母是该期 A+B 全部音节。
 - `n_unassigned_period` 与 `n_unassigned_film` 是两个分组谓词都没匹配上的视频数。今天应当都是 0；容差是 0，所以将来语料一变就会红。
+- `n_judgeable_unassigned_film_*` 是 `title` 为空的视频上、该期内发布集的可判音节数。今天应当都是 0；容差是 0。它们是 film/other 三端恒等式的第三项，不能用 `n_unassigned_film`（视频数）代替。
 - `n_dur_le_0_*` 同时是 `gap_excl_zerodur_pp` 那一版被剔除的行数（契约第 25 条要求声明）。
 
-## 怎么交这 39 个数字
+## 怎么交这 41 个数字
 
 两个 agent 交的是**同一种文件**，形状一样，都不含任何判定字段：
 
@@ -99,13 +102,13 @@ verifier  tasks/TASK-6/mine.json
 `query` 是这个数字的算路，`output-check` 会**照着它把每个数字重新跑一遍**，跑出来的和你写下的不一致就红。只有两种形式：
 
 - **`tasks/TASK-6/sql/<名>.sql`**（worker）或 **`tasks/TASK-6/mine_sql/<名>.sql`**（verifier）：一个文件一条语句，`SELECT` 或 `WITH` 开头，返回**恰好一行一列**，那一格就是这个数字。
-- **`derived:<表达式>`**：只能用这 39 个名字里的其他名字、数字、`+ - * /` 和括号。例如
+- **`derived:<表达式>`**：只能用这 41 个名字里的其他名字、数字、`+ - * /` 和括号。例如
   `derived:100 * (n_match_pre / n_judgeable_pre - n_match_post / n_judgeable_post)`。
   重放时代进去的是**重放出来的**输入值，不是你写下的值——所以把输入写错、再把推导写成与错输入自洽，两行都会红。
 
 两条约束：一个 `.sql` 文件只能支撑一个数字；worker 与 verifier 不得指向同一个 `.sql` 文件，所以两个目录分开。`derived:` 两边写成一样没问题，它的每个输入都各自被重放过。
 
-39 个数字每一个都必须落进这两种形式之一。这确实限制了写法，换来的是从此没有一个数字只是「写在那里」。开工前先定下哪些走 SQL、哪些走 `derived:`。
+41 个数字每一个都必须落进这两种形式之一。这确实限制了写法，换来的是从此没有一个数字只是「写在那里」。开工前先定下哪些走 SQL、哪些走 `derived:`。`n_judgeable_unassigned_film_*` 必须走 SQL：写进 `derived:` 会让下面的 film/other 恒等式在该文件上被跳过。
 
 ## `n` 是什么
 
@@ -133,6 +136,8 @@ n_judgeable_film_pre       derived:n_total_pre
 n_judgeable_film_post      derived:n_total_post
 n_judgeable_other_pre      derived:n_total_pre
 n_judgeable_other_post     derived:n_total_post
+n_judgeable_unassigned_film_pre  derived:n_total_pre
+n_judgeable_unassigned_film_post derived:n_total_post
 gap_contract_pp            derived:n_judgeable_pre + n_judgeable_post
 gap_all_pp                 derived:n_total_pre + n_total_post
 gap_excl_none_pp           derived:n_total_pre + n_total_post
@@ -158,12 +163,22 @@ rate_none_post_pm          derived:n_total_post
 
 下面 ```frame``` 块在出现 `videos_expected` 时激活恒等式
 `n_videos_pre + n_videos_post + n_unassigned_period = frame.videos_expected`
-（容差 `videos_expected_tol`；未写则按 0）。没有这块、或没有 `videos_expected` 时，恒等式检查不运行。检查读的是这个字段，不得把 567 写进闸门脚本。
+（容差 `videos_expected_tol`；未写则按 0）。没有这块、或没有 `videos_expected` 时，该条恒等式不运行。检查读的是这个字段，不得把 567 写进闸门脚本。
 
 ```frame
 windows.tier IN ('A','B')
 videos_expected 567
 videos_expected_tol 0
+```
+
+## 恒等式
+
+下面 ```identities``` 块每一行是 `<expr> = <expr>  <tol>`。`output-check` 用与 `derived:` 相同的 AST，代入**该文件重放出来的**值（不合并 worker 与 verifier 的字典）。`frame.<字段>` 绑定上面 ```frame``` 块的数值。一条恒等式**只在该文件里每一个出现的数字名都是 SQL 算路时才计**；任一名字是 `derived:` 就跳过——否则 worker 把 `n_judgeable_pre` 写成推导式时，film/other 恒等式在该文件上会变成恒真。
+
+```identities
+n_videos_pre + n_videos_post + n_unassigned_period = frame.videos_expected  0
+n_judgeable_film_pre + n_judgeable_other_pre + n_judgeable_unassigned_film_pre = n_judgeable_pre  0
+n_judgeable_film_post + n_judgeable_other_post + n_judgeable_unassigned_film_post = n_judgeable_post  0
 ```
 
 ## 还要交的东西（这部分不进 numbers 块）
@@ -189,8 +204,8 @@ videos_expected_tol 0
 `worker` 与 `verifier` **同时启动，从同一个 `starting_ref`**。不是一个做完另一个再做：`output-check` 会检查引入你那个文件的 commit，它的树里不能有对方的文件，所以谁在对方合入之后才切分支，谁就红。
 
 - `worker`，分支 `cursor/t6-worker-…`：写 `tasks/TASK-6/sql/`、`src/`、`tests/`，交 `tasks/TASK-6/results.json` 与上面那部分开放分析。
-- `verifier`，分支 `cursor/t6-verifier-…`：**不读 worker 的代码、对话、PR**，只读本文件和语料，用自己的 SQL 把这 39 个数字重算一遍，写 `tasks/TASK-6/mine_sql/`，交 `tasks/TASK-6/mine.json`。
+- `verifier`，分支 `cursor/t6-verifier-…`：**不读 worker 的代码、对话、PR**，只读本文件和语料，用自己的 SQL 把这 41 个数字重算一遍，写 `tasks/TASK-6/mine_sql/`，交 `tasks/TASK-6/mine.json`。
 - 不一致的行发回去重算。同一个输出文件最多被改三次——第一次加两次重试，`output-check` 数 commit。仍不一致就停，两套数字一起升级给 Tom。
-- 两个都合入、`output-check` 报出 39 个全一致之后，把本文件的 `status:` 改成 `closed`，并写入一行 `corpus_sha:`，值为当时 `README.md` 里的语料 sha256。stamp 与当前 pin 不符或缺失时本任务是 STALE：不再重放，不参与红绿，也不打印 39/39 agree。改不动 `closed` 就说明还没齐，那是检查在告诉你事实。然后放 `auditor`，写 `review/TASK-6/audit.md`。
+- 两个都合入、`output-check` 报出 41 个全一致之后，把本文件的 `status:` 改成 `closed`，并写入一行 `corpus_sha:`，值为当时 `README.md` 里的语料 sha256。stamp 与当前 pin 不符或缺失时本任务是 STALE：不再重放，不参与红绿，也不打印 41/41 agree。改不动 `closed` 就说明还没齐，那是检查在告诉你事实。然后放 `auditor`，写 `review/TASK-6/audit.md`。
 
 两个 agent 都不能改本文件，但**必须**能写 `tasks/TASK-6/` 下面自己的产出。
