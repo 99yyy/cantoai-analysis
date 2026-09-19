@@ -12,9 +12,9 @@ Two rules, both mechanical:
    the bar in the same change that alters what it measures makes the check
    unfalsifiable, and the diff hides it.
 2. A pull request that changes a bar at all must state why, as a line beginning
-   ``BAR-CHANGE:`` in its body, naming each bar it touches. The line does not
-   make the change right; it makes it visible to the round audit, which is where
-   judgement belongs.
+   ``BAR-CHANGE:`` in its body, naming each bar path it moves. A vague token is
+   not a name. The line does not make the change right; it makes it visible to
+   the round audit, which is where judgement belongs.
 
 Counting rule for bars that are code: a NET REMOVAL is a bar change (fewer
 checks emitted, fewer counterexample patterns, fewer mutation patches). Adding
@@ -55,8 +55,10 @@ BAR_YAML_KEYS = re.compile(
 BAR_YAML_FILES = ["frame.yaml", "rounds/ROUND-*.yaml"]
 MUTATION_GLOB = "tests/mutations/*.patch"
 
+# sql/* and sql/** do not match tasks/TASK-N/sql/*.sql (fnmatch is
+# prefix-anchored). Task analysis SQL lives there (plan §3.4).
 MEASURED = ["src/*", "src/**", "sql/*", "sql/**", "data/*", "data/**",
-            "scripts/*.py", "scripts/**/*.py"]
+            "scripts/*.py", "scripts/**/*.py", "tasks/**/*.sql"]
 
 # Top-level task briefs only. fnmatch '*' matches a slash, so tasks/TASK-*.md
 # would also hit tasks/TASK-6/open_analysis.md.
@@ -185,6 +187,35 @@ def declaration_bars(path: str, old_text: str, new_text: str) -> list[str]:
     return sorted(hits)
 
 
+def bar_path(bar: str) -> str:
+    """The path a bar entry names (file, directory prefix, or yaml file)."""
+    token = bar.split()[0]
+    if ":" in token:
+        token = token.split(":", 1)[0]
+    return token
+
+
+def unnamed_bar_paths(bars: list[str], declared: list[str]) -> list[str]:
+    """Bar paths that no ``BAR-CHANGE:`` line names.
+
+    Matching is substring on the path with a trailing slash stripped, so
+    ``tests/mutations/foo.patch`` names ``tests/mutations/``. A token such as
+    ``x`` names nothing.
+    """
+    blob = "\n".join(declared)
+    missing: list[str] = []
+    seen: set[str] = set()
+    for bar in bars:
+        path = bar_path(bar)
+        key = path.rstrip("/") or path
+        if key in seen:
+            continue
+        seen.add(key)
+        if key not in blob:
+            missing.append(path)
+    return missing
+
+
 def yaml_bar_keys_touched(base: str, path: str) -> list[str]:
     """Keys whose value moved or vanished. A key that is only added is not a bar change."""
     try:
@@ -271,6 +302,13 @@ def main() -> int:
             failed = True
         else:
             print(f"  declared: {declared[0].strip()[:160]}")
+            unnamed = unnamed_bar_paths(bars, declared)
+            if unnamed:
+                print(
+                    "history_audit: FAIL BAR-CHANGE does not name every bar path it moves: "
+                    + ", ".join(unnamed)
+                )
+                failed = True
 
     if failed:
         return 1
