@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -331,3 +333,219 @@ def test_execute_twice_disagreement_fails(conn, tmp_path):
     conn.create_function("flip", 0, flip)
     with pytest.raises(output_check.Fail, match=r"returned 568 then 569"):
         _run(conn, tmp_path, "SELECT COUNT(*) + flip() FROM videos;\n")
+
+
+# --------------------------------------------------------------------------- §4.1
+
+
+CORPUS_SHA = "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f"
+
+
+def test_task_ids_from_paths_brief_and_either_output():
+    assert output_check.task_ids_from_paths(["tasks/TASK-7.md"]) == frozenset({"7"})
+    assert output_check.task_ids_from_paths(["tasks/TASK-7/results.json"]) == frozenset(
+        {"7"}
+    )
+    assert output_check.task_ids_from_paths(["tasks/TASK-7/mine.json"]) == frozenset({"7"})
+    assert output_check.task_ids_from_paths(
+        ["tasks/TASK-8/sql/n.sql", "tasks/TASK-8/mine_sql/n.sql"]
+    ) == frozenset({"8"})
+    both = output_check.task_ids_from_paths(
+        ["tasks/TASK-7/results.json", "LOOP.md", "tasks/TASK-8.md"]
+    )
+    assert both == frozenset({"7", "8"})
+
+
+def test_task_ids_from_paths_ignores_review_and_unrelated():
+    assert output_check.task_ids_from_paths(
+        ["review/TASK-7/audit.md", "scripts/output_check.py", "tasks/NOTES.md"]
+    ) == frozenset()
+    assert output_check.task_ids_from_paths(
+        ["tasks/TASK-6/open_analysis.md"]
+    ) == frozenset({"6"})
+    assert output_check.task_ids_from_paths([]) == frozenset()
+    assert output_check.task_ids_from_paths(["src/frame.py"]) == frozenset()
+
+
+def _write_brief(root: Path, n: str, status: str = "open", name: str = "n_count") -> Path:
+    md = root / "tasks" / f"TASK-{n}.md"
+    md.parent.mkdir(parents=True, exist_ok=True)
+    md.write_text(
+        f"# TASK-{n}\n\nstatus: {status}\n\n"
+        f"```numbers\n# name  tol\n{name}  0\n```\n",
+        encoding="utf-8",
+    )
+    return md
+
+
+def _write_rows(path: Path, name: str, value: float, query: str, n: int = 1) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            [{"name": name, "value": value, "n": n, "query": query}],
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _iterating_task(root: Path, n: str = "7") -> Path:
+    """Open task with both outputs present and a real disagreement."""
+    md = _write_brief(root, n)
+    w_sql = root / "tasks" / f"TASK-{n}" / "sql" / "count_videos.sql"
+    v_sql = root / "tasks" / f"TASK-{n}" / "mine_sql" / "count_windows.sql"
+    w_sql.parent.mkdir(parents=True, exist_ok=True)
+    v_sql.parent.mkdir(parents=True, exist_ok=True)
+    w_sql.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+    v_sql.write_text("SELECT COUNT(*) FROM windows AS w;\n", encoding="utf-8")
+    _write_rows(
+        root / "tasks" / f"TASK-{n}" / "results.json",
+        "n_count",
+        567,
+        f"tasks/TASK-{n}/sql/count_videos.sql",
+    )
+    _write_rows(
+        root / "tasks" / f"TASK-{n}" / "mine.json",
+        "n_count",
+        4911,
+        f"tasks/TASK-{n}/mine_sql/count_windows.sql",
+    )
+    return md
+
+
+def test_check_task_fails_open_iterate_disagreement(conn, tmp_path):
+    md = _iterating_task(tmp_path, "7")
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    assert fail, "full check must fail an iterating disagreement"
+    assert any("disagree" in m for m in fail)
+
+
+def test_frozen_summary_does_not_fail_open_iterate_disagreement(tmp_path, capsys):
+    md = _iterating_task(tmp_path, "7")
+    output_check.frozen_summary(tmp_path, md)
+    out = capsys.readouterr().out
+    assert "TASK-7 [open]: frozen (not touched by this PR)" in out
+    assert "results.json, mine.json" in out
+
+
+def test_frozen_summary_open_task_does_not_fail_unrelated_pr(conn, tmp_path):
+    """An open iterating task must not redden a PR that does not touch it."""
+    md = _iterating_task(tmp_path, "7")
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail)
+    assert fail
+    # frozen path is what main() uses when the id is absent from the PR diff
+    output_check.frozen_summary(tmp_path, md)
+    # check_task's fail list is unchanged by frozen_summary (it has no fail arg)
+    assert output_check.task_ids_from_paths(
+        ["scripts/output_check.py", "LOOP.md"]
+    ) == frozenset()
+
+
+def test_full_check_task_6_closed_still_agrees(conn):
+    """PR-scoped skip must not be the only path that still sees TASK-6."""
+    md = ROOT / "tasks" / "TASK-6.md"
+    fail: list[str] = []
+    output_check.check_task(ROOT, md, conn, 60.0, None, None, fail)
+    assert fail == []
+
+
+def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-C", str(repo), *args],
+        check=check,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _init_git(repo: Path) -> None:
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.email", "probe@example.com")
+    _git(repo, "config", "user.name", "probe")
+    _git(repo, "config", "commit.gpgsign", "false")
+
+
+def _commit(repo: Path, message: str) -> str:
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-m", message)
+    return _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def _run_main(repo: Path, *extra: str) -> tuple[int, str]:
+    argv = [
+        "output_check.py",
+        "--repo-root",
+        str(repo),
+        "--corpus",
+        str(CORPUS_PATH),
+        *extra,
+    ]
+    old = sys.argv
+    sys.argv = argv
+    try:
+        code = output_check.main()
+    finally:
+        sys.argv = old
+    return code, ""
+
+
+def test_unrelated_pr_is_green_while_open_task_iterates(tmp_path, capsys):
+    """Probe: TASK-7 in ITERATE on the tree; the PR only adds TASK-8 worker.
+
+    After (§4.1): GREEN. The same tree fully checked (no base ref) is RED.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text(f"sha256: `{CORPUS_SHA}`\n", encoding="utf-8")
+    _iterating_task(repo, "7")
+    _write_brief(repo, "8")
+    _init_git(repo)
+    base = _commit(repo, "main: TASK-7 iterating, TASK-8 brief")
+
+    w_sql = repo / "tasks" / "TASK-8" / "sql" / "count_videos.sql"
+    w_sql.parent.mkdir(parents=True, exist_ok=True)
+    w_sql.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+    _write_rows(
+        repo / "tasks" / "TASK-8" / "results.json",
+        "n_count",
+        567,
+        "tasks/TASK-8/sql/count_videos.sql",
+    )
+    _commit(repo, "TASK-8 worker")
+
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "full-check TASK-8" in out
+    assert "TASK-7 [open]: frozen (not touched by this PR)" in out
+    assert "output_check: PASS" in out
+
+    code_all, _ = _run_main(repo)
+    out_all = capsys.readouterr().out
+    assert code_all == 1, out_all
+    assert any("disagree" in line for line in out_all.splitlines())
+
+
+def test_pr_that_touches_either_output_still_compares(tmp_path, capsys):
+    """Plan §4.3: editing mine.json on an iterating task re-runs the comparison."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text(f"sha256: `{CORPUS_SHA}`\n", encoding="utf-8")
+    _iterating_task(repo, "7")
+    _init_git(repo)
+    base = _commit(repo, "main: TASK-7 iterating")
+
+    mine = repo / "tasks" / "TASK-7" / "mine.json"
+    data = json.loads(mine.read_text(encoding="utf-8"))
+    data[0]["n"] = 2
+    mine.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    _commit(repo, "retry mine.json")
+
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert "full-check TASK-7" in out
+    assert any("disagree" in line for line in out.splitlines())
