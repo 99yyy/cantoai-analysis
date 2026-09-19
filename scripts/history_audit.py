@@ -10,15 +10,18 @@ Two rules, both mechanical:
 
 1. One pull request may not change a bar and a measured file together. Lowering
    the bar in the same change that alters what it measures makes the check
-   unfalsifiable, and the diff hides it.
+   unfalsifiable, and the diff hides it. Measured paths are ``files − bar
+   paths`` (plan §7 item 1 alternative): a gate script can be a counted bar
+   without being measured against itself, so a legitimate dedupe with
+   ``BAR-CHANGE:`` is not an automatic red.
 2. A pull request that changes a bar at all must state why, as a line beginning
    ``BAR-CHANGE:`` in its body, naming each bar path it moves. A vague token is
    not a name. The line does not make the change right; it makes it visible to
    the round audit, which is where judgement belongs.
 
 Counting rule for bars that are code: a NET REMOVAL is a bar change (fewer
-checks emitted, fewer counterexample patterns, fewer mutation patches). Adding
-checks is never flagged.
+checks emitted, fewer fail sites, fewer counterexample patterns, fewer
+mutation patches). Adding checks is never flagged.
 
 Task briefs ``tasks/TASK-*.md`` declare bars in fenced ``numbers``, ``fixture``,
 ``frame``, and ``n`` blocks (plan §3.3). Widening a tolerance, deleting a name,
@@ -43,8 +46,15 @@ BAR_FILES = ["expected/*", "expected/**"]
 # Adding a bar is normal: new code needs its expected value declared in the same
 # change (contract clause 9). Only a bar that already existed and then moved, or
 # disappeared, is a bar being lowered. Every rule below tests for that.
+# Gate-script fail sites (Fail raises; appends on the fail list). output_check.py
+# has dozens. scope_check.py has none of this token (it fails via
+# ValueError / print FAIL); a rarer token must not freeze that file — rule 1
+# already subtracts bar paths from measured (plan §7 item 1 alternative).
+GATE_FAIL_SITE_RE = r"(?:raise Fail\(|fail\.append)"
 BAR_COUNTED = {
     "scripts/contract_check.py": (r"\b(?:row|compare_check)\s*\(", "contract checks emitted"),
+    "scripts/*.py": (GATE_FAIL_SITE_RE, "fail sites"),
+    "scripts/**/*.py": (GATE_FAIL_SITE_RE, "fail sites"),
     "tests/*.py": (r"match\s*=", "counterexample patterns"),
     "tests/**/*.py": (r"match\s*=", "counterexample patterns"),
 }
@@ -195,6 +205,17 @@ def bar_path(bar: str) -> str:
     return token
 
 
+def measured_paths(files: list[str], bars: list[str]) -> list[str]:
+    """Measured paths after subtracting bar paths (plan §7 item 1 alternative).
+
+    ``scripts/*.py`` is in MEASURED and in BAR_COUNTED. Computing measured from
+    the globs alone makes a net delete of fail sites both a bar and measured,
+    so rule 1 is unconditionally red even with BAR-CHANGE. Subtract first.
+    """
+    barred = {bar_path(b) for b in bars}
+    return sorted(f for f in files if match_any(f, MEASURED) and f not in barred)
+
+
 def unnamed_bar_paths(bars: list[str], declared: list[str]) -> list[str]:
     """Bar paths that no ``BAR-CHANGE:`` line names.
 
@@ -282,7 +303,7 @@ def main() -> int:
         bars.extend(declaration_bars(f, old, new))
 
     bars = sorted(set(bars))
-    measured = sorted(f for f in files if match_any(f, MEASURED))
+    measured = measured_paths(files, bars)
 
     print(f"history_audit: {len(files)} file(s) changed")
     print(f"  bars touched:     {bars or 'none'}")
