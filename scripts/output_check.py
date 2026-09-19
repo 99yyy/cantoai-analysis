@@ -57,6 +57,10 @@ What this enforces, in order:
   replay       every number equals what its own route produces, within tol.
                A SQL route whose plan never SCAN/SEARCHes a corpus table
                fails, so two constant SELECTs cannot certify agreement.
+               Each statement is executed twice and the two numbers must
+               be identical; random(), randomblob(), and the strftime('now')
+               family in the comment-stripped statement fail, so a jitter
+               of (abs(random()) % 5) / 100.0 cannot hide inside tol 0.05.
   agreement    the two files agree on every value within tol and on every n
                exactly. Any disagreement fails, and both numbers are printed.
   attempts     at most three commits touch one output file: the first and two
@@ -114,6 +118,13 @@ _PLAN_SCAN = re.compile(
     r"(?P<name>\"[^\"]+\"|`[^`]+`|\[[^\]]+\]|\w+)"
 )
 _PLAN_CTE = re.compile(r"(?i)\b(?:CO-ROUTINE|MATERIALIZE)\s+(\w+)")
+# Non-deterministic SQLite in comment-stripped statement text (plan §2.4).
+_RANDOM_CALL = re.compile(r"(?i)\brandom\s*\(")
+_RANDOMBLOB_CALL = re.compile(r"(?i)\brandomblob\s*\(")
+_CURRENT_NOW = re.compile(r"(?i)\bcurrent_(?:timestamp|date|time)\b")
+_NOW_FAMILY_CALL = re.compile(
+    r"(?i)\b(?:strftime|date|time|datetime|julianday|unixepoch|timediff)\s*\("
+)
 _NOT_ALIAS = frozenset(
     {
         "on",
@@ -528,6 +539,85 @@ def plan_touches_corpus(details: list[str], stmt: str) -> bool:
     return False
 
 
+def _sql_string_literals(text: str) -> list[str]:
+    """Unescaped contents of single-quoted SQL string literals."""
+    out: list[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] != "'":
+            i += 1
+            continue
+        j = i + 1
+        buf: list[str] = []
+        while j < n:
+            if text[j] == "'":
+                if j + 1 < n and text[j + 1] == "'":
+                    buf.append("'")
+                    j += 2
+                    continue
+                out.append("".join(buf))
+                j += 1
+                break
+            buf.append(text[j])
+            j += 1
+        i = j
+    return out
+
+
+def _paren_group(text: str, open_i: int) -> str | None:
+    """Return the ``(...)`` group starting at ``open_i``, skipping quoted spans."""
+    depth = 0
+    i, n = open_i, len(text)
+    while i < n:
+        c = text[i]
+        if c in "'\"":
+            quote = c
+            i += 1
+            while i < n:
+                if text[i] == quote:
+                    if quote == "'" and i + 1 < n and text[i + 1] == "'":
+                        i += 2
+                        continue
+                    i += 1
+                    break
+                i += 1
+            continue
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return text[open_i : i + 1]
+        i += 1
+    return None
+
+
+def forbidden_nondeterminism(stmt: str) -> str | None:
+    """Banned token in comment-stripped statement text, or None.
+
+    ``random()``, ``randomblob()``, and the ``strftime('now')`` family:
+    date/time functions whose timestring is the literal ``'now'``, plus
+    CURRENT_DATE / CURRENT_TIME / CURRENT_TIMESTAMP.
+    """
+    hits: list[tuple[int, str]] = []
+    for m in _RANDOMBLOB_CALL.finditer(stmt):
+        hits.append((m.start(), "randomblob()"))
+    for m in _RANDOM_CALL.finditer(stmt):
+        hits.append((m.start(), "random()"))
+    for m in _CURRENT_NOW.finditer(stmt):
+        hits.append((m.start(), "strftime('now')"))
+    for m in _NOW_FAMILY_CALL.finditer(stmt):
+        args = _paren_group(stmt, m.end() - 1)
+        if args is None:
+            continue
+        if any(s.lower() == "now" for s in _sql_string_literals(args)):
+            hits.append((m.start(), "strftime('now')"))
+    if not hits:
+        return None
+    hits.sort(key=lambda t: t[0])
+    return hits[0][1]
+
+
 def run_sql(conn: sqlite3.Connection, label: str, sql_path: Path, seconds: float) -> float:
     stmts = strip_and_split(sql_path.read_text(encoding="utf-8"))
     if len(stmts) != 1:
@@ -535,6 +625,13 @@ def run_sql(conn: sqlite3.Connection, label: str, sql_path: Path, seconds: float
     stmt = stmts[0]
     if not re.match(r"(?is)^\s*(select|with)\b", stmt):
         raise Fail(f"{label}: {sql_path.name} must begin with SELECT or WITH")
+
+    banned = forbidden_nondeterminism(stmt)
+    if banned is not None:
+        raise Fail(
+            f"{label}: {sql_path.name} uses {banned}; "
+            f"a replayed number must be deterministic"
+        )
 
     try:
         plan_rows = conn.execute("EXPLAIN QUERY PLAN " + stmt).fetchall()
@@ -549,30 +646,46 @@ def run_sql(conn: sqlite3.Connection, label: str, sql_path: Path, seconds: float
         )
 
     deadline = time.monotonic() + seconds
-    conn.set_progress_handler(lambda: 1 if time.monotonic() > deadline else 0, 100_000)
-    try:
-        cur = conn.execute(stmt)
-        got = cur.fetchmany(2)
-    except sqlite3.OperationalError as e:
-        if "interrupt" in str(e).lower():
-            raise Fail(f"{label}: {sql_path.name} ran longer than {seconds:g}s")
-        raise Fail(f"{label}: {sql_path.name} would not run: {e}")
-    except sqlite3.Error as e:
-        raise Fail(f"{label}: {sql_path.name} would not run: {e}")
-    finally:
-        conn.set_progress_handler(None, 0)
 
-    if len(got) != 1:
-        raise Fail(
-            f"{label}: {sql_path.name} returned "
-            f"{'no rows' if not got else 'more than one row'}; it must return exactly one"
+    def execute_once() -> float:
+        conn.set_progress_handler(
+            lambda: 1 if time.monotonic() > deadline else 0, 100_000
         )
-    if len(got[0]) != 1:
-        raise Fail(f"{label}: {sql_path.name} returned {len(got[0])} columns; it must return exactly one")
-    v = got[0][0]
-    if isinstance(v, bool) or not isinstance(v, (int, float)):
-        raise Fail(f"{label}: {sql_path.name} returned {v!r}, which is not a number")
-    return float(v)
+        try:
+            cur = conn.execute(stmt)
+            got = cur.fetchmany(2)
+        except sqlite3.OperationalError as e:
+            if "interrupt" in str(e).lower():
+                raise Fail(f"{label}: {sql_path.name} ran longer than {seconds:g}s")
+            raise Fail(f"{label}: {sql_path.name} would not run: {e}")
+        except sqlite3.Error as e:
+            raise Fail(f"{label}: {sql_path.name} would not run: {e}")
+        finally:
+            conn.set_progress_handler(None, 0)
+
+        if len(got) != 1:
+            raise Fail(
+                f"{label}: {sql_path.name} returned "
+                f"{'no rows' if not got else 'more than one row'}; it must return exactly one"
+            )
+        if len(got[0]) != 1:
+            raise Fail(
+                f"{label}: {sql_path.name} returned {len(got[0])} columns; "
+                f"it must return exactly one"
+            )
+        v = got[0][0]
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            raise Fail(f"{label}: {sql_path.name} returned {v!r}, which is not a number")
+        return float(v)
+
+    first = execute_once()
+    second = execute_once()
+    if first != second:
+        raise Fail(
+            f"{label}: {sql_path.name} returned {num(first)} then {num(second)}; "
+            f"a replayed number must be deterministic"
+        )
+    return first
 
 
 def eval_derived(label: str, expr: str, known: dict[str, float]) -> float:
