@@ -59,6 +59,19 @@ STOP     全部一致 → 把任务书改成 status: closed，并盖上当时 RE
 
 前三个是 main 的必需检查。
 
+## 本地 `./verify`
+
+一条命令，固定子命令，失败非零。调用现有脚本，不另写一套规则。
+
+```
+./verify              # 与 CI 相同：pytest、output-check、relations；PR 上再跑 scope-check 与 history-audit
+./verify task 6       # 只跑 TASK-6 的 output-check 与 relations
+./verify relations 6  # 只跑 TASK-6 的 double / permute / identities
+./verify probe        # 已知必红的探针（常数 SQL、relations 写死分母）；仍绿则 ./verify 自身坏了
+```
+
+main 上不跑 scope-check / history-audit（与 CI 一致）。`./verify probe` 在丢弃用的树里跑探针，不以本仓库的绿灯当证据。
+
 ## output-check 实际做了什么
 
 按顺序，任何一条不过就红。**在 pull request 上，下面 2–9 条只作用于这次 diff 碰到的任务**（`tasks/TASK-N.md` 或 `tasks/TASK-N/` 下任何文件，包括只改 `results.json` 或只改 `mine.json`）。没碰到的任务打一行 frozen summary，不把失败并进总账——`status: open` 且两边已经不合的任务（ITERATE）因此不能挡住一条无关的 PR。没有 `--base-ref` 时（main 上的 push）仍走完全部任务。任务书发现是顶层 glob `tasks/TASK-*.md`（非递归）。**若 `tasks/` 下任一 TASK-N 目录里有 `results.json` 或 `mine.json`，而对应的 `tasks/TASK-N.md` 不在该 glob 里，这一条对整棵树生效、不受 PR freeze 跳过**（plan §2.6）：把任务书移走不得让检查变成「nothing to check」绿灯。
