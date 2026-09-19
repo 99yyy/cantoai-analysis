@@ -101,7 +101,10 @@ What this enforces, in order:
                starts from that reset, so reopen after a brief edit does
                not inherit the previous ceiling (plan §4.4).
   independence (pull requests only) the commit that introduced one agent's file
-               did not have the other agent's file in its tree.
+               did not have the other agent's file in its tree, nor did any
+               ancestor of that commit; the two introducing commits have no
+               ancestor relationship, were not both introduced on this branch,
+               and do not share an author identity (plan §2.7).
   blocked-commit
                an empty commit whose subject starts with ``BLOCKED:`` is
                recognized and printed. It is the durable marker when the
@@ -117,12 +120,16 @@ What this enforces, in order:
                re-runs the comparison (plan §4.3). On main, every task is
                still fully checked.
 
-On independence, precisely: this proves a branch did not start from a tree that
-already held the other answer, which is how this fails in practice -- the second
-agent launched after the first merged, with the answer sitting in its working
-copy. It does not prove the agent never fetched the other branch mid-run.
-Nothing in CI can prove that; the auditor reads the history for it. Launch both
-agents from one starting ref and the check passes for both.
+On independence, precisely: the introducing-commit *tree* check only blocked
+the naive order (merge the other side, then commit yours). Committing yours
+first and then merging main, or writing both sides on one branch across
+commits that delete-and-restore, left that tree clean. Plan §2.7 walks every
+ancestor, requires the two introducing commits to be incomparable in the DAG,
+rejects both files being first-added on this pull request, and rejects a
+shared author identity. That still does not prove the agent never fetched the
+other branch mid-run -- nothing in CI can, and the auditor reads the history
+for it. Launch both agents from one starting ref, with distinct authors, and
+the check passes for both.
 
 Usage:
     python scripts/output_check.py [--repo-root .]
@@ -357,6 +364,122 @@ def first_added(root: Path, rng: str, path: str) -> str | None:
     out = git(root, "log", rng, "--diff-filter=A", "--format=%H", "--", path)
     shas = [l.strip() for l in out.splitlines() if l.strip()]
     return shas[-1] if shas else None
+
+
+def is_ancestor(root: Path, maybe_anc: str, desc: str) -> bool:
+    """True when ``maybe_anc`` equals ``desc`` or is an ancestor of it."""
+    p = subprocess.run(
+        ["git", "-C", str(root), "merge-base", "--is-ancestor", maybe_anc, desc],
+        capture_output=True,
+        text=True,
+    )
+    if p.returncode == 0:
+        return True
+    if p.returncode == 1:
+        return False
+    raise Fail(
+        f"git merge-base --is-ancestor {maybe_anc} {desc}: "
+        f"{p.stderr.strip() or 'failed'}"
+    )
+
+
+def commit_author(root: Path, sha: str) -> str:
+    """Author identity of ``sha`` as ``Name <email>``."""
+    ident = git(root, "log", "-1", "--format=%an <%ae>", sha).strip()
+    if not ident or ident == "<>":
+        raise Fail(f"{sha}: git author is empty")
+    return ident
+
+
+def check_independence(
+    root: Path, n: str, base: str, head: str, fail: list[str]
+) -> None:
+    """Plan §2.7: the two introducing commits are independent.
+
+    A file first-added in ``base..head`` may not have the other side in its
+    own tree *or in any ancestor tree*. When both sides have an introducing
+    commit and this pull request introduced at least one of them, those
+    commits must have no ancestor relationship, must not both be unique to
+    this pull request (same branch), and must not share an author identity.
+    """
+    intro: dict[str, str] = {}
+    added_in_pr: dict[str, bool] = {}
+    for k in (WORKER, VERIFIER):
+        rel = f"tasks/TASK-{n}/{k}"
+        try:
+            sha_pr = first_added(root, f"{base}..{head}", rel)
+        except Fail as e:
+            fail.append(str(e))
+            continue
+        if sha_pr is not None:
+            intro[k] = sha_pr
+            added_in_pr[k] = True
+            continue
+        try:
+            if not in_tree(root, head, rel):
+                continue
+            sha_all = first_added(root, head, rel)
+        except Fail as e:
+            fail.append(str(e))
+            continue
+        if sha_all is not None:
+            intro[k] = sha_all
+            added_in_pr[k] = False
+
+    for k, other in ((WORKER, VERIFIER), (VERIFIER, WORKER)):
+        sha = intro.get(k)
+        if sha is None or not added_in_pr.get(k):
+            continue
+        orel = f"tasks/TASK-{n}/{other}"
+        try:
+            held = first_added(root, sha, orel)
+        except Fail as e:
+            fail.append(str(e))
+            continue
+        if held is not None:
+            fail.append(
+                f"TASK-{n}: {k} was added in {sha[:8]}, whose history already "
+                f"held {other} (at {held[:8]}); the two computations are not "
+                f"independent"
+            )
+
+    w, v = intro.get(WORKER), intro.get(VERIFIER)
+    if not (w and v):
+        return
+    if not (added_in_pr.get(WORKER) or added_in_pr.get(VERIFIER)):
+        return
+
+    try:
+        related = is_ancestor(root, w, v) or is_ancestor(root, v, w)
+    except Fail as e:
+        fail.append(str(e))
+        related = False
+    if related:
+        fail.append(
+            f"TASK-{n}: {WORKER} introduced in {w[:8]} and {VERIFIER} "
+            f"introduced in {v[:8]} have an ancestor relationship; "
+            f"the two computations are not independent"
+        )
+
+    if added_in_pr.get(WORKER) and added_in_pr.get(VERIFIER):
+        fail.append(
+            f"TASK-{n}: {WORKER} and {VERIFIER} were both introduced on this "
+            f"branch ({w[:8]}, {v[:8]}); the two computations are not "
+            f"independent"
+        )
+
+    try:
+        aw = commit_author(root, w)
+        av = commit_author(root, v)
+    except Fail as e:
+        fail.append(str(e))
+        return
+    if aw == av:
+        fail.append(
+            f"TASK-{n}: {WORKER} introduced in {w[:8]} and {VERIFIER} "
+            f"introduced in {v[:8]} have the same author {aw}; "
+            f"the two computations are not independent"
+        )
 
 
 def task_ids_from_paths(paths: Iterable[str]) -> frozenset[str]:
@@ -1378,23 +1501,9 @@ def check_task(
                     f"escalate both sets of numbers instead of trying again"
                 )
 
-    # Neither branch may have started from the other's answer.
+    # Neither branch may have started from the other's answer (plan §2.7).
     if base and head:
-        for k, other in ((WORKER, VERIFIER), (VERIFIER, WORKER)):
-            rel, orel = f"tasks/TASK-{n}/{k}", f"tasks/TASK-{n}/{other}"
-            try:
-                sha = first_added(root, f"{base}..{head}", rel)
-            except Fail as e:
-                fail.append(str(e))
-                continue
-            if sha is None:
-                continue
-            if in_tree(root, sha, orel):
-                fail.append(
-                    f"TASK-{n}: {k} was added in {sha[:8]}, whose tree already held "
-                    f"{other}; this branch started from the other answer, so the two "
-                    f"computations are not independent"
-                )
+        check_independence(root, n, base, head, fail)
 
     if status == "closed":
         for k in sorted(set(paths) - set(present)):

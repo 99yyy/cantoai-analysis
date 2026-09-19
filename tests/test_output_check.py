@@ -481,9 +481,12 @@ def _init_git(repo: Path) -> None:
     _git(repo, "config", "commit.gpgsign", "false")
 
 
-def _commit(repo: Path, message: str) -> str:
+def _commit(repo: Path, message: str, author: str | None = None) -> str:
     _git(repo, "add", "-A")
-    _git(repo, "commit", "-m", message)
+    cmd = ["commit", "-m", message]
+    if author:
+        cmd.extend(["--author", author])
+    _git(repo, *cmd)
     return _git(repo, "rev-parse", "HEAD").stdout.strip()
 
 
@@ -1226,3 +1229,263 @@ def test_both_output_files_without_brief_are_listed(tmp_path):
         "tasks/TASK-7/results.json",
         "tasks/TASK-7/mine.json",
     }
+
+
+# --------------------------------------------------------------------------- §2.7 independence ancestry / branch / author
+
+
+WORKER_AUTHOR = "Worker <worker@example.com>"
+VERIFIER_AUTHOR = "Verifier <verifier@example.com>"
+SAME_AUTHOR = "Agent <agent@example.com>"
+
+
+def _write_side(repo: Path, n: str, side: str) -> None:
+    """One agreeing videos-count output; the other side is a distinct SQL file."""
+    if side == output_check.WORKER:
+        sql = repo / "tasks" / f"TASK-{n}" / "sql" / "count_videos.sql"
+        sql.parent.mkdir(parents=True, exist_ok=True)
+        sql.write_text("SELECT COUNT(*) FROM videos;\n", encoding="utf-8")
+        _write_rows(
+            repo / "tasks" / f"TASK-{n}" / "results.json",
+            "n_count",
+            567,
+            f"tasks/TASK-{n}/sql/count_videos.sql",
+        )
+        return
+    sql = repo / "tasks" / f"TASK-{n}" / "mine_sql" / "count_videos_as.sql"
+    sql.parent.mkdir(parents=True, exist_ok=True)
+    sql.write_text("SELECT COUNT(*) FROM videos AS vid;\n", encoding="utf-8")
+    _write_rows(
+        repo / "tasks" / f"TASK-{n}" / "mine.json",
+        "n_count",
+        567,
+        f"tasks/TASK-{n}/mine_sql/count_videos_as.sql",
+    )
+
+
+def _brief_repo(repo: Path, n: str = "7") -> str:
+    (repo / "README.md").write_text(f"sha256: `{CORPUS_SHA}`\n", encoding="utf-8")
+    _write_brief(repo, n)
+    _init_git(repo)
+    return _commit(repo, "brief")
+
+
+def _merge(repo: Path, ref: str, message: str) -> str:
+    _git(repo, "merge", ref, "--no-ff", "-m", message)
+    return _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def _old_tree_independence_hits(
+    repo: Path, base: str, head: str, n: str = "7"
+) -> list[str]:
+    """Pre-§2.7 check: only the introducing commit's own tree."""
+    hits: list[str] = []
+    for k, other in (
+        (output_check.WORKER, output_check.VERIFIER),
+        (output_check.VERIFIER, output_check.WORKER),
+    ):
+        rel = f"tasks/TASK-{n}/{k}"
+        orel = f"tasks/TASK-{n}/{other}"
+        sha = output_check.first_added(repo, f"{base}..{head}", rel)
+        if sha is None:
+            continue
+        if output_check.in_tree(repo, sha, orel):
+            hits.append(k)
+    return hits
+
+
+def _mine_first_then_merge(
+    repo: Path,
+    mine_author: str,
+    worker_author: str,
+    n: str = "7",
+) -> tuple[str, str]:
+    """Commit mine.json on the starting ref, then merge main (worker already in)."""
+    start = _brief_repo(repo, n)
+    _git(repo, "checkout", "-b", "worker")
+    _write_side(repo, n, output_check.WORKER)
+    _commit(repo, "worker results", author=worker_author)
+    _git(repo, "checkout", "main")
+    _merge(repo, "worker", "merge worker")
+    base = _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    _git(repo, "checkout", "-b", "verifier", start)
+    _write_side(repo, n, output_check.VERIFIER)
+    _commit(repo, "verifier mine", author=mine_author)
+    _merge(repo, "main", "merge main")
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    return base, head
+
+
+def test_is_ancestor_self_and_parent(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text("x\n", encoding="utf-8")
+    _init_git(repo)
+    a = _commit(repo, "a")
+    (repo / "README.md").write_text("y\n", encoding="utf-8")
+    b = _commit(repo, "b")
+    assert output_check.is_ancestor(repo, a, a)
+    assert output_check.is_ancestor(repo, a, b)
+    assert not output_check.is_ancestor(repo, b, a)
+
+
+def test_is_ancestor_unrelated_branches(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text("x\n", encoding="utf-8")
+    _init_git(repo)
+    start = _commit(repo, "start")
+    _git(repo, "checkout", "-b", "left")
+    (repo / "left.txt").write_text("l\n", encoding="utf-8")
+    left = _commit(repo, "left")
+    _git(repo, "checkout", "-b", "right", start)
+    (repo / "right.txt").write_text("r\n", encoding="utf-8")
+    right = _commit(repo, "right")
+    assert not output_check.is_ancestor(repo, left, right)
+    assert not output_check.is_ancestor(repo, right, left)
+    assert output_check.is_ancestor(repo, start, left)
+    assert output_check.is_ancestor(repo, start, right)
+
+
+def test_commit_author_format(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "README.md").write_text("x\n", encoding="utf-8")
+    _init_git(repo)
+    sha = _commit(repo, "a", author=WORKER_AUTHOR)
+    assert output_check.commit_author(repo, sha) == WORKER_AUTHOR
+
+
+def test_mine_first_then_merge_same_author_is_red(tmp_path, capsys):
+    """Probe class: peek, commit mine.json first, merge main.
+
+    Before (§2.7): GREEN — introducing tree of mine.json has no results.json.
+    After: RED — same author introduced both files.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    base, head = _mine_first_then_merge(repo, SAME_AUTHOR, SAME_AUTHOR)
+    _git(repo, "checkout", head)
+
+    assert _old_tree_independence_hits(repo, base, head) == []
+
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", head)
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert "have the same author Agent <agent@example.com>" in out
+    assert "the two computations are not independent" in out
+    assert "output_check: FAIL" in out
+
+
+def test_mine_first_then_merge_distinct_authors_is_green(tmp_path, capsys):
+    """Honest verifier: same git topology, different authors."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    base, head = _mine_first_then_merge(repo, VERIFIER_AUTHOR, WORKER_AUTHOR)
+    _git(repo, "checkout", head)
+
+    assert _old_tree_independence_hits(repo, base, head) == []
+    w = output_check.first_added(repo, head, "tasks/TASK-7/results.json")
+    v = output_check.first_added(repo, f"{base}..{head}", "tasks/TASK-7/mine.json")
+    assert w and v
+    assert not output_check.is_ancestor(repo, w, v)
+    assert not output_check.is_ancestor(repo, v, w)
+    assert output_check.commit_author(repo, w) == WORKER_AUTHOR
+    assert output_check.commit_author(repo, v) == VERIFIER_AUTHOR
+
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", head)
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "output_check: PASS" in out
+    assert "not independent" not in out
+
+
+def test_same_branch_three_commits_delete_trick_is_red(tmp_path, capsys):
+    """Probe class: one agent, one branch, both sides across three commits.
+
+    C1 add results.json, C2 delete it and add mine.json, C3 restore results.json.
+    Before: GREEN — each introducing tree lacks the other file.
+    After: RED — ancestor relationship, same branch, history held the other file.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    base = _brief_repo(repo)
+    _write_side(repo, "7", output_check.WORKER)
+    c1 = _commit(repo, "add results", author=WORKER_AUTHOR)
+    (repo / "tasks" / "TASK-7" / "results.json").unlink()
+    _write_side(repo, "7", output_check.VERIFIER)
+    c2 = _commit(repo, "drop results, add mine", author=VERIFIER_AUTHOR)
+    _write_side(repo, "7", output_check.WORKER)
+    _commit(repo, "restore results", author=WORKER_AUTHOR)
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    assert output_check.first_added(repo, f"{base}..{head}", "tasks/TASK-7/results.json") == c1
+    assert output_check.first_added(repo, f"{base}..{head}", "tasks/TASK-7/mine.json") == c2
+    assert not output_check.in_tree(repo, c1, "tasks/TASK-7/mine.json")
+    assert not output_check.in_tree(repo, c2, "tasks/TASK-7/results.json")
+    assert _old_tree_independence_hits(repo, base, head) == []
+
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", head)
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert "have an ancestor relationship" in out
+    assert "were both introduced on this branch" in out
+    assert "whose history already held results.json" in out
+    assert "the two computations are not independent" in out
+
+
+def test_merge_other_then_commit_still_fails(tmp_path, capsys):
+    """Naive order: merge the other side, then commit yours. Red before and after."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _brief_repo(repo)
+    _git(repo, "checkout", "-b", "worker")
+    _write_side(repo, "7", output_check.WORKER)
+    _commit(repo, "worker results", author=WORKER_AUTHOR)
+    _git(repo, "checkout", "main")
+    _merge(repo, "worker", "merge worker")
+    base = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    _git(repo, "checkout", "-b", "verifier")
+    _write_side(repo, "7", output_check.VERIFIER)
+    _commit(repo, "verifier mine", author=VERIFIER_AUTHOR)
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    assert output_check.VERIFIER in _old_tree_independence_hits(repo, base, head)
+
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", head)
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert "whose history already held results.json" in out
+    assert "have an ancestor relationship" in out
+
+
+def test_worker_only_pr_does_not_require_a_pair(tmp_path, capsys):
+    """A worker PR with no mine.json yet is independent by construction."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    base = _brief_repo(repo)
+    _write_side(repo, "7", output_check.WORKER)
+    _commit(repo, "worker results", author=WORKER_AUTHOR)
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "output_check: PASS" in out
+    assert "not independent" not in out
+
+
+def test_check_independence_same_author_message_is_stable(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    base, head = _mine_first_then_merge(repo, SAME_AUTHOR, SAME_AUTHOR)
+    fail: list[str] = []
+    output_check.check_independence(repo, "7", base, head, fail)
+    w = output_check.first_added(repo, head, "tasks/TASK-7/results.json")
+    v = output_check.first_added(repo, f"{base}..{head}", "tasks/TASK-7/mine.json")
+    assert w and v
+    assert fail == [
+        "TASK-7: results.json introduced in "
+        f"{w[:8]} and mine.json introduced in {v[:8]} "
+        "have the same author Agent <agent@example.com>; "
+        "the two computations are not independent"
+    ]
