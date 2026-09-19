@@ -54,7 +54,7 @@ STOP     全部一致 → 把任务书改成 status: closed，这一步本身要
 
 1. `data/corpus_v2.sqlite` 的 sha256 与 `README.md` 里记的一致。语料不对，后面全部无意义。
 2. 任务书有且只有一行 `status: open` 或 `status: closed`，`numbers` 块能解析。
-3. 两个输出文件的每一行恰好是 `{name, value, n, query}`，名字集合与 `numbers` 块**相等**——少一个和多一个都红；同一文件内不得有重名，也不得有两个数字共用一条算路。
+3. 两个输出文件的每一行恰好是 `{name, value, n, query}`，名字集合与 `numbers` 块**相等**——少一个和多一个都红；同一文件内不得有重名，也不得有两个数字共用一条算路。算路按 `route()` 解析后的路径计（`sql/../sql/x.sql` 与 `sql/x.sql` 是同一条），不是按 query 字符串。
 4. 每个 `query` 是下面两种之一：
    - `tasks/TASK-N/<…>.sql`：一条语句，`SELECT` 或 `WITH` 开头，返回恰好一行一列；`EXPLAIN QUERY PLAN` 必须出现对语料表 `videos` / `windows` / `syllables` / `runs` 的 `SCAN` 或 `SEARCH`（`SELECT 12345` 过不了这一关）；
    - `derived:<expr>`：只用其他已声明的数字名、数字、`+ - * /` 和括号。

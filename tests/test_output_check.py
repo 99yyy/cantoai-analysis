@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sqlite3
 from pathlib import Path
 
@@ -69,3 +70,100 @@ def test_count_from_videos_passes_corpus_plan_gate(conn, tmp_path):
 def test_aliased_videos_scan_passes_corpus_plan_gate(conn):
     got = output_check.run_sql(conn, "results.json:n_videos_pre", N_VIDEOS_PRE_SQL, 60.0)
     assert got == 391.0
+
+
+def _parse(tmp_path: Path, rows: list[dict], names: list[str]) -> tuple[dict | None, list[str]]:
+    path = tmp_path / "results.json"
+    path.write_text(json.dumps(rows), encoding="utf-8")
+    fail: list[str] = []
+    got = output_check.parse_rows(
+        path, {n: 0.0 for n in names}, fail, "6", ROOT
+    )
+    return got, fail
+
+
+def test_duplicate_query_string_still_fails(tmp_path):
+    q = "tasks/TASK-6/sql/n_videos_pre.sql"
+    got, fail = _parse(
+        tmp_path,
+        [
+            {"name": "a", "value": 1, "n": 1, "query": q},
+            {"name": "b", "value": 2, "n": 1, "query": q},
+        ],
+        ["a", "b"],
+    )
+    assert got is None
+    assert any("already backs a" in m and "one route may produce only one number" in m for m in fail)
+
+
+def test_path_alias_is_the_same_sql_route(tmp_path):
+    got, fail = _parse(
+        tmp_path,
+        [
+            {
+                "name": "a",
+                "value": 1,
+                "n": 1,
+                "query": "tasks/TASK-6/sql/n_videos_pre.sql",
+            },
+            {
+                "name": "b",
+                "value": 2,
+                "n": 1,
+                "query": "tasks/TASK-6/sql/../sql/n_videos_pre.sql",
+            },
+        ],
+        ["a", "b"],
+    )
+    assert got is None
+    assert any(
+        "query 'tasks/TASK-6/sql/../sql/n_videos_pre.sql' already backs a" in m
+        and "one route may produce only one number" in m
+        for m in fail
+    )
+
+
+def test_dot_segment_path_alias_is_the_same_sql_route(tmp_path):
+    got, fail = _parse(
+        tmp_path,
+        [
+            {
+                "name": "a",
+                "value": 1,
+                "n": 1,
+                "query": "tasks/TASK-6/sql/n_videos_pre.sql",
+            },
+            {
+                "name": "b",
+                "value": 2,
+                "n": 1,
+                "query": "tasks/TASK-6/sql/./n_videos_pre.sql",
+            },
+        ],
+        ["a", "b"],
+    )
+    assert got is None
+    assert any("already backs a" in m for m in fail)
+
+
+def test_distinct_sql_files_are_not_duplicate_routes(tmp_path):
+    got, fail = _parse(
+        tmp_path,
+        [
+            {
+                "name": "a",
+                "value": 1,
+                "n": 1,
+                "query": "tasks/TASK-6/sql/n_videos_pre.sql",
+            },
+            {
+                "name": "b",
+                "value": 2,
+                "n": 1,
+                "query": "tasks/TASK-6/sql/n_videos_post.sql",
+            },
+        ],
+        ["a", "b"],
+    )
+    assert got is not None
+    assert fail == []
