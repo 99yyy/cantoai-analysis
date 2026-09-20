@@ -1,0 +1,86 @@
+[
+  {
+    "name": "n_videos_pre",
+    "value": 391,
+    "n": 567,
+    "query": "tasks/TASK-8/sql/n_videos_pre.sql"
+  },
+  {
+    "name": "n_videos_post",
+    "value": 176,
+    "n": 567,
+    "query": "tasks/TASK-8/sql/n_videos_post.sql"
+  },
+  {
+    "name": "n_unassigned_period",
+    "value": 0,
+    "n": 567,
+    "query": "tasks/TASK-8/sql/n_unassigned_period.sql"
+  },
+  {
+    "name": "n_judgeable_pre",
+    "value": 104539,
+    "n": 104539,
+    "query": "tasks/TASK-8/sql/n_judgeable_pre.sql"
+  },
+  {
+    "name": "n_judgeable_post",
+    "value": 34823,
+    "n": 34823,
+    "query": "tasks/TASK-8/sql/n_judgeable_post.sql"
+  },
+  {
+    "name": "n_tone_judgeable_pre",
+    "value": 7555,
+    "n": 104539,
+    "query": "tasks/TASK-8/sql/n_tone_judgeable_pre.sql"
+  },
+  {
+    "name": "n_tone_judgeable_post",
+    "value": 3764,
+    "n": 34823,
+    "query": "tasks/TASK-8/sql/n_tone_judgeable_post.sql"
+  },
+  {
+    "name": "n_segment_judgeable_pre",
+    "value": 4736,
+    "n": 104539,
+    "query": "tasks/TASK-8/sql/n_segment_judgeable_pre.sql"
+  },
+  {
+    "name": "n_segment_judgeable_post",
+    "value": 2977,
+    "n": 34823,
+    "query": "tasks/TASK-8/sql/n_segment_judgeable_post.sql"
+  },
+  {
+    "name": "n_diff_judgeable_pre",
+    "value": 779,
+    "n": 104539,
+    "query": "tasks/TASK-8/sql/n_diff_judgeable_pre.sql"
+  },
+  {
+    "name": "n_diff_judgeable_post",
+    "value": 764,
+    "n": 34823,
+    "query": "tasks/TASK-8/sql/n_diff_judgeable_post.sql"
+  },
+  {
+    "name": "gap_share_tone_pp",
+    "value": 3.5819801831625573,
+    "n": 139362,
+    "query": "derived:100 * (n_tone_judgeable_post / n_judgeable_post - n_tone_judgeable_pre / n_judgeable_pre)"
+  },
+  {
+    "name": "gap_share_segment_pp",
+    "value": 4.018580877255639,
+    "n": 139362,
+    "query": "derived:100 * (n_segment_judgeable_post / n_judgeable_post - n_segment_judgeable_pre / n_judgeable_pre)"
+  },
+  {
+    "name": "gap_share_diff_pp",
+    "value": 1.4487758315949515,
+    "n": 139362,
+    "query": "derived:100 * (n_diff_judgeable_post / n_judgeable_post - n_diff_judgeable_pre / n_judgeable_pre)"
+  }
+]
