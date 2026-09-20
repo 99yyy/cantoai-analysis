@@ -1,0 +1,27 @@
+[
+  {
+    "id": "bc-d1e6ce74-6779-5dea-8456-0a112608a15d",
+    "role": "coordinator",
+    "at": "2026-09-20T08:31:17Z"
+  },
+  {
+    "id": "bc-077fff26-3189-5513-8ebd-b0504f7ae2bb",
+    "role": "coordinator",
+    "at": "2026-09-20T08:45:44Z"
+  },
+  {
+    "id": "bc-0a16b4fb-99a2-5b32-93f3-655e0e69de82",
+    "role": "verifier",
+    "at": "2026-09-20T09:01:30Z"
+  },
+  {
+    "id": "bc-7bfe5380-35ef-56a1-84fe-bd4962d6f26b",
+    "role": "worker",
+    "at": "2026-09-20T09:01:30Z"
+  },
+  {
+    "id": "bc-421d1d73-d3f9-5f2b-ab4a-d97e2d1d1f66",
+    "role": "auditor",
+    "at": "2026-09-20T09:34:59Z"
+  }
+]
