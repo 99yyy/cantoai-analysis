@@ -19,6 +19,10 @@ if ! command -v npm >/dev/null 2>&1; then
   fi
 fi
 
+# This image's npm prefix is "/" (EACCES on /usr/lib/node_modules).
+# Install into $HOME/.local so `ocr` lands on the default Cloud Agent PATH.
+OCR_PREFIX="${HOME}/.local"
+export PATH="${OCR_PREFIX}/bin:${PATH}"
 if ! command -v ocr >/dev/null 2>&1; then
-  npm install -g @alibaba-group/open-code-review
+  npm install -g --prefix "${OCR_PREFIX}" @alibaba-group/open-code-review
 fi
