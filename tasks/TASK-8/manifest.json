@@ -1,0 +1,287 @@
+{
+  "git_sha": "4cf5b74ef83bab6991fe6ebfd6effb1ccc821e57",
+  "inputs": {
+    "data/corpus_v2.sqlite": {
+      "sha256": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+      "tables": {
+        "videos": {
+          "rows": 567,
+          "columns": [
+            "video_id",
+            "title",
+            "upload_date",
+            "n_windows",
+            "speech_s"
+          ]
+        },
+        "windows": {
+          "rows": 4911,
+          "columns": [
+            "uid",
+            "video_id",
+            "idx",
+            "start",
+            "end",
+            "dur",
+            "start_sample",
+            "end_sample",
+            "boundary_start",
+            "boundary_end",
+            "lang",
+            "text_raw",
+            "text_norm",
+            "text_clean",
+            "flag_hai",
+            "flag_simp",
+            "flag_sing",
+            "flag_boiler",
+            "chars_per_sec",
+            "aligned",
+            "coverage",
+            "first_s",
+            "in_range",
+            "max_zero_run",
+            "tone_shift_suspect",
+            "n_syllables",
+            "tier",
+            "text_human"
+          ]
+        },
+        "syllables": {
+          "rows": 171867,
+          "columns": [
+            "syl_id",
+            "uid",
+            "video_id",
+            "pos",
+            "c0",
+            "char",
+            "start",
+            "end",
+            "dur",
+            "win_start",
+            "jp_default",
+            "jp_ctx",
+            "jp_candidates",
+            "n_cand",
+            "prev_char",
+            "next_char",
+            "ctx",
+            "tier",
+            "jp_realized",
+            "jp_match",
+            "review_prior",
+            "verification_status",
+            "verification_note"
+          ]
+        }
+      }
+    }
+  },
+  "frame": {
+    "videos_expected": 567,
+    "windows_expected": 4911,
+    "syllables_expected": 171867,
+    "published_expected": 164693
+  },
+  "steps": [
+    {
+      "step": "load_videos",
+      "rule": "videos full table",
+      "group": "all",
+      "rows_before": 567,
+      "rows_after": 567
+    },
+    {
+      "step": "load_windows",
+      "rule": "windows full table",
+      "group": "all",
+      "rows_before": 4911,
+      "rows_after": 4911
+    },
+    {
+      "step": "load_syllables",
+      "rule": "syllables full table",
+      "group": "all",
+      "rows_before": 171867,
+      "rows_after": 171867
+    },
+    {
+      "step": "join_syllables_windows",
+      "rule": "inner uid",
+      "group": "all",
+      "rows_before": 171867,
+      "rows_after": 171867,
+      "unmatched_left": 0
+    },
+    {
+      "step": "tier_whitelist",
+      "rule": "windows.tier IN ('A','B')",
+      "group": "all",
+      "rows_before": 171867,
+      "rows_after": 164693
+    },
+    {
+      "step": "join_published_videos",
+      "rule": "inner video_id",
+      "group": "all",
+      "rows_before": 164693,
+      "rows_after": 164693,
+      "unmatched_left": 0
+    },
+    {
+      "step": "period_videos",
+      "rule": "four-digit year <=2024 vs >=2025, neither is unassigned",
+      "group": "all",
+      "rows_before": 567,
+      "rows_after": 567,
+      "n_pre": 391,
+      "n_post": 176,
+      "n_unassigned": 0
+    },
+    {
+      "step": "period_published_syllables",
+      "rule": "same period predicates on published A+B syllables",
+      "group": "all",
+      "rows_before": 164693,
+      "rows_after": 164693,
+      "n_pre": 122208,
+      "n_post": 42485,
+      "n_unassigned": 0
+    },
+    {
+      "step": "empty_realized",
+      "rule": "jp_realized nonempty",
+      "group": "pre",
+      "rows_before": 122208,
+      "rows_after": 121070
+    },
+    {
+      "step": "dur_gt_0",
+      "rule": "dur > 0 (contract 25)",
+      "group": "pre",
+      "rows_before": 122208,
+      "rows_after": 105321
+    },
+    {
+      "step": "judgeable",
+      "rule": "jp_realized nonempty and dur > 0",
+      "group": "pre",
+      "rows_before": 122208,
+      "rows_after": 104539
+    },
+    {
+      "step": "class_partition",
+      "rule": "jp_match in {tone, segment, diff}; else unassigned",
+      "group": "pre",
+      "rows_before": 104539,
+      "rows_after": 13070,
+      "n_unassigned": 91469,
+      "n_undeclared_enum": 0
+    },
+    {
+      "step": "empty_realized",
+      "rule": "jp_realized nonempty",
+      "group": "post",
+      "rows_before": 42485,
+      "rows_after": 41440
+    },
+    {
+      "step": "dur_gt_0",
+      "rule": "dur > 0 (contract 25)",
+      "group": "post",
+      "rows_before": 42485,
+      "rows_after": 35512
+    },
+    {
+      "step": "judgeable",
+      "rule": "jp_realized nonempty and dur > 0",
+      "group": "post",
+      "rows_before": 42485,
+      "rows_after": 34823
+    },
+    {
+      "step": "class_partition",
+      "rule": "jp_match in {tone, segment, diff}; else unassigned",
+      "group": "post",
+      "rows_before": 34823,
+      "rows_after": 7505,
+      "n_unassigned": 27318,
+      "n_undeclared_enum": 0
+    }
+  ],
+  "contract24": {
+    "pre": {
+      "n_total": 122208,
+      "n_match": 91469,
+      "n_judgeable": 104539,
+      "n_empty_realized": 1138,
+      "n_dur_le_0": 16887,
+      "n_empty_and_zerodur": 356
+    },
+    "post": {
+      "n_total": 42485,
+      "n_match": 27318,
+      "n_judgeable": 34823,
+      "n_empty_realized": 1045,
+      "n_dur_le_0": 6973,
+      "n_empty_and_zerodur": 356
+    }
+  },
+  "none_published": {
+    "pre": 1138,
+    "post": 1045
+  },
+  "class_unassigned_judgeable": {
+    "pre": 91469,
+    "post": 27318
+  },
+  "undeclared_enum_judgeable": {
+    "pre": 0,
+    "post": 0
+  },
+  "year_cells": [
+    {
+      "year": "2021",
+      "n_videos": 9
+    },
+    {
+      "year": "2022",
+      "n_videos": 193
+    },
+    {
+      "year": "2023",
+      "n_videos": 36
+    },
+    {
+      "year": "2024",
+      "n_videos": 153
+    },
+    {
+      "year": "2025",
+      "n_videos": 138
+    },
+    {
+      "year": "2026",
+      "n_videos": 38
+    }
+  ],
+  "shares": {
+    "tone": {
+      "pre": 0.07226967925845856,
+      "post": 0.10808948109008414,
+      "gap_share_pp": 3.5819801831625573
+    },
+    "segment": {
+      "pre": 0.04530366657419719,
+      "post": 0.08548947534675358,
+      "gap_share_pp": 4.018580877255639
+    },
+    "diff": {
+      "pre": 0.007451764413281168,
+      "post": 0.021939522729230682,
+      "gap_share_pp": 1.4487758315949515
+    }
+  },
+  "descriptive": 1
+}
