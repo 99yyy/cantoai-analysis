@@ -11,7 +11,7 @@ This folder is the **index of record** for the campaign. Machine-gated numbers a
 | TASK-6 | closed | Film title-proxy mix term ≈ 1.91pp of `gap_contract_pp` ≈ 9.05pp; residual ≈ 7.14pp. | [brief](../../tasks/TASK-6.md) · [results](../../tasks/TASK-6/results.json) · [audit](../../review/TASK-6/audit.md) · [PR #46](https://github.com/99yyy/cantoai-analysis/pull/46) |
 | TASK-7 | closed | other×common `gap_other_common_pp` ≈ 7.33pp; cluster 95% CI excludes 0. | [brief](../../tasks/TASK-7.md) · [RESULT](../../tasks/TASK-7/RESULT.json) · [audit](../../review/TASK-7/audit.md) · [PR #83](https://github.com/99yyy/cantoai-analysis/pull/83) |
 | TASK-8 | closed | On judgeable A+B, tone and segment share gaps (≈ 3.58 and ≈ 4.02 pp) larger than diff (≈ 1.45 pp). | [brief](../../tasks/TASK-8.md) · [RESULT](../../tasks/TASK-8/RESULT.json) · [audit](../../review/TASK-8/audit.md) · [PR #87](https://github.com/99yyy/cantoai-analysis/pull/87) |
-| TASK-9 | **open** | Pin-unchanged diagnostic: existing-column proxies (`flag_sing`, `coverage`, …) pre vs post; Q2 cluster-median + trim10 of the same gaps (19 names). No results yet. | [brief](../../tasks/TASK-9.md) |
+| TASK-9 | closed | Published A+B `flag_sing` gaps are 0 (tier drop already removed 14 sing-flag windows); coverage mean gap ≈ -17.19 pm, unsigned as quality. RESULT inconclusive. | [brief](../../tasks/TASK-9.md) · [RESULT](../../tasks/TASK-9/RESULT.json) · [audit](../../review/TASK-9/audit.md) |
 | Corpus columns | deferred | SNR / `singing_prob` / `content_type` need a pipeline rebuild outside this repo. Not executed here. | [PLAN](PLAN-corpus-columns.md) |
 
 Quotes of closed findings are pointers to `tasks/` / `review/`. This folder does not re-judge them and does not invent new numbers.
@@ -40,7 +40,9 @@ Tasks and review:
 | `tasks/TASK-8.md` | Brief (closed) |
 | `tasks/TASK-8/` | outputs + `RESULT.json` |
 | `review/TASK-8/audit.md` | Auditor |
-| `tasks/TASK-9.md` | Brief (open); no `tasks/TASK-9/` outputs yet |
+| `tasks/TASK-9.md` | Brief (closed) |
+| `tasks/TASK-9/` | outputs + `RESULT.json` |
+| `review/TASK-9/audit.md` | Auditor |
 
 Issues and loop docs:
 
@@ -56,7 +58,8 @@ PRs (campaign so far):
 - TASK-6: [#44](https://github.com/99yyy/cantoai-analysis/pull/44) verifier, [#45](https://github.com/99yyy/cantoai-analysis/pull/45) worker, [#46](https://github.com/99yyy/cantoai-analysis/pull/46) close
 - TASK-7: [#77](https://github.com/99yyy/cantoai-analysis/pull/77) brief, [#78](https://github.com/99yyy/cantoai-analysis/pull/78) verifier, [#79](https://github.com/99yyy/cantoai-analysis/pull/79) worker, [#83](https://github.com/99yyy/cantoai-analysis/pull/83) close
 - TASK-8: [#84](https://github.com/99yyy/cantoai-analysis/pull/84) brief, [#85](https://github.com/99yyy/cantoai-analysis/pull/85) verifier, [#86](https://github.com/99yyy/cantoai-analysis/pull/86) worker, [#87](https://github.com/99yyy/cantoai-analysis/pull/87) close
+- TASK-9: [#91](https://github.com/99yyy/cantoai-analysis/pull/91) brief, [#92](https://github.com/99yyy/cantoai-analysis/pull/92) Q2 names, [#93](https://github.com/99yyy/cantoai-analysis/pull/93) verifier, [#94](https://github.com/99yyy/cantoai-analysis/pull/94) worker
 
 ## Next
 
-TASK-9 (open, Autopilot). Worker / verifier start from the same ref after this brief lands. Corpus rebuild stays on the PLAN until Tom approves it; this analysis repo will not download audio or models.
+TASK-9 is closed (`inconclusive`). Corpus rebuild stays on the PLAN until Tom approves it; this analysis repo will not download audio or models.
