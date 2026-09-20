@@ -1,0 +1,9 @@
+{
+  "status": "complete",
+  "outputs": {
+    "results.json": "3c390bab4bbe48a122456f10c94fb6385326dce627bc8cafda14cc2616f06c71",
+    "manifest.json": "fb48b0d570022e9dcb8648122444d220fb8ffc1605fe4787d0ed4c584f8b5858",
+    "bootstrap.json": "b5cf2d4778b709ce845ecace7f1079dfae2b79257a377262a9ce5d4cdecae21b",
+    "open_analysis.md": "a6e5ecd81f215d7ca71a90e8645f56f5a7beab7130a433bdbb829fc84796a7a7"
+  }
+}
