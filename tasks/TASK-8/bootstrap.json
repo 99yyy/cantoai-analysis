@@ -1,0 +1,53 @@
+{
+  "B": 2000,
+  "master_seed": 20260919,
+  "stratum_seeds": {
+    "pre": 1656575222,
+    "post": 2660412771
+  },
+  "G_h": {
+    "pre": 391,
+    "post": 176
+  },
+  "ci_unreliable": 0,
+  "m": 3,
+  "classes": {
+    "tone": {
+      "observed_pp": 3.5819801831625573,
+      "ci95": [
+        1.8938785607527269,
+        5.226764925722932
+      ],
+      "includes_0": false,
+      "p_raw": 0.0,
+      "p_BH": 0.0,
+      "conclusion": "estimated"
+    },
+    "segment": {
+      "observed_pp": 4.018580877255639,
+      "ci95": [
+        3.094653724664776,
+        4.979466809348829
+      ],
+      "includes_0": false,
+      "p_raw": 0.0,
+      "p_BH": 0.0,
+      "conclusion": "estimated"
+    },
+    "diff": {
+      "observed_pp": 1.4487758315949515,
+      "ci95": [
+        1.0301546293106,
+        1.940659855514909
+      ],
+      "includes_0": false,
+      "p_raw": 0.0,
+      "p_BH": 0.0,
+      "conclusion": "estimated"
+    }
+  },
+  "n_judgeable_videos": {
+    "pre": 389,
+    "post": 176
+  }
+}
