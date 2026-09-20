@@ -8,4 +8,7 @@ Machine-gated artifacts stay in `tasks/TASK-N/` (briefs, SQL, `results.json` / `
 
 A campaign folder does not replace a task. Tasks remain the unit of measurement.
 
-Current campaigns: `post-2025-jyutping-drop/` (why published Jyutping agreement falls after 2024 on this channel). Index of record for that campaign, including TASK-6/7/8 closed and TASK-9 open, is `post-2025-jyutping-drop/README.md`.
+Current campaigns:
+
+- `post-2025-jyutping-drop/` — why published Jyutping agreement falls after 2024 on this channel. Index of record, including TASK-6/7/8/9 closed, is `post-2025-jyutping-drop/README.md`.
+- `strand1-frontend-v1/` — exploratory context-aware Jyutping vs ToJyutping (`jp_ctx`). Reproducible v1 snapshot; not a TASK. Index: `strand1-frontend-v1/README.md`.

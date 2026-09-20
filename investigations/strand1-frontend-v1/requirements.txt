@@ -1,0 +1,3 @@
+# Optional. Eval uses jp_ctx from data/corpus_v2.sqlite.
+# Install only if you want the 30-row ToJyutping package spot-check in run.py.
+ToJyutping

@@ -1,0 +1,4124 @@
+{
+  "trigrams": {
+    "|曾|江": {
+      "pred": "zang1",
+      "support": 12,
+      "pred_n": 12,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 12
+    },
+    "獨|樂|樂": {
+      "pred": "ngok6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "眾|樂|樂": {
+      "pred": "ngok6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "有|翻|咁": {
+      "pred": "faan2",
+      "support": 9,
+      "pred_n": 5,
+      "frac": 0.5556,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "度|啦|": {
+      "pred": "laa3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "|呢|句": {
+      "pred": "ne1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "正|正|係": {
+      "pred": "zing6",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "用|嚟|比": {
+      "pred": "lei4",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "睇|到|佢": {
+      "pred": "dou2",
+      "support": 7,
+      "pred_n": 7,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "個|老|公": {
+      "pred": "nou5",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "在|河|之": {
+      "pred": "hou6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "之|洲|窈": {
+      "pred": "zau3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "洲|窈|窕": {
+      "pred": "miu6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "窈|窕|淑": {
+      "pred": "tiu4",
+      "support": 8,
+      "pred_n": 8,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 8
+    },
+    "子|好|逑": {
+      "pred": "hou6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "冷|靜|讓": {
+      "pred": "zing5",
+      "support": 4,
+      "pred_n": 2,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "牽|掛|重": {
+      "pred": "gaa1",
+      "support": 4,
+      "pred_n": 2,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "安|倍|晉": {
+      "pred": "pui3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "會|咁|講": {
+      "pred": "gam2",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "下|呢|個": {
+      "pred": "nei1",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "喺|呢|個": {
+      "pred": "nei1",
+      "support": 17,
+      "pred_n": 13,
+      "frac": 0.7647,
+      "ctx_correct": 0,
+      "lift": 13
+    },
+    "上|下|嘅": {
+      "pred": "haa6",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "打|油|詩": {
+      "pred": "jau4",
+      "support": 7,
+      "pred_n": 7,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "噶|啦|": {
+      "pred": "laa3",
+      "support": 8,
+      "pred_n": 7,
+      "frac": 0.875,
+      "ctx_correct": 1,
+      "lift": 6
+    },
+    "你|念|得": {
+      "pred": "nin4",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "近|排|有": {
+      "pred": "paai2",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "屠|殺|事": {
+      "pred": "sik1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "事|件|": {
+      "pred": "din2",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "|用|意": {
+      "pred": "jung4",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "用|意|係": {
+      "pred": "ji6",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "警|惕|世": {
+      "pred": "cik1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "我|念|個": {
+      "pred": "lin4",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "激|情|版": {
+      "pred": "zing3",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "情|生|愛": {
+      "pred": "sang1",
+      "support": 9,
+      "pred_n": 7,
+      "frac": 0.7778,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "遇|上|係": {
+      "pred": "soeng6",
+      "support": 6,
+      "pred_n": 6,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 6
+    },
+    "牛|津|度": {
+      "pred": "zeon3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "畢|業|不": {
+      "pred": "jyut6",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "整|翻|個": {
+      "pred": "faan2",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "嚟|坐|下": {
+      "pred": "co2",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "坐|下|興": {
+      "pred": "aa1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "下|興|咧": {
+      "pred": "hing3",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "興|咧|": {
+      "pred": "le3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "英|文|津": {
+      "pred": "man4",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "學|度|畢": {
+      "pred": "dou3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "失|禮|係": {
+      "pred": "laa3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "雞|嚟|都": {
+      "pred": "lai3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "醜|啦|": {
+      "pred": "laa3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "停|咁|念": {
+      "pred": "gam2",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "句|咯|唔": {
+      "pred": "lo1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "|彈|咩": {
+      "pred": "taan4",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "|咁|都": {
+      "pred": "gam2",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "哋|啦|": {
+      "pred": "laa3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "開|又|講": {
+      "pred": "jau4",
+      "support": 5,
+      "pred_n": 3,
+      "frac": 0.6,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "起|嚟|好": {
+      "pred": "lai4",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "口|咁|喎": {
+      "pred": "gam2",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "|咁|啊": {
+      "pred": "gam2",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "咁|啊|我": {
+      "pred": "waa1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "|咁|嘅": {
+      "pred": "gam2",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "滑|劣|劣": {
+      "pred": "lyut6",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "|呢|個": {
+      "pred": "nei1",
+      "support": 20,
+      "pred_n": 20,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 20
+    },
+    "係|呢|個": {
+      "pred": "nei1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "講|翻|轉": {
+      "pred": "faan2",
+      "support": 18,
+      "pred_n": 18,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 18
+    },
+    "翻|轉|頭": {
+      "pred": "zyun2",
+      "support": 21,
+      "pred_n": 11,
+      "frac": 0.5238,
+      "ctx_correct": 4,
+      "lift": 7
+    },
+    "|咁|咪": {
+      "pred": "gam2",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "|由|於": {
+      "pred": "jau5",
+      "support": 7,
+      "pred_n": 6,
+      "frac": 0.8571,
+      "ctx_correct": 1,
+      "lift": 5
+    },
+    "萬|炎|炎": {
+      "pred": "ji6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "地|更|無": {
+      "pred": "gang1",
+      "support": 4,
+      "pred_n": 2,
+      "frac": 0.5,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "下|啦|": {
+      "pred": "laa3",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "馬|永|貞": {
+      "pred": "wing6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "|咁|點": {
+      "pred": "gam2",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "不|在|乎": {
+      "pred": "zoi3",
+      "support": 18,
+      "pred_n": 15,
+      "frac": 0.8333,
+      "ctx_correct": 2,
+      "lift": 13
+    },
+    "只|在|乎": {
+      "pred": "zoi3",
+      "support": 26,
+      "pred_n": 21,
+      "frac": 0.8077,
+      "ctx_correct": 4,
+      "lift": 17
+    },
+    "問|誰|又": {
+      "pred": "seoi6",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "生|意|外": {
+      "pred": "ji6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "有|數|": {
+      "pred": "sou4",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "人|淚|濕": {
+      "pred": "leoi4",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "口|輕|輕": {
+      "pred": "heng1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "以|咁|講": {
+      "pred": "gam2",
+      "support": 11,
+      "pred_n": 11,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 11
+    },
+    "陣|型|到": {
+      "pred": "jing6",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "得|白|啲": {
+      "pred": "baak3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "懷|千|千": {
+      "pred": "ci3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "輕|輕|的": {
+      "pred": "hing1",
+      "support": 5,
+      "pred_n": 5,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "我|輕|輕": {
+      "pred": "hing1",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "不|帶|走": {
+      "pred": "daai6",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "林|鳳|同": {
+      "pred": "fung2",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "莫|摸|頭": {
+      "pred": "mo1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "咗|呢|個": {
+      "pred": "nei1",
+      "support": 6,
+      "pred_n": 6,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 6
+    },
+    "久|只|在": {
+      "pred": "ci5",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "重|慶|傷": {
+      "pred": "hing4",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "慶|傷|心": {
+      "pred": "soeng3",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "酸|辣|粉": {
+      "pred": "laap1",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "辣|粉|上": {
+      "pred": "fan6",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "粉|上|海": {
+      "pred": "soeng2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "上|海|悲": {
+      "pred": "hoi6",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "海|悲|傷": {
+      "pred": "bei2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "傷|牛|肉": {
+      "pred": "lau1",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "牛|肉|麪": {
+      "pred": "jung4",
+      "support": 4,
+      "pred_n": 2,
+      "frac": 0.5,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "麪|粉|絲": {
+      "pred": "fan6",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "粉|絲|如": {
+      "pred": "si2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "絲|如|何": {
+      "pred": "jyu1",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "睡|覺|枕": {
+      "pred": "gaau6",
+      "support": 5,
+      "pred_n": 3,
+      "frac": 0.6,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "覺|枕|頭": {
+      "pred": "zang3",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "枕|頭|也": {
+      "pred": "tau2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "也|可|當": {
+      "pred": "ho4",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "當|口|罩": {
+      "pred": "hau6",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "屬|下|流": {
+      "pred": "haa4",
+      "support": 5,
+      "pred_n": 3,
+      "frac": 0.6,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "得|令|嘅": {
+      "pred": "ling5",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "之|道|": {
+      "pred": "dou3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "教|訓|我": {
+      "pred": "fan6",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "豐|盛|人": {
+      "pred": "sing3",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "|在|我": {
+      "pred": "zoi3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "你|的|醒": {
+      "pred": "dik3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "你|投|入": {
+      "pred": "hau6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "用|嚟|形": {
+      "pred": "lei4",
+      "support": 5,
+      "pred_n": 5,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "唔|係|冇": {
+      "pred": "hai5",
+      "support": 5,
+      "pred_n": 3,
+      "frac": 0.6,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "吳|楚|帆": {
+      "pred": "co5",
+      "support": 9,
+      "pred_n": 5,
+      "frac": 0.5556,
+      "ctx_correct": 4,
+      "lift": 1
+    },
+    "回|顧|一": {
+      "pred": "gu2",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "新|冠|疫": {
+      "pred": "gun1",
+      "support": 7,
+      "pred_n": 7,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "右|邊|嗰": {
+      "pred": "bin1",
+      "support": 5,
+      "pred_n": 4,
+      "frac": 0.8,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "左|邊|嗰": {
+      "pred": "bin1",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "照|咁|睇": {
+      "pred": "gam2",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "左|吞|右": {
+      "pred": "tan3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "講|下|講": {
+      "pred": "haa2",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "下|講|下": {
+      "pred": "gong5",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "咪|話|唔": {
+      "pred": "waak6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "|劏|豬": {
+      "pred": "hong1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "豬|凳|一": {
+      "pred": "dang6",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "咁|嘅|意": {
+      "pred": "ge3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "陷|阱|天": {
+      "pred": "zing3",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "阱|天|遇": {
+      "pred": "pin1",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "遇|上|乃": {
+      "pred": "soeng6",
+      "support": 5,
+      "pred_n": 5,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "乃|註|定": {
+      "pred": "zyu6",
+      "support": 5,
+      "pred_n": 5,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "業|自|造": {
+      "pred": "zi1",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "自|造|命": {
+      "pred": "zou1",
+      "support": 5,
+      "pred_n": 5,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "造|命|如": {
+      "pred": "ming4",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "命|如|數": {
+      "pred": "jyu1",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "身|份|不": {
+      "pred": "fan6",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "國|著|名": {
+      "pred": "zyu1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "式|接|吻": {
+      "pred": "zit3",
+      "support": 7,
+      "pred_n": 4,
+      "frac": 0.5714,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "咁|咪|即": {
+      "pred": "mai6",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "獨|臂|刀": {
+      "pred": "bei1",
+      "support": 14,
+      "pred_n": 8,
+      "frac": 0.5714,
+      "ctx_correct": 6,
+      "lift": 2
+    },
+    "有|呢|個": {
+      "pred": "nei1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "都|付|笑": {
+      "pred": "fu3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "嗰|只|": {
+      "pred": "zek3",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "估|你|唔": {
+      "pred": "lei5",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "朝|暮|暮": {
+      "pred": "mou4",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "嘅|咁|就": {
+      "pred": "gam2",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "嘅|華|人": {
+      "pred": "waai6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "聽|啊|唔": {
+      "pred": "aa1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "兩|語|可": {
+      "pred": "jyu6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "揾|次|講": {
+      "pred": "ci6",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "仲|會|同": {
+      "pred": "wui5",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "武|俠|片": {
+      "pred": "hat6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "啊|唔|係": {
+      "pred": "m6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "所|帶|出": {
+      "pred": "daai6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "點|解|會": {
+      "pred": "gaai5",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "同|牛|口": {
+      "pred": "ngau6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "讓|你|心": {
+      "pred": "nei1",
+      "support": 4,
+      "pred_n": 2,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "嚟|噶|": {
+      "pred": "gaa3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "鑊|過|鑊": {
+      "pred": "go3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "鑊|仔|牛": {
+      "pred": "ze2",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "威|過|威": {
+      "pred": "go3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "以|講|做": {
+      "pred": "gong1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "嘅|蓮|香": {
+      "pred": "nin4",
+      "support": 9,
+      "pred_n": 5,
+      "frac": 0.5556,
+      "ctx_correct": 4,
+      "lift": 1
+    },
+    "患|在|好": {
+      "pred": "zoi3",
+      "support": 5,
+      "pred_n": 5,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "在|好|為": {
+      "pred": "hou6",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "好|為|人": {
+      "pred": "wai6",
+      "support": 10,
+      "pred_n": 10,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 10
+    },
+    "咁|咁|咁": {
+      "pred": "gam2",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "|正|所": {
+      "pred": "zing6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "一|日|會": {
+      "pred": "jan4",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "林|鳳|響": {
+      "pred": "fung2",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "大|埔|林": {
+      "pred": "bou6",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "芳|艷|芬": {
+      "pred": "jin6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "七|載|人": {
+      "pred": "zo2",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "品|無|窮": {
+      "pred": "mou6",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "慧|文|壇": {
+      "pred": "man6",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "當|事|人": {
+      "pred": "si4",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "青|必|必": {
+      "pred": "bi1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "語|片|時": {
+      "pred": "pin2",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "事|頭|婆": {
+      "pred": "tau4",
+      "support": 9,
+      "pred_n": 9,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 9
+    },
+    "|咁|睇": {
+      "pred": "gam2",
+      "support": 5,
+      "pred_n": 5,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "李|海|泉": {
+      "pred": "hoi4",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "不|知|不": {
+      "pred": "zi3",
+      "support": 5,
+      "pred_n": 3,
+      "frac": 0.6,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "使|幾|耐": {
+      "pred": "giu3",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "做|阿|二": {
+      "pred": "aa6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "嘞|噃|我": {
+      "pred": "ou1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "己|親|手": {
+      "pred": "caan1",
+      "support": 4,
+      "pred_n": 2,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "把|人|孝": {
+      "pred": "jan1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "人|孝|敬": {
+      "pred": "haau1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "敬|我|我": {
+      "pred": "mou5",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "點|頂|啊": {
+      "pred": "ding1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "琴|伴|白": {
+      "pred": "bun3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "不|戴|還": {
+      "pred": "daai6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "|理|想": {
+      "pred": "nei5",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "理|想|不": {
+      "pred": "son3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "會|跌|倒": {
+      "pred": "dit6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "跟|佢|學": {
+      "pred": "geoi3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "n|散|退": {
+      "pred": "saan1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "邊|嗰|張": {
+      "pred": "go1",
+      "support": 4,
+      "pred_n": 2,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "竟|呢|個": {
+      "pred": "nei1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "紐|澤|西": {
+      "pred": "zoe1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "有|咁|嘅": {
+      "pred": "gam2",
+      "support": 5,
+      "pred_n": 5,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "宣|佈|結": {
+      "pred": "bou6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "佈|結|業": {
+      "pred": "git6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "育|及|傳": {
+      "pred": "kam4",
+      "support": 385,
+      "pred_n": 199,
+      "frac": 0.5169,
+      "ctx_correct": 173,
+      "lift": 26
+    },
+    "而|呢|個": {
+      "pred": "nei1",
+      "support": 5,
+      "pred_n": 5,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "港|話|當": {
+      "pred": "waa6",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "州|蓮|香": {
+      "pred": "nin4",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "港|蓮|香": {
+      "pred": "nin4",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "眾|裏|尋": {
+      "pred": "neoi5",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "我|賣|先": {
+      "pred": "maai5",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "創|作|嘅": {
+      "pred": "zok6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "嚟|揾|你": {
+      "pred": "wan5",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "步|檻|過": {
+      "pred": "laam6",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "步|跨|過": {
+      "pred": "kwaa1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "個|藝|名": {
+      "pred": "ngai2",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "食|煙|": {
+      "pred": "jin4",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "大|陣|仗": {
+      "pred": "zan3",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 1,
+      "lift": 4
+    },
+    "睇|到|所": {
+      "pred": "dou2",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "阿|哥|哥": {
+      "pred": "gou1",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "年|無|線": {
+      "pred": "mou5",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "唔|喺|呢": {
+      "pred": "hai5",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "多|辯|駁": {
+      "pred": "bin3",
+      "support": 5,
+      "pred_n": 3,
+      "frac": 0.6,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "得|越|多": {
+      "pred": "jyut1",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "越|多|我": {
+      "pred": "do5",
+      "support": 5,
+      "pred_n": 5,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "多|我|知": {
+      "pred": "ngo1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "知|道|得": {
+      "pred": "dou1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "道|得|越": {
+      "pred": "dak6",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "直|教|生": {
+      "pred": "gaau1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "|依|家": {
+      "pred": "ji4",
+      "support": 5,
+      "pred_n": 5,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "鄭|少|秋": {
+      "pred": "siu3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "佢|呢|個": {
+      "pred": "nei1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "堅|泥|地": {
+      "pred": "lai4",
+      "support": 4,
+      "pred_n": 2,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "就|呢|個": {
+      "pred": "nei1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "到|只|鹿": {
+      "pred": "zek3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "捉|到|鹿": {
+      "pred": "dou2",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "墓|誌|銘": {
+      "pred": "zi6",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "主|辦|單": {
+      "pred": "baan1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "辦|單|位": {
+      "pred": "daan2",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "幅|壁|畫": {
+      "pred": "bik2",
+      "support": 5,
+      "pred_n": 3,
+      "frac": 0.6,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "夜|霧|遠": {
+      "pred": "mou5",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "絲|愛|意": {
+      "pred": "wui6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "心|透|露": {
+      "pred": "tau6",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "飯|碗|麪": {
+      "pred": "wun6",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "豬|屎|八": {
+      "pred": "si6",
+      "support": 7,
+      "pred_n": 7,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "話|諸|事": {
+      "pred": "jyu1",
+      "support": 8,
+      "pred_n": 5,
+      "frac": 0.625,
+      "ctx_correct": 3,
+      "lift": 2
+    },
+    "為|我|覺": {
+      "pred": "ngo1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "救|火|嘅": {
+      "pred": "fo3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "火|嘅|水": {
+      "pred": "ge2",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "e|帶|大": {
+      "pred": "daai6",
+      "support": 5,
+      "pred_n": 3,
+      "frac": 0.6,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "出|生|響": {
+      "pred": "saang1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "若|然|覺": {
+      "pred": "jin3",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "得|無|釐": {
+      "pred": "mou1",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "頭|當|初": {
+      "pred": "hong1",
+      "support": 4,
+      "pred_n": 2,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "咁|風|流": {
+      "pred": "fung3",
+      "support": 5,
+      "pred_n": 3,
+      "frac": 0.6,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "尋|味|重": {
+      "pred": "mei4",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "何|來|睡": {
+      "pred": "loi2",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "口|罩|若": {
+      "pred": "caam5",
+      "support": 4,
+      "pred_n": 2,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "流|香|港": {
+      "pred": "hoeng4",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "香|港|傷": {
+      "pred": "gong1",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "一|朝|進": {
+      "pred": "ziu1",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "方|艷|芬": {
+      "pred": "jin6",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "者|鬥|轉": {
+      "pred": "dau2",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "個|車|牌": {
+      "pred": "ce4",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "蜜|與|痛": {
+      "pred": "jyu1",
+      "support": 4,
+      "pred_n": 4,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "林|鳳|嘅": {
+      "pred": "fung2",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "問|嗰|陣": {
+      "pred": "ge3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "風|流|香": {
+      "pred": "lau1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "咗|一|日": {
+      "pred": "jat2",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "虎|鬥|之": {
+      "pred": "dau6",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "榴|槤|飄": {
+      "pred": "nin4",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "上|愛|情": {
+      "pred": "oi1",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "|愛|C": {
+      "pred": "dak1",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "麗|蓮|夢": {
+      "pred": "nin4",
+      "support": 5,
+      "pred_n": 5,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "碗|麪|反": {
+      "pred": "min2",
+      "support": 5,
+      "pred_n": 5,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "龍|成|虎": {
+      "pred": "sing3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 1
+    },
+    "那|日|踏": {
+      "pred": "jaa3",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "日|踏|上": {
+      "pred": "daap3",
+      "support": 3,
+      "pred_n": 3,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "踏|上|愛": {
+      "pred": "soeng1",
+      "support": 3,
+      "pred_n": 2,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 2
+    },
+    "名|截|拳": {
+      "pred": "zit1",
+      "support": 4,
+      "pred_n": 3,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 2
+    }
+  },
+  "bigrams_l": {
+    "|曾": {
+      "pred": "zang1",
+      "support": 16,
+      "pred_n": 12,
+      "frac": 0.75,
+      "ctx_correct": 4,
+      "lift": 8
+    },
+    "有|翻": {
+      "pred": "faan2",
+      "support": 12,
+      "pred_n": 6,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 4
+    },
+    "上|下": {
+      "pred": "haa6",
+      "support": 22,
+      "pred_n": 17,
+      "frac": 0.7727,
+      "ctx_correct": 8,
+      "lift": 9
+    },
+    "啊|呢": {
+      "pred": "ne1",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "嗰|只": {
+      "pred": "zek3",
+      "support": 33,
+      "pred_n": 26,
+      "frac": 0.7879,
+      "ctx_correct": 0,
+      "lift": 26
+    },
+    "有|名": {
+      "pred": "ming4",
+      "support": 8,
+      "pred_n": 6,
+      "frac": 0.75,
+      "ctx_correct": 5,
+      "lift": 1
+    },
+    "老|伴": {
+      "pred": "bun2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "用|嚟": {
+      "pred": "lei4",
+      "support": 16,
+      "pred_n": 16,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 16
+    },
+    "相|處": {
+      "pred": "cyu5",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "睇|到": {
+      "pred": "dou2",
+      "support": 33,
+      "pred_n": 28,
+      "frac": 0.8485,
+      "ctx_correct": 2,
+      "lift": 26
+    },
+    "窈|窕": {
+      "pred": "tiu4",
+      "support": 8,
+      "pred_n": 8,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 8
+    },
+    "得|啦": {
+      "pred": "laa3",
+      "support": 9,
+      "pred_n": 6,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 5
+    },
+    "啊|咁": {
+      "pred": "gam2",
+      "support": 11,
+      "pred_n": 6,
+      "frac": 0.5455,
+      "ctx_correct": 0,
+      "lift": 6
+    },
+    "林|鳳": {
+      "pred": "fung2",
+      "support": 46,
+      "pred_n": 40,
+      "frac": 0.8696,
+      "ctx_correct": 1,
+      "lift": 39
+    },
+    "安|倍": {
+      "pred": "pui3",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 1,
+      "lift": 4
+    },
+    "左|右": {
+      "pred": "jau5",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "講|翻": {
+      "pred": "faan2",
+      "support": 23,
+      "pred_n": 22,
+      "frac": 0.9565,
+      "ctx_correct": 1,
+      "lift": 21
+    },
+    "後|嚟": {
+      "pred": "lai4",
+      "support": 16,
+      "pred_n": 15,
+      "frac": 0.9375,
+      "ctx_correct": 0,
+      "lift": 15
+    },
+    "會|咁": {
+      "pred": "gam2",
+      "support": 11,
+      "pred_n": 7,
+      "frac": 0.6364,
+      "ctx_correct": 4,
+      "lift": 3
+    },
+    "喺|呢": {
+      "pred": "nei1",
+      "support": 27,
+      "pred_n": 17,
+      "frac": 0.6296,
+      "ctx_correct": 5,
+      "lift": 12
+    },
+    "打|油": {
+      "pred": "jau4",
+      "support": 7,
+      "pred_n": 7,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "咁|咪": {
+      "pred": "mai6",
+      "support": 11,
+      "pred_n": 9,
+      "frac": 0.8182,
+      "ctx_correct": 0,
+      "lift": 9
+    },
+    "噶|啦": {
+      "pred": "laa3",
+      "support": 24,
+      "pred_n": 12,
+      "frac": 0.5,
+      "ctx_correct": 3,
+      "lift": 9
+    },
+    "近|排": {
+      "pred": "paai2",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "激|情": {
+      "pred": "zing3",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "情|生": {
+      "pred": "sang1",
+      "support": 9,
+      "pred_n": 7,
+      "frac": 0.7778,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "遇|上": {
+      "pred": "soeng6",
+      "support": 20,
+      "pred_n": 13,
+      "frac": 0.65,
+      "ctx_correct": 5,
+      "lift": 8
+    },
+    "整|翻": {
+      "pred": "faan2",
+      "support": 11,
+      "pred_n": 10,
+      "frac": 0.9091,
+      "ctx_correct": 0,
+      "lift": 10
+    },
+    "|咁": {
+      "pred": "gam2",
+      "support": 44,
+      "pred_n": 40,
+      "frac": 0.9091,
+      "ctx_correct": 4,
+      "lift": 36
+    },
+    "起|嚟": {
+      "pred": "lai4",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 1,
+      "lift": 4
+    },
+    "心|裏": {
+      "pred": "neoi5",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "生|啊": {
+      "pred": "aa1",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "滑|劣": {
+      "pred": "lyut6",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "係|呢": {
+      "pred": "ne1",
+      "support": 9,
+      "pred_n": 5,
+      "frac": 0.5556,
+      "ctx_correct": 3,
+      "lift": 2
+    },
+    "滑|溜": {
+      "pred": "lau4",
+      "support": 6,
+      "pred_n": 6,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 6
+    },
+    "翻|轉": {
+      "pred": "zyun2",
+      "support": 22,
+      "pred_n": 11,
+      "frac": 0.5,
+      "ctx_correct": 4,
+      "lift": 7
+    },
+    "|由": {
+      "pred": "jau5",
+      "support": 11,
+      "pred_n": 7,
+      "frac": 0.6364,
+      "ctx_correct": 3,
+      "lift": 4
+    },
+    "宣|佈": {
+      "pred": "bou6",
+      "support": 11,
+      "pred_n": 7,
+      "frac": 0.6364,
+      "ctx_correct": 4,
+      "lift": 3
+    },
+    "唔|掂": {
+      "pred": "dim3",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "下|啦": {
+      "pred": "laa3",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "成|咁": {
+      "pred": "gam2",
+      "support": 7,
+      "pred_n": 6,
+      "frac": 0.8571,
+      "ctx_correct": 0,
+      "lift": 6
+    },
+    "虎|鬥": {
+      "pred": "dau6",
+      "support": 14,
+      "pred_n": 8,
+      "frac": 0.5714,
+      "ctx_correct": 5,
+      "lift": 3
+    },
+    "龍|咁": {
+      "pred": "gam2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "不|在": {
+      "pred": "zoi3",
+      "support": 24,
+      "pred_n": 19,
+      "frac": 0.7917,
+      "ctx_correct": 4,
+      "lift": 15
+    },
+    "只|在": {
+      "pred": "zoi3",
+      "support": 26,
+      "pred_n": 21,
+      "frac": 0.8077,
+      "ctx_correct": 4,
+      "lift": 17
+    },
+    "之|道": {
+      "pred": "dou3",
+      "support": 8,
+      "pred_n": 7,
+      "frac": 0.875,
+      "ctx_correct": 1,
+      "lift": 6
+    },
+    "輕|輕": {
+      "pred": "hing1",
+      "support": 10,
+      "pred_n": 5,
+      "frac": 0.5,
+      "ctx_correct": 4,
+      "lift": 1
+    },
+    "以|咁": {
+      "pred": "gam2",
+      "support": 19,
+      "pred_n": 14,
+      "frac": 0.7368,
+      "ctx_correct": 3,
+      "lift": 11
+    },
+    "估|你": {
+      "pred": "lei5",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 1,
+      "lift": 4
+    },
+    "玲|玲": {
+      "pred": "ling2",
+      "support": 11,
+      "pred_n": 8,
+      "frac": 0.7273,
+      "ctx_correct": 0,
+      "lift": 8
+    },
+    "咗|呢": {
+      "pred": "nei1",
+      "support": 10,
+      "pred_n": 7,
+      "frac": 0.7,
+      "ctx_correct": 1,
+      "lift": 6
+    },
+    "慶|傷": {
+      "pred": "soeng3",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "酸|辣": {
+      "pred": "laap1",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "粉|上": {
+      "pred": "soeng2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "海|悲": {
+      "pred": "bei2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "傷|牛": {
+      "pred": "lau1",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "絲|如": {
+      "pred": "jyu1",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "覺|枕": {
+      "pred": "zang3",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "枕|頭": {
+      "pred": "tau2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "當|口": {
+      "pred": "hau6",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "一|朝": {
+      "pred": "ziu1",
+      "support": 7,
+      "pred_n": 7,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "下|流": {
+      "pred": "lau6",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "日|咁": {
+      "pred": "gam2",
+      "support": 7,
+      "pred_n": 4,
+      "frac": 0.5714,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "個|例": {
+      "pred": "lai4",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "到|咁": {
+      "pred": "gam2",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "睇|翻": {
+      "pred": "faan2",
+      "support": 10,
+      "pred_n": 8,
+      "frac": 0.8,
+      "ctx_correct": 2,
+      "lift": 6
+    },
+    "教|訓": {
+      "pred": "fan6",
+      "support": 7,
+      "pred_n": 4,
+      "frac": 0.5714,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "好|咁": {
+      "pred": "gam2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "以|呢": {
+      "pred": "nei1",
+      "support": 7,
+      "pred_n": 4,
+      "frac": 0.5714,
+      "ctx_correct": 3,
+      "lift": 1
+    },
+    "豐|盛": {
+      "pred": "sing3",
+      "support": 7,
+      "pred_n": 5,
+      "frac": 0.7143,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "個|時": {
+      "pred": "si6",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "舞|片": {
+      "pred": "pin2",
+      "support": 8,
+      "pred_n": 8,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 8
+    },
+    "聽|到": {
+      "pred": "dou2",
+      "support": 12,
+      "pred_n": 8,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 7
+    },
+    "嚟|咁": {
+      "pred": "gam2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "啦|咁": {
+      "pred": "gam2",
+      "support": 7,
+      "pred_n": 6,
+      "frac": 0.8571,
+      "ctx_correct": 0,
+      "lift": 6
+    },
+    "打|仗": {
+      "pred": "zoeng6",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 1,
+      "lift": 4
+    },
+    "你|啦": {
+      "pred": "laa3",
+      "support": 9,
+      "pred_n": 5,
+      "frac": 0.5556,
+      "ctx_correct": 2,
+      "lift": 3
+    },
+    "吳|楚": {
+      "pred": "co5",
+      "support": 11,
+      "pred_n": 7,
+      "frac": 0.6364,
+      "ctx_correct": 4,
+      "lift": 3
+    },
+    "回|顧": {
+      "pred": "gu2",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "新|冠": {
+      "pred": "gun1",
+      "support": 11,
+      "pred_n": 11,
+      "frac": 1.0,
+      "ctx_correct": 4,
+      "lift": 7
+    },
+    "右|邊": {
+      "pred": "bin1",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "邊|嗰": {
+      "pred": "go3",
+      "support": 9,
+      "pred_n": 5,
+      "frac": 0.5556,
+      "ctx_correct": 2,
+      "lift": 3
+    },
+    "左|邊": {
+      "pred": "bin1",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "收|尾": {
+      "pred": "mei5",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "包|散": {
+      "pred": "saan1",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "豬|凳": {
+      "pred": "dang6",
+      "support": 14,
+      "pred_n": 8,
+      "frac": 0.5714,
+      "ctx_correct": 2,
+      "lift": 6
+    },
+    "有|咁": {
+      "pred": "gam2",
+      "support": 11,
+      "pred_n": 6,
+      "frac": 0.5455,
+      "ctx_correct": 4,
+      "lift": 2
+    },
+    "年|初": {
+      "pred": "co3",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "可|秀": {
+      "pred": "sau6",
+      "support": 17,
+      "pred_n": 16,
+      "frac": 0.9412,
+      "ctx_correct": 0,
+      "lift": 16
+    },
+    "人|物": {
+      "pred": "mat6",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "式|接": {
+      "pred": "zit3",
+      "support": 7,
+      "pred_n": 4,
+      "frac": 0.5714,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "接|吻": {
+      "pred": "man2",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "獨|臂": {
+      "pred": "bei1",
+      "support": 14,
+      "pred_n": 8,
+      "frac": 0.5714,
+      "ctx_correct": 6,
+      "lift": 2
+    },
+    "嚟|噶": {
+      "pred": "gaa3",
+      "support": 11,
+      "pred_n": 6,
+      "frac": 0.5455,
+      "ctx_correct": 1,
+      "lift": 5
+    },
+    "語|片": {
+      "pred": "pin2",
+      "support": 10,
+      "pred_n": 9,
+      "frac": 0.9,
+      "ctx_correct": 1,
+      "lift": 8
+    },
+    "得|嚟": {
+      "pred": "lei4",
+      "support": 13,
+      "pred_n": 7,
+      "frac": 0.5385,
+      "ctx_correct": 4,
+      "lift": 3
+    },
+    "舞|伴": {
+      "pred": "bun3",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "嘅|咁": {
+      "pred": "gam2",
+      "support": 9,
+      "pred_n": 8,
+      "frac": 0.8889,
+      "ctx_correct": 0,
+      "lift": 8
+    },
+    "唔|認": {
+      "pred": "jing4",
+      "support": 8,
+      "pred_n": 5,
+      "frac": 0.625,
+      "ctx_correct": 3,
+      "lift": 2
+    },
+    "佢|呢": {
+      "pred": "ne1",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "得|越": {
+      "pred": "jyut1",
+      "support": 7,
+      "pred_n": 4,
+      "frac": 0.5714,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "回|報": {
+      "pred": "bou6",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "到|呢": {
+      "pred": "ne1",
+      "support": 13,
+      "pred_n": 7,
+      "frac": 0.5385,
+      "ctx_correct": 6,
+      "lift": 1
+    },
+    "就|呢": {
+      "pred": "nei1",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "人|話": {
+      "pred": "waa6",
+      "support": 13,
+      "pred_n": 12,
+      "frac": 0.9231,
+      "ctx_correct": 1,
+      "lift": 11
+    },
+    "嘅|蓮": {
+      "pred": "nin4",
+      "support": 10,
+      "pred_n": 6,
+      "frac": 0.6,
+      "ctx_correct": 4,
+      "lift": 2
+    },
+    "好|為": {
+      "pred": "wai6",
+      "support": 10,
+      "pred_n": 10,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 10
+    },
+    "咁|咁": {
+      "pred": "gam2",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "你|噶": {
+      "pred": "gaa3",
+      "support": 8,
+      "pred_n": 5,
+      "frac": 0.625,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "阿|哥": {
+      "pred": "gou1",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "碗|麪": {
+      "pred": "min2",
+      "support": 13,
+      "pred_n": 8,
+      "frac": 0.6154,
+      "ctx_correct": 0,
+      "lift": 8
+    },
+    "使|幾": {
+      "pred": "giu3",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "驚|蟄": {
+      "pred": "zat6",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "育|及": {
+      "pred": "kam4",
+      "support": 385,
+      "pred_n": 199,
+      "frac": 0.5169,
+      "ctx_correct": 173,
+      "lift": 26
+    },
+    "而|呢": {
+      "pred": "nei1",
+      "support": 8,
+      "pred_n": 5,
+      "frac": 0.625,
+      "ctx_correct": 1,
+      "lift": 4
+    },
+    "大|陣": {
+      "pred": "zan3",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 1,
+      "lift": 4
+    },
+    "奸|到": {
+      "pred": "dou6",
+      "support": 8,
+      "pred_n": 5,
+      "frac": 0.625,
+      "ctx_correct": 1,
+      "lift": 4
+    },
+    "用|上": {
+      "pred": "soeng5",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "豬|屎": {
+      "pred": "si6",
+      "support": 7,
+      "pred_n": 7,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "話|諸": {
+      "pred": "jyu1",
+      "support": 8,
+      "pred_n": 5,
+      "frac": 0.625,
+      "ctx_correct": 3,
+      "lift": 2
+    },
+    "出|生": {
+      "pred": "saang1",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "若|然": {
+      "pred": "jin3",
+      "support": 7,
+      "pred_n": 4,
+      "frac": 0.5714,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "勾|陳": {
+      "pred": "can2",
+      "support": 7,
+      "pred_n": 4,
+      "frac": 0.5714,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "女|神": {
+      "pred": "san2",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 0,
+      "lift": 5
+    }
+  },
+  "bigrams_r": {
+    "曾|江": {
+      "pred": "zang1",
+      "support": 14,
+      "pred_n": 14,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 14
+    },
+    "樂|樂": {
+      "pred": "ngok6",
+      "support": 7,
+      "pred_n": 4,
+      "frac": 0.5714,
+      "ctx_correct": 3,
+      "lift": 1
+    },
+    "翻|咁": {
+      "pred": "faan2",
+      "support": 10,
+      "pred_n": 6,
+      "frac": 0.6,
+      "ctx_correct": 0,
+      "lift": 6
+    },
+    "呢|句": {
+      "pred": "ne1",
+      "support": 15,
+      "pred_n": 9,
+      "frac": 0.6,
+      "ctx_correct": 0,
+      "lift": 9
+    },
+    "呢|個": {
+      "pred": "nei1",
+      "support": 185,
+      "pred_n": 167,
+      "frac": 0.9027,
+      "ctx_correct": 1,
+      "lift": 166
+    },
+    "嚟|比": {
+      "pred": "lei4",
+      "support": 7,
+      "pred_n": 4,
+      "frac": 0.5714,
+      "ctx_correct": 3,
+      "lift": 1
+    },
+    "帶|走": {
+      "pred": "daai6",
+      "support": 9,
+      "pred_n": 6,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 4
+    },
+    "咁|睇": {
+      "pred": "gam2",
+      "support": 16,
+      "pred_n": 14,
+      "frac": 0.875,
+      "ctx_correct": 0,
+      "lift": 14
+    },
+    "咁|你": {
+      "pred": "gam2",
+      "support": 23,
+      "pred_n": 16,
+      "frac": 0.6957,
+      "ctx_correct": 1,
+      "lift": 15
+    },
+    "咁|即": {
+      "pred": "gam2",
+      "support": 15,
+      "pred_n": 13,
+      "frac": 0.8667,
+      "ctx_correct": 1,
+      "lift": 12
+    },
+    "窕|淑": {
+      "pred": "tiu4",
+      "support": 8,
+      "pred_n": 8,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 8
+    },
+    "噶|我": {
+      "pred": "gaa3",
+      "support": 7,
+      "pred_n": 6,
+      "frac": 0.8571,
+      "ctx_correct": 0,
+      "lift": 6
+    },
+    "咁|我": {
+      "pred": "gam2",
+      "support": 14,
+      "pred_n": 9,
+      "frac": 0.6429,
+      "ctx_correct": 1,
+      "lift": 8
+    },
+    "回|復": {
+      "pred": "wui6",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "在|我": {
+      "pred": "zoi3",
+      "support": 11,
+      "pred_n": 6,
+      "frac": 0.5455,
+      "ctx_correct": 4,
+      "lift": 2
+    },
+    "哥|哥": {
+      "pred": "gou1",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "咁|講": {
+      "pred": "gam2",
+      "support": 29,
+      "pred_n": 27,
+      "frac": 0.931,
+      "ctx_correct": 0,
+      "lift": 27
+    },
+    "咁|嘅": {
+      "pred": "gam2",
+      "support": 39,
+      "pred_n": 36,
+      "frac": 0.9231,
+      "ctx_correct": 8,
+      "lift": 28
+    },
+    "油|詩": {
+      "pred": "jau4",
+      "support": 7,
+      "pred_n": 7,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "咁|咪": {
+      "pred": "gam2",
+      "support": 11,
+      "pred_n": 10,
+      "frac": 0.9091,
+      "ctx_correct": 0,
+      "lift": 10
+    },
+    "呢|種": {
+      "pred": "ne1",
+      "support": 12,
+      "pred_n": 11,
+      "frac": 0.9167,
+      "ctx_correct": 0,
+      "lift": 11
+    },
+    "噶|啦": {
+      "pred": "gaa3",
+      "support": 25,
+      "pred_n": 15,
+      "frac": 0.6,
+      "ctx_correct": 1,
+      "lift": 14
+    },
+    "意|係": {
+      "pred": "ji6",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 1,
+      "lift": 4
+    },
+    "生|愛": {
+      "pred": "sang1",
+      "support": 9,
+      "pred_n": 7,
+      "frac": 0.7778,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "上|係": {
+      "pred": "soeng6",
+      "support": 12,
+      "pred_n": 10,
+      "frac": 0.8333,
+      "ctx_correct": 4,
+      "lift": 6
+    },
+    "翻|個": {
+      "pred": "faan2",
+      "support": 10,
+      "pred_n": 7,
+      "frac": 0.7,
+      "ctx_correct": 1,
+      "lift": 6
+    },
+    "咁|都": {
+      "pred": "gam2",
+      "support": 9,
+      "pred_n": 9,
+      "frac": 1.0,
+      "ctx_correct": 1,
+      "lift": 8
+    },
+    "咁|喎": {
+      "pred": "gam2",
+      "support": 9,
+      "pred_n": 8,
+      "frac": 0.8889,
+      "ctx_correct": 1,
+      "lift": 7
+    },
+    "咁|啊": {
+      "pred": "gam2",
+      "support": 14,
+      "pred_n": 9,
+      "frac": 0.6429,
+      "ctx_correct": 3,
+      "lift": 6
+    },
+    "咯|": {
+      "pred": "lo1",
+      "support": 31,
+      "pred_n": 25,
+      "frac": 0.8065,
+      "ctx_correct": 0,
+      "lift": 25
+    },
+    "邵|氏": {
+      "pred": "siu3",
+      "support": 27,
+      "pred_n": 15,
+      "frac": 0.5556,
+      "ctx_correct": 12,
+      "lift": 3
+    },
+    "劣|劣": {
+      "pred": "lyut6",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "翻|轉": {
+      "pred": "faan2",
+      "support": 21,
+      "pred_n": 19,
+      "frac": 0.9048,
+      "ctx_correct": 1,
+      "lift": 18
+    },
+    "轉|頭": {
+      "pred": "zyun2",
+      "support": 28,
+      "pred_n": 15,
+      "frac": 0.5357,
+      "ctx_correct": 6,
+      "lift": 9
+    },
+    "由|於": {
+      "pred": "jau5",
+      "support": 23,
+      "pred_n": 16,
+      "frac": 0.6957,
+      "ctx_correct": 5,
+      "lift": 11
+    },
+    "投|入": {
+      "pred": "hau6",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 3,
+      "lift": 1
+    },
+    "翻|幾": {
+      "pred": "faan2",
+      "support": 6,
+      "pred_n": 6,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 6
+    },
+    "片|嘅": {
+      "pred": "pin2",
+      "support": 6,
+      "pred_n": 6,
+      "frac": 1.0,
+      "ctx_correct": 2,
+      "lift": 4
+    },
+    "咁|點": {
+      "pred": "gam2",
+      "support": 8,
+      "pred_n": 6,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 5
+    },
+    "噶|": {
+      "pred": "gaa3",
+      "support": 30,
+      "pred_n": 28,
+      "frac": 0.9333,
+      "ctx_correct": 1,
+      "lift": 27
+    },
+    "在|乎": {
+      "pred": "zoi3",
+      "support": 46,
+      "pred_n": 38,
+      "frac": 0.8261,
+      "ctx_correct": 6,
+      "lift": 32
+    },
+    "然|覺": {
+      "pred": "jin3",
+      "support": 7,
+      "pred_n": 4,
+      "frac": 0.5714,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "咁|就": {
+      "pred": "gam2",
+      "support": 30,
+      "pred_n": 26,
+      "frac": 0.8667,
+      "ctx_correct": 3,
+      "lift": 23
+    },
+    "日|日": {
+      "pred": "jat1",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "啦|係": {
+      "pred": "laa3",
+      "support": 7,
+      "pred_n": 4,
+      "frac": 0.5714,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "輕|輕": {
+      "pred": "hing1",
+      "support": 14,
+      "pred_n": 7,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "會|同": {
+      "pred": "wui5",
+      "support": 10,
+      "pred_n": 8,
+      "frac": 0.8,
+      "ctx_correct": 2,
+      "lift": 6
+    },
+    "型|到": {
+      "pred": "jing6",
+      "support": 8,
+      "pred_n": 6,
+      "frac": 0.75,
+      "ctx_correct": 1,
+      "lift": 5
+    },
+    "咪|叫": {
+      "pred": "mai6",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "咁|先": {
+      "pred": "gam2",
+      "support": 7,
+      "pred_n": 7,
+      "frac": 1.0,
+      "ctx_correct": 1,
+      "lift": 6
+    },
+    "依|家": {
+      "pred": "ji4",
+      "support": 10,
+      "pred_n": 9,
+      "frac": 0.9,
+      "ctx_correct": 0,
+      "lift": 9
+    },
+    "悲|傷": {
+      "pred": "bei2",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "慶|傷": {
+      "pred": "hing4",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "傷|心": {
+      "pred": "soeng3",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 3,
+      "lift": 1
+    },
+    "辣|粉": {
+      "pred": "laap1",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "粉|上": {
+      "pred": "fan6",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "海|悲": {
+      "pred": "hoi6",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "牛|肉": {
+      "pred": "lau1",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "絲|如": {
+      "pred": "si2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "枕|頭": {
+      "pred": "zang3",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "頭|也": {
+      "pred": "tau2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "可|當": {
+      "pred": "ho4",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "認|真": {
+      "pred": "jing2",
+      "support": 12,
+      "pred_n": 7,
+      "frac": 0.5833,
+      "ctx_correct": 4,
+      "lift": 3
+    },
+    "咁|有": {
+      "pred": "gam2",
+      "support": 14,
+      "pred_n": 9,
+      "frac": 0.6429,
+      "ctx_correct": 7,
+      "lift": 2
+    },
+    "呢|只": {
+      "pred": "ne1",
+      "support": 12,
+      "pred_n": 8,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 7
+    },
+    "吳|楚": {
+      "pred": "m4",
+      "support": 9,
+      "pred_n": 7,
+      "frac": 0.7778,
+      "ctx_correct": 2,
+      "lift": 5
+    },
+    "楚|帆": {
+      "pred": "co5",
+      "support": 9,
+      "pred_n": 5,
+      "frac": 0.5556,
+      "ctx_correct": 4,
+      "lift": 1
+    },
+    "顧|一": {
+      "pred": "gu2",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "冠|疫": {
+      "pred": "gun1",
+      "support": 7,
+      "pred_n": 7,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "邊|嗰": {
+      "pred": "bin1",
+      "support": 9,
+      "pred_n": 7,
+      "frac": 0.7778,
+      "ctx_correct": 1,
+      "lift": 6
+    },
+    "胡|楓": {
+      "pred": "wu6",
+      "support": 13,
+      "pred_n": 11,
+      "frac": 0.8462,
+      "ctx_correct": 1,
+      "lift": 10
+    },
+    "呢|部": {
+      "pred": "ne1",
+      "support": 8,
+      "pred_n": 8,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 8
+    },
+    "咪|即": {
+      "pred": "mai6",
+      "support": 7,
+      "pred_n": 4,
+      "frac": 0.5714,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "上|嚟": {
+      "pred": "soeng6",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "咁|係": {
+      "pred": "gam2",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 0,
+      "lift": 5
+    },
+    "劍|擊": {
+      "pred": "gin3",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "接|吻": {
+      "pred": "zit3",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "臂|刀": {
+      "pred": "bei1",
+      "support": 14,
+      "pred_n": 8,
+      "frac": 0.5714,
+      "ctx_correct": 6,
+      "lift": 2
+    },
+    "在|人": {
+      "pred": "zoi3",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 1,
+      "lift": 2
+    },
+    "黎|愛": {
+      "pred": "lai6",
+      "support": 14,
+      "pred_n": 10,
+      "frac": 0.7143,
+      "ctx_correct": 3,
+      "lift": 7
+    },
+    "咁|": {
+      "pred": "gam2",
+      "support": 9,
+      "pred_n": 7,
+      "frac": 0.7778,
+      "ctx_correct": 2,
+      "lift": 5
+    },
+    "若|然": {
+      "pred": "joek3",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "咁|啦": {
+      "pred": "gam2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "得|越": {
+      "pred": "dak6",
+      "support": 8,
+      "pred_n": 5,
+      "frac": 0.625,
+      "ctx_correct": 3,
+      "lift": 2
+    },
+    "咁|又": {
+      "pred": "gam2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "壁|畫": {
+      "pred": "bik2",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 3,
+      "lift": 1
+    },
+    "多|我": {
+      "pred": "do5",
+      "support": 8,
+      "pred_n": 5,
+      "frac": 0.625,
+      "ctx_correct": 3,
+      "lift": 2
+    },
+    "啦|唔": {
+      "pred": "laa3",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "為|人": {
+      "pred": "wai6",
+      "support": 16,
+      "pred_n": 12,
+      "frac": 0.75,
+      "ctx_correct": 4,
+      "lift": 8
+    },
+    "咁|咁": {
+      "pred": "gam2",
+      "support": 8,
+      "pred_n": 4,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "啦|I": {
+      "pred": "laa3",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "艷|芬": {
+      "pred": "jin6",
+      "support": 7,
+      "pred_n": 5,
+      "frac": 0.7143,
+      "ctx_correct": 1,
+      "lift": 4
+    },
+    "事|人": {
+      "pred": "si4",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "咁|做": {
+      "pred": "gam2",
+      "support": 8,
+      "pred_n": 7,
+      "frac": 0.875,
+      "ctx_correct": 1,
+      "lift": 6
+    },
+    "咁|佢": {
+      "pred": "gam2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    },
+    "頭|婆": {
+      "pred": "tau4",
+      "support": 9,
+      "pred_n": 9,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 9
+    },
+    "呢|段": {
+      "pred": "ne1",
+      "support": 14,
+      "pred_n": 13,
+      "frac": 0.9286,
+      "ctx_correct": 0,
+      "lift": 13
+    },
+    "及|傳": {
+      "pred": "kam4",
+      "support": 385,
+      "pred_n": 199,
+      "frac": 0.5169,
+      "ctx_correct": 173,
+      "lift": 26
+    },
+    "陣|仗": {
+      "pred": "zan3",
+      "support": 6,
+      "pred_n": 5,
+      "frac": 0.8333,
+      "ctx_correct": 1,
+      "lift": 4
+    },
+    "卒|之": {
+      "pred": "ceot1",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "咁|唔": {
+      "pred": "gam2",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 0,
+      "lift": 4
+    },
+    "辯|駁": {
+      "pred": "bin3",
+      "support": 9,
+      "pred_n": 6,
+      "frac": 0.6667,
+      "ctx_correct": 3,
+      "lift": 3
+    },
+    "透|露": {
+      "pred": "tau6",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 2,
+      "lift": 1
+    },
+    "新|加": {
+      "pred": "sing3",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 1,
+      "lift": 3
+    },
+    "咧|我": {
+      "pred": "ne1",
+      "support": 6,
+      "pred_n": 3,
+      "frac": 0.5,
+      "ctx_correct": 0,
+      "lift": 3
+    },
+    "屎|八": {
+      "pred": "si6",
+      "support": 7,
+      "pred_n": 7,
+      "frac": 1.0,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "諸|事": {
+      "pred": "jyu1",
+      "support": 8,
+      "pred_n": 5,
+      "frac": 0.625,
+      "ctx_correct": 3,
+      "lift": 2
+    },
+    "翻|唱": {
+      "pred": "faan2",
+      "support": 8,
+      "pred_n": 7,
+      "frac": 0.875,
+      "ctx_correct": 0,
+      "lift": 7
+    },
+    "剋|夫": {
+      "pred": "haak1",
+      "support": 6,
+      "pred_n": 4,
+      "frac": 0.6667,
+      "ctx_correct": 2,
+      "lift": 2
+    }
+  },
+  "unigrams": {},
+  "n_trigrams": 280,
+  "n_bigrams_l": 124,
+  "n_bigrams_r": 109,
+  "n_unigrams": 0,
+  "hyperparams": {
+    "TRAIN_PCT": 70,
+    "TRIGRAM_MIN_SUPPORT": 3,
+    "UNIGRAM_MIN_SUPPORT": 8,
+    "UNIGRAM_MIN_ALT_FRAC": 0.55,
+    "note": "v1 refined: lift-gated tri+bi; unigrams disabled"
+  }
+}

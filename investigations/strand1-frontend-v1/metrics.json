@@ -1,0 +1,111 @@
+{
+  "corpus_sha256": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+  "base_rate_ctx_default_all_judgeable": 0.184153,
+  "base_rate_ctx_default_n": 133340,
+  "base_rate_should_change_n": 24555,
+  "split": {
+    "n_judgeable": 139362,
+    "n_videos_total": 565,
+    "n_videos_train_hash": 388,
+    "n_videos_eval_hash": 177,
+    "n_overlap_text_clean": 62,
+    "n_rows_moved_eval_to_train": 3430,
+    "n_train": 100604,
+    "n_eval": 38758,
+    "n_videos_train_final": 565,
+    "n_videos_eval_final": 171,
+    "n_text_clean_train": 2438,
+    "n_text_clean_eval": 989,
+    "eval_should_change": 8051,
+    "eval_should_not": 30707
+  },
+  "rules": {
+    "n_trigrams": 280,
+    "n_bigrams_l": 124,
+    "n_bigrams_r": 109,
+    "n_unigrams": 0,
+    "hyperparams": {
+      "TRAIN_PCT": 70,
+      "TRIGRAM_MIN_SUPPORT": 3,
+      "UNIGRAM_MIN_SUPPORT": 8,
+      "UNIGRAM_MIN_ALT_FRAC": 0.55,
+      "note": "v1 refined: lift-gated tri+bi; unigrams disabled"
+    }
+  },
+  "metrics": {
+    "A_exact_match": {
+      "all_judgeable_eval": {
+        "n": 38758,
+        "pred_exact": 0.82014,
+        "ctx_exact": 0.812142,
+        "delta_pred_minus_ctx": 0.007998
+      },
+      "among_ctx_eq_default": {
+        "n": 37011,
+        "pred_exact": 0.827024,
+        "ctx_exact": 0.821729,
+        "delta_pred_minus_ctx": 0.005296
+      },
+      "among_ctx_ne_default": {
+        "n": 1747,
+        "pred_exact": 0.674299,
+        "ctx_exact": 0.609044,
+        "delta_pred_minus_ctx": 0.065255
+      },
+      "among_should_change": {
+        "n": 8051,
+        "pred_exact": 0.181344,
+        "ctx_exact": 0.132157,
+        "delta_pred_minus_ctx": 0.049186
+      },
+      "among_should_not": {
+        "n": 30707,
+        "pred_exact": 0.987625,
+        "ctx_exact": 0.990426,
+        "delta_pred_minus_ctx": -0.002801
+      }
+    },
+    "B_change_decision": {
+      "n_ctx_eq_default": 37011,
+      "base_rate_realized_ne_default": 0.178271,
+      "tp": 402,
+      "fp": 144,
+      "fn": 6196,
+      "tn": 30269,
+      "precision": 0.736264,
+      "recall": 0.060928,
+      "f1": 0.112542,
+      "always_predict_change_baseline": {
+        "precision": 0.178271,
+        "recall": 1.0,
+        "f1": 0.302598
+      }
+    },
+    "C_win_lose_tie": {
+      "n_pred_ne_ctx": 737,
+      "true_win": 474,
+      "true_lose": 164,
+      "tie_both_wrong": 99,
+      "tie_both_right": 0,
+      "same_both_right": 31313,
+      "same_both_wrong": 6708,
+      "true_win_rate_among_diff": 0.643148,
+      "true_lose_rate_among_diff": 0.222524
+    },
+    "D_tone_vs_segment": {
+      "true_win_tone_only": 294,
+      "true_win_segment_diff": 180
+    }
+  },
+  "tojyutping_spot_check": {
+    "ok": true,
+    "checked": 30,
+    "agree": 30,
+    "disagree": 0,
+    "examples_disagree": [],
+    "note": "jp_ctx treated as ToJyutping; package spot-check for sanity"
+  },
+  "recommendation": "DO NOT CONTINUE",
+  "recommendation_reason": "Directionally positive (win 474>lose 164, EM Δ=+0.0080) but effect size too small on this corpus to justify a product line.",
+  "claim_limit": "on these rows I beat ToJyutping at predicting realized reading"
+}
