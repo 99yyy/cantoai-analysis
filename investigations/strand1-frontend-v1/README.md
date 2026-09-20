@@ -9,13 +9,17 @@ on these rows I beat ToJyutping at predicting realized reading — NOT “my rea
 
 ## Corrected reachable definition
 
-`metrics.json` is the original v1 snapshot (exact string equality vs `jp_realized`).
+**`metrics_exact_alt.json` is the corrected reachable (exact_alt) change-decision metrics.** Prefer it over `metrics.json` for any claim about “should we change from default?”.
 
-**`metrics_exact_alt.json` is the corrected reachable definition** (a prediction
-may count as reachable when it matches an alternate dictionary reading, not only
-the acoustic string). Prefer that file when it is present. It is **not** in this
-tree yet; see TODO below. Do not treat `metrics.json` as that corrected
-definition.
+Among `jp_ctx == jp_default`:
+
+- Positive label: `jp_match == 'exact_alt'` (realized is another dictionary candidate — reachable for a dict-alt override).
+- Predicted change: `pred != jp_default`.
+- `tone` / `segment` / `diff` are unreachable for that override and are not the positive class.
+
+`metrics.json` remains the original v1 snapshot (positive class = realized≠default; exact string equality vs `jp_realized`). Do not treat it as the reachable definition.
+
+Write-up: `comparison_exact_alt.md`. Why README 17.8% ≠ split-table 20.8%: `base_rate_note.md` (different denominators, not a corpus bug).
 
 ## Corpus pin
 
@@ -37,14 +41,17 @@ python3 investigations/strand1-frontend-v1/run.py --check
 compares them to committed `metrics.json` (ignores `tojyutping_spot_check`,
 which needs the optional package). It does not overwrite the v1 snapshot files.
 
-Write a fresh copy (does not replace the committed snapshot unless `--out-dir`
-points at this folder):
+The exact_alt rescore in `metrics_exact_alt.json` / `comparison_exact_alt.md`
+uses the same v1 rules and eval split (preds from `rules.json`). `run.py`
+reproduces the original v1 snapshot, not a second exact_alt writer.
+
+Write a fresh copy of the original v1 snapshot:
 
 ```bash
 python3 investigations/strand1-frontend-v1/run.py --out-dir /tmp/strand1-frontend-v1-rerun
 ```
 
-Regenerate `predictions_eval.csv` (not committed; see below):
+Regenerate `predictions_eval.csv`:
 
 ```bash
 python3 investigations/strand1-frontend-v1/run.py --out-dir /tmp/strand1-frontend-v1-rerun --write-predictions
@@ -72,19 +79,24 @@ and `jp_default`. `dur > 0` is declared here and removes the known
 zero-duration aligner rows (contract clause 25). This is not a TASK
 measurement loop.
 
-## Original v1 headline numbers (eval)
+## Headline numbers
 
-Copied from the v1 snapshot (`metrics.json` / `comparison.md`); not re-judged
-here:
+Original v1 (`metrics.json` / `comparison.md`), not the reachable definition:
 
-- Base rate among ctx=default judgeable eval: **17.8%** realized≠default
-- Change-decision F1 (among ctx=default): **0.1125** (P=0.7363, R=0.0609); always-change baseline F1=0.3026
+- Base rate among ctx=default judgeable eval: **17.8%** realized≠default (see `base_rate_note.md` for vs 20.8%)
+- Change-decision F1 (among ctx=default, old label): **0.1125** (P=0.7363, R=0.0609); always-change baseline F1=0.3026
 - Exact-match all eval: pred **0.8201** vs ctx **0.8121** (Δ=+0.0080)
 - Overrides pred≠ctx: true_win=474, true_lose=164, tie_both_wrong=99 (n_diff=737)
 - Rules learned: 280 trigrams, 124+109 bigrams; train=100604, eval=38758
 
-Recommendation in the snapshot: **DO NOT CONTINUE** — directionally positive
-but effect size too small on this corpus to justify a product line.
+Corrected reachable change-decision (`metrics_exact_alt.json` / `comparison_exact_alt.md`), among eval `jp_ctx==jp_default`:
+
+- Positive class `jp_match==exact_alt`; base rate **3.6%** (1333/37011)
+- F1 **0.2363** (P=0.4066, R=0.1665); always-change F1=0.0695
+- Confusion: TP=222 FP=324 FN=1111 TN=35354
+- True reachable recall 16.7% (222/1333). Tom’s old_TP/n_exact_alt ≈ 30.2% overcounts because 180 of 402 old TPs are tone/segment/diff.
+
+Recommendation in both snapshots: **DO NOT CONTINUE** — still directionally positive (win 474>164, EM Δ=+0.0080) but coverage of reachable alts and EM lift remain too small for a product line.
 
 ## Files
 
@@ -92,22 +104,10 @@ but effect size too small on this corpus to justify a product line.
 |---|---|
 | `run.py` | recompute original v1 against `data/corpus_v2.sqlite` |
 | `metrics.json` | original v1 metrics snapshot |
+| `metrics_exact_alt.json` | **corrected reachable (exact_alt) change-decision metrics** |
 | `comparison.md` | original v1 win/lose/tie write-up |
+| `comparison_exact_alt.md` | reachable exact_alt rescore write-up |
+| `base_rate_note.md` | 17.8% vs 20.8% denominators |
 | `rules.json` | learned trigram/bigram rules |
 | `predictions_eval.csv` | eval-row predictions (~2.0 MB); regenerate with `--write-predictions` |
 | `requirements.txt` | optional ToJyutping |
-
-`predictions_eval.csv` is under 25 MB so it is committed. Regenerate:
-
-```bash
-python3 investigations/strand1-frontend-v1/run.py --out-dir /tmp/strand1-frontend-v1-rerun --write-predictions
-```
-
-## TODO (uploads incomplete)
-
-Parent uploads did not include these files. **Do not invent numbers.** Parent
-will reply with the files:
-
-- `metrics_exact_alt.json` — corrected reachable definition (missing)
-- `comparison_exact_alt.md` — missing
-- `base_rate_note.md` — missing

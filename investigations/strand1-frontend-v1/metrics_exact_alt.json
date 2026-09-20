@@ -1,0 +1,105 @@
+{
+  "corpus_sha256": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+  "definition": {
+    "positive_label": "jp_match=='exact_alt'",
+    "predicted_change": "pred != jp_default (among jp_ctx==jp_default)",
+    "note": "Reachable should-change only: exact_alt is in dictionary candidates; tone/segment/diff are unreachable for dictionary-alt override."
+  },
+  "overall_ctx_default_judgeable": {
+    "n": 133340,
+    "exact_default": 108785,
+    "realized_ne_default": 24555,
+    "exact_alt": 4930,
+    "tone": 10785,
+    "segment": 7344,
+    "diff": 1496,
+    "tone_segment_diff": 19625,
+    "exact_alt_frac_of_old_should_change": 0.200774
+  },
+  "eval_ctx_default": {
+    "n": 37011,
+    "jp_match": {
+      "segment": 1935,
+      "tone": 2982,
+      "exact_default": 30413,
+      "diff": 348,
+      "exact_alt": 1333
+    },
+    "n_exact_alt": 1333,
+    "n_realized_ne_default": 6598,
+    "base_rate_exact_alt": 0.036016,
+    "base_rate_realized_ne_default": 0.178271
+  },
+  "B_change_decision_exact_alt": {
+    "tp": 222,
+    "fp": 324,
+    "fn": 1111,
+    "tn": 35354,
+    "precision": 0.406593,
+    "recall": 0.166542,
+    "f1": 0.236296,
+    "always_predict_change_baseline": {
+      "precision": 0.036016,
+      "recall": 1.0,
+      "f1": 0.069528
+    }
+  },
+  "B_change_decision_old_realized_ne_default": {
+    "tp": 402,
+    "fp": 144,
+    "fn": 6196,
+    "tn": 30269,
+    "precision": 0.736264,
+    "recall": 0.060928,
+    "f1": 0.112542
+  },
+  "among_exact_alt_positives": {
+    "n": 1333,
+    "pred_exact_match_realized": 220,
+    "pred_exact_match_rate": 0.165041,
+    "pred_change": 222,
+    "pred_change_and_exact_match": 220,
+    "note": "pred_change_and_exact_match == TP only if every change that hits exact_alt also matches realized; TP counts any change when label is exact_alt."
+  },
+  "overrides": {
+    "n_pred_ne_ctx": 737,
+    "true_win": 474,
+    "true_lose": 164,
+    "tie_both_wrong": 99,
+    "true_win_on_exact_alt": 346,
+    "true_lose_on_exact_alt": 0,
+    "true_win_ctx_default_exact_alt": 220,
+    "true_win_by_jp_match_among_ctx_default": {
+      "tone": 99,
+      "exact_alt": 220,
+      "segment": 21
+    }
+  },
+  "tom_claim_check": {
+    "old_recall": 0.060928,
+    "n_exact_alt_eval_ctx_default": 1333,
+    "old_TP": 402,
+    "approx_R_reachable_old_TP_over_n_exact_alt": 0.301575,
+    "true_R_reachable": 0.166542,
+    "note": "Tom said old 6.1% recall is ~30% of reachable via R_reachable ≈ old_TP / n_exact_alt. That arithmetic holds: 402/1333 ≈ 30.2%. However that overstates true reachable recall because only 222/402 old TPs are exact_alt (180 are tone/segment/diff changes). True reachable recall = new_TP / n_exact_alt = 222/1333 ≈ 16.7%.",
+    "old_TP_that_are_exact_alt": 222,
+    "tom_approx_verified": true,
+    "tom_approx_equals_true_R": false
+  },
+  "base_rate_inconsistency": {
+    "readme_17_8_pct": {
+      "value": 0.178271,
+      "formula": "realized≠default among eval rows with jp_ctx==jp_default",
+      "n_num": 6598,
+      "n_den": 37011
+    },
+    "table_20_8_pct": {
+      "value": 0.207725,
+      "formula": "eval_should_change / n_eval = realized≠default among ALL eval (includes ctx≠default)",
+      "n_num": 8051,
+      "n_den": 38758
+    }
+  },
+  "recommendation": "DO NOT CONTINUE",
+  "recommendation_reason": "Reachable change-decision F1=0.2363 (P=0.4066, R=0.1665) on exact_alt base rate 3.6%; always-change F1=0.0695. True reachable recall 16.7% (Tom approx old_TP/n_exact_alt=30.2%). Still directionally positive (win 474>164, EM Δ=+0.0080) but absolute coverage of reachable alts and EM lift remain too small for a product line."
+}
