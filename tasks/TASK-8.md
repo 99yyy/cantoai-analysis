@@ -1,6 +1,7 @@
 # TASK-8：可判集上，tone/segment 是否撑起了发布后的不一致增量
 
-status: open
+status: closed
+corpus_sha: 2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f
 rung: Autopilot
 
 ## 目标

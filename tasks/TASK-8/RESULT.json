@@ -1,0 +1,70 @@
+{
+  "task": "TASK-8",
+  "subtype": "success",
+  "verdict": "supported",
+  "hypothesis": "On the contract-judgeable published A+B set, the pre−post rise in disagreement quality concentrates in tone and/or segment rather than mainly in diff.",
+  "why": "Tone and segment share gaps (3.58 pp and 4.02 pp) dominate the diff share gap (1.45 pp).",
+  "numbers": {
+    "n_videos_pre": {
+      "value": 391,
+      "within_tol": true
+    },
+    "n_videos_post": {
+      "value": 176,
+      "within_tol": true
+    },
+    "n_unassigned_period": {
+      "value": 0,
+      "within_tol": true
+    },
+    "n_judgeable_pre": {
+      "value": 104539,
+      "within_tol": true
+    },
+    "n_judgeable_post": {
+      "value": 34823,
+      "within_tol": true
+    },
+    "n_tone_judgeable_pre": {
+      "value": 7555,
+      "within_tol": true
+    },
+    "n_tone_judgeable_post": {
+      "value": 3764,
+      "within_tol": true
+    },
+    "n_segment_judgeable_pre": {
+      "value": 4736,
+      "within_tol": true
+    },
+    "n_segment_judgeable_post": {
+      "value": 2977,
+      "within_tol": true
+    },
+    "n_diff_judgeable_pre": {
+      "value": 779,
+      "within_tol": true
+    },
+    "n_diff_judgeable_post": {
+      "value": 764,
+      "within_tol": true
+    },
+    "gap_share_tone_pp": {
+      "value": 3.5819801831625573,
+      "within_tol": true
+    },
+    "gap_share_segment_pp": {
+      "value": 4.018580877255639,
+      "within_tol": true
+    },
+    "gap_share_diff_pp": {
+      "value": 1.4487758315949515,
+      "within_tol": true
+    }
+  },
+  "turns_used": 5,
+  "turn_cap": 3,
+  "corpus_sha": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+  "forked_from": null,
+  "fork_depth": 0
+}
