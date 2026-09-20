@@ -1,6 +1,7 @@
 # TASK-9：语料 pin 不变，用现有列做发布前后内容/质量代理诊断
 
-status: open
+status: closed
+corpus_sha: 2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f
 rung: Autopilot
 
 ## 目标

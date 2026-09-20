@@ -1,0 +1,90 @@
+{
+  "task": "TASK-9",
+  "subtype": "success",
+  "verdict": "inconclusive",
+  "hypothesis": "On published A+B windows of this channel's 567 videos, post-2024 windows present worse weak-quality proxies or a higher flag_sing per-mille.",
+  "why": "Machine completion is 19/19 agree; research is inconclusive because gap_flag_sing_pm is 0.0 on published A+B (vidmed and trim10 also 0.0) while gap_coverage_pm is -17.1878 with Q2 ratios under 2 but coverage direction is not defined as quality.",
+  "numbers": {
+    "n_videos_pre": {
+      "value": 391,
+      "within_tol": true
+    },
+    "n_videos_post": {
+      "value": 176,
+      "within_tol": true
+    },
+    "n_unassigned_period": {
+      "value": 0,
+      "within_tol": true
+    },
+    "n_windows_pre": {
+      "value": 3286,
+      "within_tol": true
+    },
+    "n_windows_post": {
+      "value": 1153,
+      "within_tol": true
+    },
+    "n_flag_sing_pre": {
+      "value": 0,
+      "within_tol": true
+    },
+    "n_flag_sing_post": {
+      "value": 0,
+      "within_tol": true
+    },
+    "rate_flag_sing_pre_pm": {
+      "value": 0.0,
+      "within_tol": true
+    },
+    "rate_flag_sing_post_pm": {
+      "value": 0.0,
+      "within_tol": true
+    },
+    "gap_flag_sing_pm": {
+      "value": 0.0,
+      "within_tol": true
+    },
+    "rate_coverage_pre_pm": {
+      "value": 900.0386488131467,
+      "within_tol": true
+    },
+    "rate_coverage_post_pm": {
+      "value": 882.8508239375542,
+      "within_tol": true
+    },
+    "gap_coverage_pm": {
+      "value": -17.18782487559247,
+      "within_tol": true
+    },
+    "rate_coverage_median_pre_pm": {
+      "value": 988.0,
+      "within_tol": true
+    },
+    "rate_coverage_median_post_pm": {
+      "value": 982.0,
+      "within_tol": true
+    },
+    "gap_flag_sing_vidmed_pm": {
+      "value": 0.0,
+      "within_tol": true
+    },
+    "gap_coverage_vidmed_pm": {
+      "value": -22.00000000000002,
+      "within_tol": true
+    },
+    "gap_flag_sing_trim10_pm": {
+      "value": 0.0,
+      "within_tol": true
+    },
+    "gap_coverage_trim10_pm": {
+      "value": -19.250357101742388,
+      "within_tol": true
+    }
+  },
+  "turns_used": 5,
+  "turn_cap": 3,
+  "corpus_sha": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+  "forked_from": null,
+  "fork_depth": 0
+}
