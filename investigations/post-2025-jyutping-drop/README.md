@@ -11,7 +11,7 @@ This folder is the **index of record** for the campaign. Machine-gated numbers a
 | TASK-6 | closed | Film title-proxy mix term ≈ 1.91pp of `gap_contract_pp` ≈ 9.05pp; residual ≈ 7.14pp. | [brief](../../tasks/TASK-6.md) · [results](../../tasks/TASK-6/results.json) · [audit](../../review/TASK-6/audit.md) · [PR #46](https://github.com/99yyy/cantoai-analysis/pull/46) |
 | TASK-7 | closed | other×common `gap_other_common_pp` ≈ 7.33pp; cluster 95% CI excludes 0. | [brief](../../tasks/TASK-7.md) · [RESULT](../../tasks/TASK-7/RESULT.json) · [audit](../../review/TASK-7/audit.md) · [PR #83](https://github.com/99yyy/cantoai-analysis/pull/83) |
 | TASK-8 | closed | On judgeable A+B, tone and segment share gaps (≈ 3.58 and ≈ 4.02 pp) larger than diff (≈ 1.45 pp). | [brief](../../tasks/TASK-8.md) · [RESULT](../../tasks/TASK-8/RESULT.json) · [audit](../../review/TASK-8/audit.md) · [PR #87](https://github.com/99yyy/cantoai-analysis/pull/87) |
-| TASK-9 | **open** | Pin-unchanged diagnostic: existing-column proxies (`flag_sing`, `coverage`, …) pre vs post. No results yet. | [brief](../../tasks/TASK-9.md) |
+| TASK-9 | **open** | Pin-unchanged diagnostic: existing-column proxies (`flag_sing`, `coverage`, …) pre vs post; Q2 cluster-median + trim10 of the same gaps (19 names). No results yet. | [brief](../../tasks/TASK-9.md) |
 | Corpus columns | deferred | SNR / `singing_prob` / `content_type` need a pipeline rebuild outside this repo. Not executed here. | [PLAN](PLAN-corpus-columns.md) |
 
 Quotes of closed findings are pointers to `tasks/` / `review/`. This folder does not re-judge them and does not invent new numbers.
