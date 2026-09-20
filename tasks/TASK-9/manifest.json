@@ -1,0 +1,374 @@
+{
+  "git_sha": "f3fbae3f1aa0ff69d0a7d0f5cf518153434ad20b",
+  "inputs": {
+    "data/corpus_v2.sqlite": {
+      "sha256": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+      "tables": {
+        "videos": {
+          "rows": 567,
+          "columns": [
+            "video_id",
+            "title",
+            "upload_date",
+            "n_windows",
+            "speech_s"
+          ]
+        },
+        "windows": {
+          "rows": 4911,
+          "columns": [
+            "uid",
+            "video_id",
+            "idx",
+            "start",
+            "end",
+            "dur",
+            "start_sample",
+            "end_sample",
+            "boundary_start",
+            "boundary_end",
+            "lang",
+            "text_raw",
+            "text_norm",
+            "text_clean",
+            "flag_hai",
+            "flag_simp",
+            "flag_sing",
+            "flag_boiler",
+            "chars_per_sec",
+            "aligned",
+            "coverage",
+            "first_s",
+            "in_range",
+            "max_zero_run",
+            "tone_shift_suspect",
+            "n_syllables",
+            "tier",
+            "text_human"
+          ]
+        },
+        "syllables": {
+          "rows": 171867,
+          "columns": [
+            "syl_id",
+            "uid",
+            "video_id",
+            "pos",
+            "c0",
+            "char",
+            "start",
+            "end",
+            "dur",
+            "win_start",
+            "jp_default",
+            "jp_ctx",
+            "jp_candidates",
+            "n_cand",
+            "prev_char",
+            "next_char",
+            "ctx",
+            "tier",
+            "jp_realized",
+            "jp_match",
+            "review_prior",
+            "verification_status",
+            "verification_note"
+          ]
+        }
+      }
+    }
+  },
+  "frame": {
+    "videos_expected": 567,
+    "windows_expected": 4911,
+    "syllables_expected": 171867,
+    "published_expected": 164693
+  },
+  "steps": [
+    {
+      "step": "load_videos",
+      "rule": "videos full table",
+      "group": "all",
+      "rows_before": 567,
+      "rows_after": 567
+    },
+    {
+      "step": "load_windows",
+      "rule": "windows full table",
+      "group": "all",
+      "rows_before": 4911,
+      "rows_after": 4911
+    },
+    {
+      "step": "load_syllables",
+      "rule": "syllables full table",
+      "group": "all",
+      "rows_before": 171867,
+      "rows_after": 171867
+    },
+    {
+      "step": "tier_whitelist_syllables",
+      "rule": "syllables.tier IN ('A','B')",
+      "group": "all",
+      "rows_before": 171867,
+      "rows_after": 164693
+    },
+    {
+      "step": "period_videos",
+      "rule": "four-digit year <=2024 vs >=2025; neither predicate is unassigned",
+      "group": "all",
+      "rows_before": 567,
+      "rows_after": 567,
+      "n_pre": 391,
+      "n_post": 176,
+      "n_unassigned": 0
+    },
+    {
+      "step": "tier_whitelist_windows",
+      "rule": "windows.tier IN ('A','B')",
+      "group": "all",
+      "rows_before": 4911,
+      "rows_after": 4439,
+      "n_flag_sing_dropped": 14
+    },
+    {
+      "step": "period_published_windows",
+      "rule": "same period predicates on published A+B windows",
+      "group": "all",
+      "rows_before": 4439,
+      "rows_after": 4439,
+      "n_pre": 3286,
+      "n_post": 1153,
+      "n_unassigned": 0
+    },
+    {
+      "step": "vidmed_clusters",
+      "rule": "videos with >=1 published window in that period",
+      "group": "all",
+      "rows_before": 567,
+      "rows_after": 565,
+      "n_pre": 389,
+      "n_post": 176
+    },
+    {
+      "step": "trim10_pool",
+      "rule": "video_id with >=1 published window in pre or post",
+      "group": "all",
+      "rows_before": 567,
+      "rows_after": 565,
+      "G": 565,
+      "k": 28,
+      "trim10_skipped": 0
+    },
+    {
+      "step": "trim10_flag_sing_drop",
+      "rule": "drop lowest k and highest k clusters by flag_sing score, title, video_id",
+      "group": "flag_sing",
+      "rows_before": 565,
+      "rows_after": 509,
+      "n_dropped_videos": 56,
+      "k": 28
+    },
+    {
+      "step": "trim10_coverage_drop",
+      "rule": "drop lowest k and highest k clusters by mean coverage, title, video_id",
+      "group": "coverage",
+      "rows_before": 565,
+      "rows_after": 509,
+      "n_dropped_videos": 56,
+      "k": 28
+    },
+    {
+      "step": "videos_without_published_windows",
+      "rule": "video has zero windows.tier IN ('A','B')",
+      "group": "all",
+      "rows_before": 567,
+      "rows_after": 565,
+      "n_removed": 2
+    }
+  ],
+  "year_cells": [
+    {
+      "year": "2021",
+      "n_videos": 9,
+      "n_windows": 157,
+      "descriptive": 1,
+      "rate_flag_sing_pm": 0.0,
+      "rate_coverage_pm": 926.3057324840764
+    },
+    {
+      "year": "2022",
+      "n_videos": 193,
+      "n_windows": 2008,
+      "descriptive": 1,
+      "rate_flag_sing_pm": 0.0,
+      "rate_coverage_pm": 907.7360557768924
+    },
+    {
+      "year": "2023",
+      "n_videos": 36,
+      "n_windows": 233,
+      "descriptive": 1,
+      "rate_flag_sing_pm": 0.0,
+      "rate_coverage_pm": 886.793991416309
+    },
+    {
+      "year": "2024",
+      "n_videos": 153,
+      "n_windows": 888,
+      "descriptive": 1,
+      "rate_flag_sing_pm": 0.0,
+      "rate_coverage_pm": 881.463963963964
+    },
+    {
+      "year": "2025",
+      "n_videos": 138,
+      "n_windows": 904,
+      "descriptive": 1,
+      "rate_flag_sing_pm": 0.0,
+      "rate_coverage_pm": 885.9922566371682
+    },
+    {
+      "year": "2026",
+      "n_videos": 38,
+      "n_windows": 249,
+      "descriptive": 1,
+      "rate_flag_sing_pm": 0.0,
+      "rate_coverage_pm": 871.4457831325302
+    },
+    {
+      "year": "unassigned",
+      "n_videos": 0,
+      "n_windows": 0,
+      "descriptive": 1
+    }
+  ],
+  "vidmed": {
+    "n_videos_pre": 389,
+    "n_videos_post": 176,
+    "rate_flag_sing_pre_vidmed_pm": 0.0,
+    "rate_flag_sing_post_vidmed_pm": 0.0,
+    "rate_coverage_pre_vidmed_pm": 889.5,
+    "rate_coverage_post_vidmed_pm": 867.4999999999999
+  },
+  "trim10": {
+    "G": 565,
+    "k": 28,
+    "trim10_skipped": 0,
+    "rule": "k=0 if G<2; k=1 if 2<=G<20; else floor(0.05*G); drop lowest k and highest k by (score, title, video_id); flag_sing and coverage dropped sets are independent",
+    "n_dropped_videos_flag_sing": 56,
+    "n_dropped_videos_coverage": 56,
+    "flag_remaining_windows_pre": 2931,
+    "flag_remaining_windows_post": 1100,
+    "coverage_remaining_windows_pre": 2973,
+    "coverage_remaining_windows_post": 1046,
+    "flag_period_rates_pm": {
+      "pre": 0.0,
+      "post": 0.0
+    },
+    "coverage_period_rates_pm": {
+      "pre": 898.6098217288934,
+      "post": 879.3594646271509
+    }
+  },
+  "tier_filter": {
+    "n_windows_dropped": 472,
+    "n_flag_sing_dropped": 14,
+    "n_windows_published": 4439,
+    "n_flag_sing_published": 0,
+    "n_videos_without_published_windows": 2
+  },
+  "q2": {
+    "flag_sing": {
+      "triggered": 0,
+      "pairs": [
+        {
+          "a": "window",
+          "b": "vidmed",
+          "zero_vs_nonzero": 0,
+          "sign_mismatch": 0,
+          "abs_ratio": null,
+          "ratio_gt_2": 0,
+          "triggered": 0
+        },
+        {
+          "a": "window",
+          "b": "trim10",
+          "zero_vs_nonzero": 0,
+          "sign_mismatch": 0,
+          "abs_ratio": null,
+          "ratio_gt_2": 0,
+          "triggered": 0
+        },
+        {
+          "a": "vidmed",
+          "b": "trim10",
+          "zero_vs_nonzero": 0,
+          "sign_mismatch": 0,
+          "abs_ratio": null,
+          "ratio_gt_2": 0,
+          "triggered": 0
+        }
+      ]
+    },
+    "coverage": {
+      "triggered": 0,
+      "pairs": [
+        {
+          "a": "window",
+          "b": "vidmed",
+          "zero_vs_nonzero": 0,
+          "sign_mismatch": 0,
+          "abs_ratio": 1.2799758060859157,
+          "ratio_gt_2": 0,
+          "triggered": 0
+        },
+        {
+          "a": "window",
+          "b": "trim10",
+          "zero_vs_nonzero": 0,
+          "sign_mismatch": 0,
+          "abs_ratio": 1.11999960676111,
+          "ratio_gt_2": 0,
+          "triggered": 0
+        },
+        {
+          "a": "vidmed",
+          "b": "trim10",
+          "zero_vs_nonzero": 0,
+          "sign_mismatch": 0,
+          "abs_ratio": 1.1428359424048689,
+          "ratio_gt_2": 0,
+          "triggered": 0
+        }
+      ]
+    }
+  },
+  "descriptive": 1,
+  "descriptive_optional": {
+    "chars_per_sec_pre": 2.651004260499087,
+    "chars_per_sec_post": 2.7990980052038164,
+    "dur_pre": 13.204514911746804,
+    "dur_post": 12.407354726799653,
+    "speech_per_window_pre": 13.0413800251389,
+    "speech_per_window_post": 11.228653721330339,
+    "boundary_start": {
+      "pause": 0.7965758053615679,
+      "bof": 0.11489074115791845,
+      "short_gap": 0.08853345348051363
+    },
+    "boundary_end": {
+      "pause": 0.7850867312457761,
+      "eof": 0.12615453931065557,
+      "short_gap": 0.08875872944356837
+    }
+  },
+  "window_weighted": {
+    "rate_flag_sing_pre_pm": 0.0,
+    "rate_flag_sing_post_pm": 0.0,
+    "gap_flag_sing_pm": 0.0,
+    "rate_coverage_pre_pm": 900.0386488131467,
+    "rate_coverage_post_pm": 882.8508239375542,
+    "gap_coverage_pm": -17.18782487559247
+  }
+}

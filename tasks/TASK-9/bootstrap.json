@@ -1,0 +1,46 @@
+{
+  "B": 2000,
+  "master_seed": 20260920,
+  "stratum_seeds": {
+    "pre": 2992308033,
+    "post": 3818394395
+  },
+  "G_h": {
+    "pre": 391,
+    "post": 176
+  },
+  "ci_unreliable": 0,
+  "ci_unreliable_stratum": {
+    "pre": 0,
+    "post": 0
+  },
+  "m": 2,
+  "n_videos_with_published_windows": {
+    "pre": 389,
+    "post": 176
+  },
+  "gaps": {
+    "gap_flag_sing_pm": {
+      "observed_pm": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "includes_0": true,
+      "p_raw": 1.0,
+      "p_BH": 1.0,
+      "conclusion": "estimated"
+    },
+    "gap_coverage_pm": {
+      "observed_pm": -17.18782487559247,
+      "ci95": [
+        -29.294763030046646,
+        -5.579667139510571
+      ],
+      "includes_0": false,
+      "p_raw": 0.002,
+      "p_BH": 0.004,
+      "conclusion": "estimated"
+    }
+  }
+}
