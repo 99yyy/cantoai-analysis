@@ -27,6 +27,11 @@
 - 审计：`review/TASK-7/audit.md` — `verdict: supported`（`gap_other_common_pp` 7.3304；worker 整簇 bootstrap 95% CI 不含 0）。结论只记在此，不直接变成下一题。
 - keep rate：产出 10 个数字，留下 10 个（`output-check` 10/10 agree）→ **10/10**。
 
+## TASK-8 收口
+
+- 审计：`review/TASK-8/audit.md` — `verdict: supported`（tone/segment share gaps ≈3.58 + ≈4.02 pp dominate diff ≈1.45 pp）。结论只记在此，不直接变成下一题。
+- keep rate：产出 14 个数字，留下 14 个（`output-check` 14/14 agree）→ **14/14**。
+
 ## LOOP 预算（启动次数，不是美元）
 
 一轮家族（父任务 + `-b` + `-c`）共享 **16** 次 Cloud Agent 启动。碰到上限是 `subtype: out_of_budget`，停下来报告 Tom。账本是 `tasks/TASK-N/launches.json`，由 coordinator / auditor 追加。同一语料 pin 上关了几道题只在本 backlog 记一笔，不进 RESULT，也不叫 `val_iterations`。
