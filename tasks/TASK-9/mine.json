@@ -1,0 +1,116 @@
+[
+  {
+    "name": "n_videos_pre",
+    "value": 391,
+    "n": 567,
+    "query": "tasks/TASK-9/mine_sql/n_videos_pre.sql"
+  },
+  {
+    "name": "n_videos_post",
+    "value": 176,
+    "n": 567,
+    "query": "tasks/TASK-9/mine_sql/n_videos_post.sql"
+  },
+  {
+    "name": "n_unassigned_period",
+    "value": 0,
+    "n": 567,
+    "query": "tasks/TASK-9/mine_sql/n_unassigned_period.sql"
+  },
+  {
+    "name": "n_windows_pre",
+    "value": 3286,
+    "n": 3286,
+    "query": "tasks/TASK-9/mine_sql/n_windows_pre.sql"
+  },
+  {
+    "name": "n_windows_post",
+    "value": 1153,
+    "n": 1153,
+    "query": "tasks/TASK-9/mine_sql/n_windows_post.sql"
+  },
+  {
+    "name": "n_flag_sing_pre",
+    "value": 0,
+    "n": 3286,
+    "query": "tasks/TASK-9/mine_sql/n_flag_sing_pre.sql"
+  },
+  {
+    "name": "n_flag_sing_post",
+    "value": 0,
+    "n": 1153,
+    "query": "tasks/TASK-9/mine_sql/n_flag_sing_post.sql"
+  },
+  {
+    "name": "rate_flag_sing_pre_pm",
+    "value": 0,
+    "n": 3286,
+    "query": "tasks/TASK-9/mine_sql/rate_flag_sing_pre_pm.sql"
+  },
+  {
+    "name": "rate_flag_sing_post_pm",
+    "value": 0,
+    "n": 1153,
+    "query": "tasks/TASK-9/mine_sql/rate_flag_sing_post_pm.sql"
+  },
+  {
+    "name": "gap_flag_sing_pm",
+    "value": 0,
+    "n": 4439,
+    "query": "tasks/TASK-9/mine_sql/gap_flag_sing_pm.sql"
+  },
+  {
+    "name": "rate_coverage_pre_pm",
+    "value": 900.0386488131467,
+    "n": 3286,
+    "query": "tasks/TASK-9/mine_sql/rate_coverage_pre_pm.sql"
+  },
+  {
+    "name": "rate_coverage_post_pm",
+    "value": 882.8508239375542,
+    "n": 1153,
+    "query": "tasks/TASK-9/mine_sql/rate_coverage_post_pm.sql"
+  },
+  {
+    "name": "gap_coverage_pm",
+    "value": -17.18782487559247,
+    "n": 4439,
+    "query": "tasks/TASK-9/mine_sql/gap_coverage_pm.sql"
+  },
+  {
+    "name": "rate_coverage_median_pre_pm",
+    "value": 988,
+    "n": 3286,
+    "query": "tasks/TASK-9/mine_sql/rate_coverage_median_pre_pm.sql"
+  },
+  {
+    "name": "rate_coverage_median_post_pm",
+    "value": 982,
+    "n": 1153,
+    "query": "tasks/TASK-9/mine_sql/rate_coverage_median_post_pm.sql"
+  },
+  {
+    "name": "gap_flag_sing_vidmed_pm",
+    "value": 0,
+    "n": 567,
+    "query": "tasks/TASK-9/mine_sql/gap_flag_sing_vidmed_pm.sql"
+  },
+  {
+    "name": "gap_coverage_vidmed_pm",
+    "value": -22,
+    "n": 567,
+    "query": "tasks/TASK-9/mine_sql/gap_coverage_vidmed_pm.sql"
+  },
+  {
+    "name": "gap_flag_sing_trim10_pm",
+    "value": 0,
+    "n": 4439,
+    "query": "tasks/TASK-9/mine_sql/gap_flag_sing_trim10_pm.sql"
+  },
+  {
+    "name": "gap_coverage_trim10_pm",
+    "value": -19.250357101742452,
+    "n": 4439,
+    "query": "tasks/TASK-9/mine_sql/gap_coverage_trim10_pm.sql"
+  }
+]
