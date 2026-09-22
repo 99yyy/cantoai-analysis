@@ -177,6 +177,15 @@ published_expected 164693
 published_expected_tol 0
 ```
 
+## 读 frame 之外的名字
+
+`relations.py` 的 exclude 不变量按上面 ```frame``` 块的谓词（`windows.tier IN ('A','B')`）删掉不在发布集里的行再重放，动了的数字就算依赖 frame 之外的行。下面 ```outside_frame``` 块列出**按定义就读 frame 之外的行**的名字：`rare_share_*` 的稀有字谓词是「全库 `syllables` 表、全部 tier 上出现次数 < 10」（见上文定义），删掉不发布的行会改变哪些字算稀有，所以这两个名字不做 exclude 比较（double、permute 照做）。往这块加名字是降杆（history-audit）。
+
+```outside_frame
+rare_share_pre     # 稀有字谓词读全库 syllables，全部 tier
+rare_share_post
+```
+
 ## 恒等式
 
 下面 ```identities``` 块每一行是 `<expr> = <expr>  <tol>`。`output-check` 用与 `derived:` 相同的 AST，代入**该文件重放出来的**值（不合并 worker 与 verifier 的字典）。`frame.<字段>` 绑定上面 ```frame``` 块的数值。一条恒等式**只在该文件里每一个出现的数字名都是 SQL 算路时才计**；任一名字是 `derived:` 就跳过——否则 worker 把 `n_judgeable_pre` 写成推导式时，film/other 恒等式在该文件上会变成恒真。

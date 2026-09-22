@@ -125,6 +125,20 @@ published_expected 164693
 published_expected_tol 0
 ```
 
+## 读 frame 之外的名字
+
+`relations.py` 的 exclude 不变量按上面 ```frame``` 块的谓词（`windows.tier IN ('A','B')`）删掉不在发布集里的行再重放，动了的数字就算依赖 frame 之外的行。下面 ```outside_frame``` 块列出**按定义就读 frame 之外的行**的名字：本任务的 common 谓词是「全库 `syllables` 表、全部 tier 上出现次数 ≥ 10」（见上文定义），删掉不发布的行会改变哪些字算 common，所以该格的计数不做 exclude 比较；`agree_other_common_*` 与 `gap_other_common_pp` 由这些计数推出，一并豁免（double、permute 照做）。往这块加名字是降杆（history-audit）。
+
+```outside_frame
+n_judgeable_other_common_pre     # common 谓词读全库 syllables，全部 tier
+n_judgeable_other_common_post
+n_match_other_common_pre
+n_match_other_common_post
+agree_other_common_pre
+agree_other_common_post
+gap_other_common_pp
+```
+
 ## 恒等式
 
 下面 ```identities``` 块每一行是 `<expr> = <expr>  <tol>`。`output-check` 用与 `derived:` 相同的 AST，代入**该文件重放出来的**值（不合并 worker 与 verifier 的字典）。`frame.<字段>` 绑定上面 ```frame``` 块的数值。一条恒等式**只在该文件里每一个出现的数字名都是 SQL 算路时才计**；任一名字是 `derived:` 就跳过。
