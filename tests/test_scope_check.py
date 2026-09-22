@@ -140,3 +140,56 @@ def test_investigations_allowed_on_repair_chore_and_agent():
     assert scope_check.path_blocked("LOOP.md", agent) == "DENY"
     assert scope_check.path_blocked("scripts/scope_check.py", chore) == "DENY"
     assert scope_check.path_blocked("README.md", chore) == "DENY"
+
+
+# --- authorization is by the pull-request author, actor is the fallback ---
+
+
+def test_repair_is_authorized_by_the_owner_who_opened_the_pr_even_when_an_agent_pushed():
+    # The TASK-9 close (#98): opened by 99yyy, then pushed by cursor[bot].
+    # The actor check went red and the same head had to be re-opened as #99.
+    cls = scope_check.classify(
+        "repair/task-9-close-1f66", actor="cursor[bot]", owners=OWNERS, author="99yyy"
+    )
+    assert cls.name == "repair"
+
+
+def test_chore_is_authorized_by_the_owner_who_opened_the_pr_even_when_an_agent_pushed():
+    cls = scope_check.classify(
+        "chore/task-7-close-f7b2", actor="cursor[bot]", owners=OWNERS, author="99yyy"
+    )
+    assert cls.name == "chore"
+
+
+def test_repair_opened_by_a_non_owner_is_rejected_even_when_the_owner_pushed():
+    # An owner push must not launder someone else's pull request.
+    with pytest.raises(ValueError) as ei:
+        scope_check.classify(
+            "repair/t6-x", actor="99yyy", owners=OWNERS, author="agent-bot"
+        )
+    assert str(ei.value) == (
+        "scope_check: FAIL branch 'repair/t6-x' class repair is not authorized "
+        "for author 'agent-bot'"
+    )
+
+
+def test_without_a_pull_request_the_actor_still_decides():
+    # Local ./verify and push runs have no PR author.
+    assert scope_check.classify("repair/x-y", actor="99yyy", owners=OWNERS, author="").name == "repair"
+    with pytest.raises(ValueError) as ei:
+        scope_check.classify("repair/x-y", actor="agent-bot", owners=OWNERS, author="")
+    assert str(ei.value) == (
+        "scope_check: FAIL branch 'repair/x-y' class repair is not authorized "
+        "for actor 'agent-bot'"
+    )
+
+
+def test_author_is_compared_case_insensitively_like_actor():
+    cls = scope_check.classify("repair/x-y", actor="cursor[bot]", owners=OWNERS, author="99YYY")
+    assert cls.name == "repair"
+
+
+def test_agent_class_ignores_author():
+    cls = scope_check.classify("cursor/t9-worker-x", actor="cursor[bot]", owners=OWNERS, author="99yyy")
+    assert cls.name == "agent"
+    assert cls.deny == scope_check.DENY
