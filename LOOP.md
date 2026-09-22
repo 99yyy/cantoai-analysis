@@ -67,6 +67,14 @@ STOP     全部一致 → 把任务书改成 status: closed，并盖上当时 RE
 
 前三个是 main 的必需检查。
 
+## 仓库设置（不在脚本里，在 GitHub Settings 里）
+
+闸门脚本管的是 PR 的内容；下面三样只能靠仓库设置，改了要在这里同步记一笔：
+
+- **`.github/CODEOWNERS`**：`.github/**`、`scripts/**`、`tests/**`、`data/**`、`LOOP.md`、`README.md`、`.cursor/**`、`tasks/TASK-*.md` 归 owner。main 的分支规则开「Require review from Code Owners」，碰这些路径的 PR 没有 owner 审阅就合不进去。
+- **main 的必需检查**：`tests`、`output-check`、`scope-check`、`history-audit` 四个都必需（`tests` 以前不是）。必需检查按 job 名对上，改 `ci.yml` 里的 job 名要同步改设置。
+- **禁 force-push**：main 和 `cursor/**`、`box/**`、`chore/**`、`repair/**` 都不允许 force-push 和删除分支。「3 次改写」数的是留下来的 commit，force-push 抹掉旧版本就数不到（TASK-8、TASK-9 各推过三个 worker 版本，main 上每个输出文件只剩 1 个 commit）；identity 检查同理。
+
 ## 本地 `./verify`
 
 一条命令，固定子命令，失败非零。调用现有脚本，不另写一套规则。

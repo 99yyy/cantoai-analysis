@@ -1,0 +1,13 @@
+# Owner-reviewed paths. GitHub requests a review from the owner on any pull
+# request that touches these, and with "Require review from Code Owners" on
+# the main branch rule, no such PR merges without it. The list mirrors the
+# protected paths in scripts/gate_config.json (scope) plus the tests that
+# guard the gates and the loop contract.
+.github/**          @99yyy
+scripts/**          @99yyy
+tests/**            @99yyy
+data/**             @99yyy
+LOOP.md             @99yyy
+README.md           @99yyy
+.cursor/**          @99yyy
+tasks/TASK-*.md     @99yyy
