@@ -35,7 +35,7 @@ self-report.
                                  exactly one row and one column, equal to
                                  ``value`` within tol. EXPLAIN QUERY PLAN must
                                  SCAN or SEARCH a real corpus table
-                                 (videos, windows, syllables, runs)
+                                 (the tables gate_config.json lists)
     derived:<expr>               arithmetic over other declared names, over the
                                  values this script replayed -- never over the
                                  values the agent wrote down
@@ -98,9 +98,10 @@ What this enforces, in order:
                binds a numeric ``frame`` entry. An identity **counts only
                when every declared name in it is a SQL route in the file
                under check**; otherwise it is skipped. A derived name would
-               make ``a + b = a + b`` a tautology on that file. The older
-               ``frame.videos_expected`` period identity still runs when that
-               field is present and the three period names are declared.
+               make ``a + b = a + b`` a tautology on that file. An identity
+               skipped on both sides was never checked: on an ``open`` task
+               that fails; a task closed before the rule prints a note.
+               A ``derived:`` route must name at least one declared number.
   attempts     at most three commits touch one output file after the
                latest brief revision (the reset commit): the first and two
                retries. A fourth is not a retry, it is a loop. Recount
@@ -216,15 +217,51 @@ STATUS = re.compile(
 # closed brief is STALE, not a parse error; a malformed value is a parse error.
 CORPUS_SHA_LINE = re.compile(r"^corpus_sha:[ \t]*(.*)$", re.M)
 CORPUS_SHA_VALUE = re.compile(r"^`?([0-9a-f]{64})`?$")
-PERIOD_IDENTITY = ("n_videos_pre", "n_videos_post", "n_unassigned_period")
-VIDEOS_EXPECTED = "videos_expected"
-VIDEOS_EXPECTED_TOL = "videos_expected_tol"
 README_SHA = re.compile(r"sha256:\s*`?([0-9a-f]{64})`?")
 ROW_KEYS = {"name", "value", "n", "query"}
 DERIVED = "derived:"
 EPS = 1e-9
 MAX_ATTEMPTS = 3
-WORKER, VERIFIER = "results.json", "mine.json"
+
+
+class Fail(Exception):
+    """A condition this script exists to catch."""
+
+
+GATE_CONFIG_NAME = "gate_config.json"
+
+
+def load_gate_config() -> dict:
+    """Project facts the gate reads (tables, sides, number families, ...).
+
+    Looked up next to this file first: CI copies the base branch's config
+    beside the base branch's gate scripts in ``/tmp/gate``, so a pull request
+    is judged by the base's config, not its own. ``scripts/gate_config.json``
+    under the current directory is the fallback for a base branch that had
+    no config yet.
+    """
+    here = Path(__file__).resolve().parent / GATE_CONFIG_NAME
+    cwd = Path.cwd() / "scripts" / GATE_CONFIG_NAME
+    for cand in (here, cwd):
+        if cand.is_file():
+            try:
+                cfg = json.loads(cand.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as e:
+                raise Fail(f"{cand}: not valid JSON: {e}") from e
+            for key in ("corpus", "pin_file", "sides", "tables", "unit_table", "families"):
+                if key not in cfg:
+                    raise Fail(f"{cand}: missing key {key!r}")
+            if cfg["unit_table"] not in cfg["tables"]:
+                raise Fail(f"{cand}: unit_table {cfg['unit_table']!r} is not in tables")
+            return cfg
+    raise Fail(f"{GATE_CONFIG_NAME} not found beside {__file__} or under ./scripts/")
+
+
+GATE_CONFIG = load_gate_config()
+CORPUS_PATH_DEFAULT = str(GATE_CONFIG["corpus"])
+PIN_FILE = str(GATE_CONFIG["pin_file"])
+WORKER = str(GATE_CONFIG["sides"]["worker"])
+VERIFIER = str(GATE_CONFIG["sides"]["verifier"])
 RESULT = "RESULT.json"
 LAUNCHES = "launches.json"
 SUSPEND_STATUS = frozenset({"escalated", "blocked"})
@@ -289,7 +326,9 @@ ALLOWED_UNARY = (ast.UAdd, ast.USub)
 # Real corpus tables. SCAN CONSTANT ROW / sqlite_master / a CTE of the same
 # name is not a touch. SQLite prints aliases (SCAN v), so aliases from FROM/JOIN
 # are resolved before the name is checked.
-CORPUS_TABLES = frozenset({"videos", "windows", "syllables", "runs"})
+CORPUS_TABLES = frozenset(GATE_CONFIG["tables"]) | frozenset(
+    GATE_CONFIG.get("other_tables", [])
+)
 _IDENT = re.compile(r'("([^"]+)"|`([^`]+)`|\[([^\]]+)\]|(\w+))')
 _FROM_JOIN = re.compile(r"(?is)\b(?:from|join)\b")
 _AS_KW = re.compile(r"(?is)as\b")
@@ -368,10 +407,6 @@ _NOT_ALIAS = frozenset(
         "partition",
     }
 )
-
-
-class Fail(Exception):
-    """A condition this script exists to catch."""
 
 
 class Identity(NamedTuple):
@@ -945,9 +980,8 @@ def parse_n_block(label: str, text: str) -> dict[str, str] | None:
 def parse_frame_block(label: str, text: str) -> dict[str, float]:
     """Numeric ``frame`` entries. Predicate lines are skipped. Empty if no fence.
 
-    The identity in ``check_period_identity`` reads ``videos_expected`` from
-    this dict. It does not run when that name is absent, including when the
-    brief has no ``frame`` fence at all (plan §6).
+    Predicate lines (``<table>.<column> <sql>``) are not numeric entries; see
+    ``parse_frame_predicates``. Identities bind ``frame.<field>`` to these.
     """
     m = FRAME_FENCE.search(text)
     if not m:
@@ -974,6 +1008,43 @@ def parse_frame_block(label: str, text: str) -> dict[str, float]:
         if name in out:
             raise Fail(f"{label}: {name} is declared twice in the frame block")
         out[name] = nums[0]
+    return out
+
+
+FRAME_PREDICATE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s+(.+)$")
+
+
+def parse_frame_predicates(label: str, text: str) -> list[tuple[str, str, str]]:
+    """``<table>.<column> <sql-fragment>`` lines of the ``frame`` fence.
+
+    These define the published set: a row of ``table`` is published when
+    ``column <sql-fragment>`` holds (``windows.tier IN ('A','B')``). Numeric
+    entries are not predicates. A fragment may not contain ``;`` or a SQL
+    comment. Returns (table, column, fragment) in file order; [] without a
+    fence.
+    """
+    m = FRAME_FENCE.search(text)
+    if not m:
+        return []
+    out: list[tuple[str, str, str]] = []
+    for raw in m.group(1).splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) == 2:
+            try:
+                float(parts[1])
+                continue
+            except ValueError:
+                pass
+        pm = FRAME_PREDICATE.match(line)
+        if not pm:
+            continue
+        table, column, frag = pm.group(1), pm.group(2), pm.group(3).strip()
+        if ";" in frag or "--" in frag or "/*" in frag:
+            raise Fail(f"{label}: frame predicate {line!r} may not contain ';' or a comment")
+        out.append((table, column, frag))
     return out
 
 
@@ -1172,48 +1243,6 @@ def check_declared_n(
     return matched
 
 
-def check_period_identity(
-    task_n: str,
-    label: str,
-    declared: dict[str, float],
-    replayed: dict[str, float],
-    frame: dict[str, float],
-    fail: list[str],
-) -> str | None:
-    """``n_videos_pre + n_videos_post + n_unassigned_period = frame.videos_expected``.
-
-    Activates only when ``videos_expected`` is in ``frame`` and all three names
-    are in the numbers block. The right-hand side is the frame field, not a
-    numeric literal. Returns a success note, or None if skipped or failed.
-    """
-    if VIDEOS_EXPECTED not in frame:
-        return None
-    if not all(nm in declared for nm in PERIOD_IDENTITY):
-        return None
-    missing = [nm for nm in PERIOD_IDENTITY if nm not in replayed]
-    if missing:
-        fail.append(
-            f"TASK-{task_n}: {label}: period identity needs replayed "
-            f"{', '.join(PERIOD_IDENTITY)}; missing {', '.join(missing)}"
-        )
-        return None
-    a, b, c = (replayed[nm] for nm in PERIOD_IDENTITY)
-    got = a + b + c
-    want = frame[VIDEOS_EXPECTED]
-    t = frame.get(VIDEOS_EXPECTED_TOL, 0.0)
-    if not close(got, want, t):
-        fail.append(
-            f"TASK-{task_n}: {label}: "
-            f"{PERIOD_IDENTITY[0]} + {PERIOD_IDENTITY[1]} + {PERIOD_IDENTITY[2]} "
-            f"= {num(a)} + {num(b)} + {num(c)} = {num(got)}, "
-            f"but frame.{VIDEOS_EXPECTED} is {num(want)} (tol {t:g})"
-        )
-        return None
-    return (
-        f"{num(a)} + {num(b)} + {num(c)} = {num(got)} = frame.{VIDEOS_EXPECTED}"
-    )
-
-
 def identity_sql_routed(
     names: set[str],
     declared: dict[str, float],
@@ -1228,6 +1257,41 @@ def identity_sql_routed(
     if not declared_names:
         return False
     return all(routes.get(nm, (None, None))[0] == "sql" for nm in declared_names)
+
+
+def identity_unchecked_on_both_sides(
+    task_n: str,
+    status: str,
+    identities: tuple[Identity, ...],
+    worker_skipped: set[str],
+    verifier_skipped: set[str],
+    fail: list[str],
+) -> list[str]:
+    """An identity skipped in both files was never checked anywhere.
+
+    Each side skips an identity when it routes one of its names as
+    ``derived:``. Two sides that both do so turn the line into a tautology on
+    both, and the brief's bar is unenforced. On an ``open`` task that is a
+    failure the agents must fix (route the name as SQL on at least one side).
+    A task already ``closed`` when the rule landed keeps its close; the line is
+    printed so the audit can see which of its identities never ran. Returns
+    the printed lines.
+    """
+    both = [i.line for i in identities if i.line in worker_skipped and i.line in verifier_skipped]
+    if not both:
+        return []
+    out: list[str] = []
+    for line in both:
+        msg = (
+            f"identity {line} is checked on neither side "
+            f"({WORKER} and {VERIFIER} both route a name in it as derived:)"
+        )
+        if status == "closed":
+            out.append(f"{msg}; closed before this rule, not failed")
+        else:
+            fail.append(f"TASK-{task_n}: {msg}")
+            out.append(msg)
+    return out
 
 
 def check_identities(
@@ -1536,7 +1600,7 @@ def from_join_alias_map(stmt: str) -> dict[str, str]:
 
 
 def plan_touches_corpus(details: list[str], stmt: str) -> bool:
-    """True when EXPLAIN QUERY PLAN SCAN/SEARCHes videos, windows, syllables, or runs."""
+    """True when EXPLAIN QUERY PLAN SCAN/SEARCHes a configured corpus table."""
     ctes = {m.group(1).lower() for d in details for m in _PLAN_CTE.finditer(d)}
     aliases = from_join_alias_map(stmt)
     for detail in details:
@@ -1656,7 +1720,7 @@ def run_sql(conn: sqlite3.Connection, label: str, sql_path: Path, seconds: float
         plan_txt = "; ".join(details) if details else "(empty)"
         raise Fail(
             f"{label}: {sql_path.name} EXPLAIN QUERY PLAN does not SCAN or SEARCH "
-            f"a corpus table (videos, windows, syllables, runs); plan: {plan_txt}"
+            f"a corpus table ({', '.join(sorted(CORPUS_TABLES))}); plan: {plan_txt}"
         )
 
     deadline = time.monotonic() + seconds
@@ -1765,6 +1829,12 @@ def route(label: str, n: str, name: str, q: str, root: Path) -> tuple[str, objec
         expr = q[len(DERIVED):].strip()
         if not expr:
             raise Fail(f"{label}:{name}: derived: is followed by nothing")
+        names, _fields = parse_identity_expr(f"{label}:{name}", expr)
+        if not names:
+            raise Fail(
+                f"{label}:{name}: derived: {expr!r} names no declared number; "
+                f"a constant is not a route"
+            )
         return "derived", expr
     prefix = f"tasks/TASK-{n}/"
     if not q.startswith(prefix) or not q.endswith(".sql"):
@@ -2710,14 +2780,7 @@ def check_task(
             f"{len(replayed)} replayed{extra}"
         )
 
-    identity_notes: list[str] = []
-    for k, replayed in replayed_by.items():
-        note = check_period_identity(n, k, tol, replayed, frame, fail)
-        if note:
-            identity_notes.append(note)
-    if identity_notes:
-        print(f"  TASK-{n} [{status}]: period identity {identity_notes[0]}")
-
+    skipped_by: dict[str, set[str]] = {}
     for k, replayed in replayed_by.items():
         held, skipped = check_identities(
             n,
@@ -2729,6 +2792,7 @@ def check_task(
             frame,
             fail,
         )
+        skipped_by[k] = set(skipped)
         if skipped:
             print(
                 f"  TASK-{n} [{status}]: {k} skipped {len(skipped)} identities "
@@ -2736,6 +2800,11 @@ def check_task(
             )
         for h in held:
             print(f"  TASK-{n} [{status}]: identity {h}")
+    if WORKER in skipped_by and VERIFIER in skipped_by:
+        for line in identity_unchecked_on_both_sides(
+            n, status, identities, skipped_by[WORKER], skipped_by[VERIFIER], fail
+        ):
+            print(f"  TASK-{n} [{status}]: {line}")
 
     # Two agents may share a definition. They may not share an implementation.
     if WORKER in routes and VERIFIER in routes:
@@ -2818,7 +2887,7 @@ def check_task(
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo-root", default=".")
-    ap.add_argument("--corpus", default="data/corpus_v2.sqlite")
+    ap.add_argument("--corpus", default=CORPUS_PATH_DEFAULT)
     ap.add_argument("--base-ref", default=None)
     ap.add_argument("--head-ref", default=None)
     ap.add_argument("--task", default=None, metavar="N")
@@ -2830,16 +2899,16 @@ def main() -> int:
 
     # The corpus is the only input. Confirm it is the one the README names.
     corpus = root / args.corpus
-    readme = root / "README.md"
+    readme = root / PIN_FILE
     if not corpus.is_file():
         print(f"output_check: FAIL\n  {args.corpus} does not exist; no number can be replayed")
         return 1
     if not readme.is_file():
-        print("output_check: FAIL\n  README.md does not exist; the corpus hash is recorded there")
+        print(f"output_check: FAIL\n  {PIN_FILE} does not exist; the corpus hash is recorded there")
         return 1
     want = README_SHA.search(readme.read_text(encoding="utf-8"))
     if not want:
-        print("output_check: FAIL\n  README.md records no sha256 for the corpus")
+        print(f"output_check: FAIL\n  {PIN_FILE} records no sha256 for the corpus")
         return 1
     h = hashlib.sha256()
     with corpus.open("rb") as fh:
@@ -2848,10 +2917,10 @@ def main() -> int:
     if h.hexdigest() != want.group(1):
         print(
             f"output_check: FAIL\n  {args.corpus} is {h.hexdigest()}, "
-            f"README.md says {want.group(1)}"
+            f"{PIN_FILE} says {want.group(1)}"
         )
         return 1
-    print(f"output_check: corpus {h.hexdigest()[:16]}… matches README.md")
+    print(f"output_check: corpus {h.hexdigest()[:16]}… matches {PIN_FILE}")
 
     if args.base_ref and args.head_ref:
         print(f"output_check: history from {args.base_ref}..{args.head_ref}; independence enforced")
