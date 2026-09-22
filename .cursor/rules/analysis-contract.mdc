@@ -7,13 +7,13 @@ This file overrides any task brief. A pull request violating any clause is not m
 
 Execution flow is LOOP.md.
 
-If a clause cannot be satisfied, stop and write `BLOCKED: <one line>` in the pull-request body. Do not relax a threshold, edit an assertion, or special-case an input in order to get a green result.
+If a clause cannot be satisfied, stop and leave an empty commit whose first line is `BLOCKED: <one line>` (`git commit --allow-empty`); `output-check` recognises it. Do not relax a threshold, edit an assertion, or special-case an input in order to get a green result.
 
 **A clause about a thing your run does not produce does not apply to you, and is not an instruction to create that thing.** Most clauses below begin with the condition that switches them on. Build only what your task needs. A repository that lacks a file named here is not a defect to repair.
 
-Four checks run on every pull request: `scope-check`, `history-audit`, `output-check`, `tests`. The first three are required. Everything they do not cover is enforced by the reviewer reading the diff and by the evidence the pull-request body is required to show. When a rule is later implemented as an automated check, that check may be extended but never weakened or deleted.
+Four checks run on every pull request: `scope-check`, `history-audit`, `output-check`, `tests`. All four are required. Everything they do not cover is enforced by the reviewer reading the diff and by the evidence the pull-request body is required to show. When a rule is later implemented as an automated check, that check may be extended but never weakened or deleted.
 
-Do not modify `.cursor/`, `.github/`, `data/`, or any task brief `tasks/TASK-N.md`. Your own outputs live under `tasks/TASK-N/`, and writing those is required of you, not forbidden to you. Do not modify an assertion that already exists, except in the pull request that changes the code it guards; list each such pair in the body.
+Do not modify `.cursor/`, `.github/`, `data/`, `scripts/`, `LOOP.md`, `README.md`, or any task brief `tasks/TASK-N.md` (the coordinator drafting a new brief and the auditor closing one are the only exceptions). Write only the files your role may write: the `scope` section of `scripts/gate_config.json` lists them. Never rebase an output branch and never force-push; a retry is a new commit on the same branch, and a branch that has fallen behind `main` takes `main` in with a merge. Your own outputs live under `tasks/TASK-N/`, and writing those is required of you, not forbidden to you. Do not modify an assertion that already exists, except in the pull request that changes the code it guards; list each such pair in the body.
 
 # 1. The input is pinned
 
@@ -25,11 +25,13 @@ Do not modify `.cursor/`, `.github/`, `data/`, or any task brief `tasks/TASK-N.m
 
 3. **The agent that produced a number never checks that number, and no agent writes the verdict.** The worker and the verifier are launched from one starting ref and answer the brief separately: the verifier reads the brief and the corpus and nothing the worker wrote — not its code, not its conversation, not its pull request. A verifier that shares context with the worker is the same agent grading its own homework. `output-check` pairs the two files, computes every difference and decides every match, so neither agent can assert agreement; it also fails when the commit that introduced your file already held the other agent's file in its tree. If your branch cannot be cut before the other answer exists, write `BLOCKED` rather than starting from it.
 
+   The worker and the verifier are two Cursor agents with the same default git identity, so each declares its role in every commit it makes, retries included: `git commit --author="cantoai-worker <worker@cantoai.invalid>"` for the worker, `git commit --author="cantoai-verifier <verifier@cantoai.invalid>"` for the verifier. Without it `output-check` finds two sides with one identity and fails, and the branch cannot be repaired afterwards, because a side's file may not change identity. Never use an address ending in `@users.noreply.github.com` or anyone's real e-mail: GitHub credits a commit to whoever owns its address.
+
 4. A check that cannot locate the input it claims to read — a script, a SQL file, a column, a table — reports SKIP and names the missing thing. Never substitute a built-in default, a reimplementation of the rule, or a value recovered by regex from prose. A result derived from a substitute is SKIP: neither pass nor fail.
 
 5. A constant, a self-comparison, an algebraic identity or a file-existence test is not a check. A field such as `smoke_ok` must come from comparing two independently obtained values.
 
-6. A bar may not move in the change that moves what it measures. A declared expected value, a tolerance, a threshold, a mutation patch and a counterexample pattern are bars. A pull request that changes a bar may not also change `src/`, any `.sql` file, or `data/`, and its body carries one line beginning `BAR-CHANGE:` naming each bar it moves and why. Adding a bar for new code is not moving one.
+6. A bar may not move in the change that moves what it measures. A declared expected value, a tolerance, a threshold, a mutation patch and a counterexample pattern are bars. A pull request that changes a bar may not also change `src/`, any `.sql` file, or `data/`, and its body carries one line beginning `BAR-CHANGE:` naming each bar it moves and why. Adding a bar for new code is not moving one. The full list of bars, including a brief's `identities` and `outside_frame` blocks, `scripts/`, `.github/` and the gate tests, is in `LOOP.md`.
 
 # 3. If your run writes code
 
