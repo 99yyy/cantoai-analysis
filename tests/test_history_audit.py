@@ -44,8 +44,13 @@ def test_task_brief_regex_is_top_level_only():
 
 def test_real_task_6_numbers_block_has_39_names():
     blocks = history_audit.parse_declaration_blocks(BRIEF.read_text(encoding="utf-8"))
-    assert set(blocks) == {"numbers", "n", "frame"}
+    assert set(blocks) == {"numbers", "n", "frame", "identities"}
     assert len(blocks["numbers"]) == 41
+    assert blocks["identities"] == {
+        "n_videos_pre + n_videos_post + n_unassigned_period = frame.videos_expected": (0.0,),
+        "n_judgeable_film_pre + n_judgeable_other_pre + n_judgeable_unassigned_film_pre = n_judgeable_pre": (0.0,),
+        "n_judgeable_film_post + n_judgeable_other_post + n_judgeable_unassigned_film_post = n_judgeable_post": (0.0,),
+    }
     assert blocks["numbers"]["n_videos_pre"] == (0.0,)
     assert blocks["numbers"]["gap_contract_pp"] == (0.05,)
     # derived: n rows are not numeric, so history_audit skips them; the four
@@ -443,7 +448,9 @@ def test_dead_paths_are_retired_not_live():
     assert live.isdisjoint(retired)
     assert "expected/*" not in history_audit.BAR_FILES
     assert "expected/**" not in history_audit.BAR_FILES
-    assert history_audit.BAR_FILES == ["scripts/gate_config.json"]
+    assert "scripts/gate_config.json" in history_audit.BAR_FILES
+    for g in ("scripts/*", "scripts/**", ".github/*", ".github/**", "tests/mutations/**", "tests/fixtures/**"):
+        assert g in history_audit.BAR_FILES
     assert "scripts/contract_check.py" not in history_audit.BAR_COUNTED
     assert history_audit.BAR_YAML_FILES == []
     assert "sql/*" in history_audit.MEASURED
@@ -567,3 +574,49 @@ def test_adding_outside_frame_block_to_existing_brief_is_a_bar():
 
 def test_gate_config_is_a_bar_file():
     assert "scripts/gate_config.json" in history_audit.BAR_FILES
+
+
+# --------------------------------------------------------------------------- identities lines and gate files are bars
+
+IDENT = NUMBERS + "```identities\na + b = c  0\nx = y * 2  0.05\n```\n"
+
+
+def test_identity_line_deleted_or_reworded_is_a_bar():
+    gone = NUMBERS + "```identities\nx = y * 2  0.05\n```\n"
+    assert history_audit.declaration_bars(PATH, IDENT, gone) == [
+        "tasks/TASK-6.md ```identities a + b = c deleted"
+    ]
+    reworded = NUMBERS + "```identities\na + b = d  0\nx = y * 2  0.05\n```\n"
+    assert history_audit.declaration_bars(PATH, IDENT, reworded) == [
+        "tasks/TASK-6.md ```identities a + b = c deleted"
+    ]
+    assert history_audit.declaration_bars(PATH, NUMBERS, IDENT) == []  # adding is not a bar
+
+
+def test_identity_tolerance_widened_is_a_bar_tightened_is_not():
+    wider = NUMBERS + "```identities\na + b = c  0.1\nx = y * 2  0.05\n```\n"
+    assert history_audit.declaration_bars(PATH, IDENT, wider) == [
+        "tasks/TASK-6.md ```identities a + b = c tolerance widened (0 -> 0.1)"
+    ]
+    tighter = NUMBERS + "```identities\na + b = c  0\nx = y * 2  0.01\n```\n"
+    assert history_audit.declaration_bars(PATH, IDENT, tighter) == []
+    spaced = NUMBERS + "```identities\na   +  b =  c   0\nx = y * 2  0.05\n```\n"
+    assert history_audit.declaration_bars(PATH, IDENT, spaced) == []
+
+
+def test_identities_block_deleted_is_a_bar():
+    assert history_audit.declaration_bars(PATH, IDENT, NUMBERS) == [
+        "tasks/TASK-6.md ```identities block deleted"
+    ]
+
+
+def test_gate_and_ci_files_are_bar_paths():
+    for f in (
+        "scripts/output_check.py", "scripts/relations.py", "scripts/verify.py",
+        ".github/workflows/ci.yml", ".github/CODEOWNERS",
+        "tests/test_output_check.py", "tests/test_relations.py", "tests/test_scope_check.py",
+        "tests/test_history_audit.py", "tests/mutations/x.patch", "tests/fixtures/relations_probe/n_count.sql",
+    ):
+        assert history_audit.match_any(f, history_audit.BAR_FILES), f
+    for f in ("tests/test_src_sql_literals.py", "tasks/TASK-9/sql/x.sql", "LOOP.md", "src/tables.py"):
+        assert not history_audit.match_any(f, history_audit.BAR_FILES), f
