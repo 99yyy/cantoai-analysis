@@ -87,13 +87,17 @@ def _mini_corpus(path: Path, *, rare_mid: bool = False) -> None:
     conn.close()
 
 
-def _write_brief(repo: Path, names: list[tuple[str, str]]) -> Path:
+def _write_brief(
+    repo: Path, names: list[tuple[str, str]], *, extra: str = ""
+) -> Path:
     md = repo / "tasks" / "TASK-9.md"
     md.parent.mkdir(parents=True, exist_ok=True)
     lines = ["# TASK-9\n", "status: open\n", "```numbers\n"]
     for name, tol in names:
         lines.append(f"{name}  {tol}\n")
     lines.append("```\n")
+    if extra:
+        lines.append(extra)
     md.write_text("".join(lines), encoding="utf-8")
     return md
 
@@ -477,3 +481,271 @@ def test_task_flag_skips_unclassified_other_brief(tmp_path, capsys):
     assert "only TASK-9" in out
     assert "TASK-8" not in out
     assert "relations: PASS" in out
+
+
+# --- exclude (tier C) invariant and the published_expected anchor ----------
+
+FRAME_AB = (
+    "```frame\nwindows.tier IN ('A','B')\npublished_expected 3\n"
+    "published_expected_tol 0\n```\n"
+)
+
+
+def _all_tiers_task(repo: Path, corpus: Path, *, extra: str) -> None:
+    """The green task plus ``n_all``: COUNT over every tier (A+B+C = 4 rows).
+
+    Original replay matches the written value, so output-check style checks
+    stay green; only the exclude invariant can see that the count read tier C.
+    """
+    _pin_readme(repo, corpus)
+    _write_brief(
+        repo,
+        [
+            ("n_count", "0"),
+            ("rate_tone_pre_pm", "0.5"),
+            ("rare_share_pre", "0.0005"),
+            ("n_all", "0"),
+        ],
+        extra=extra,
+    )
+    conn = sqlite3.connect(f"file:{corpus}?mode=ro", uri=True)
+    try:
+        n_count = conn.execute("SELECT COUNT(*) FROM videos").fetchone()[0]
+        rate = conn.execute(
+            (FIXTURE / "rate_tone_pre_pm.sql").read_text(encoding="utf-8")
+        ).fetchone()[0]
+        rare = conn.execute(
+            (FIXTURE / "rare_share_pre.sql").read_text(encoding="utf-8")
+        ).fetchone()[0]
+        n_all = conn.execute(
+            (FIXTURE / "n_all_tiers.sql").read_text(encoding="utf-8")
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert n_all == 4
+    _write_side(
+        repo,
+        [
+            ("n_count", float(n_count), "n_count.sql"),
+            ("rate_tone_pre_pm", float(rate), "rate_tone_pre_pm.sql"),
+            ("rare_share_pre", float(rare), "rare_share_pre.sql"),
+            ("n_all", float(n_all), "n_all_tiers.sql"),
+        ],
+    )
+
+
+def test_exclude_not_run_without_published_expected(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _all_tiers_task(repo, corpus, extra="")
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "exclude not run (frame has no published_expected)" in out
+    assert "exclude by" not in out
+
+
+def test_exclude_count_over_outside_frame_goes_red(tmp_path, capsys):
+    """Must-go-red probe: a count that reads tier C, in a brief whose frame
+    declares published_expected. Original replay is green (value matches)."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _all_tiers_task(repo, corpus, extra=FRAME_AB)
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert "exclude by windows.tier IN ('A','B') removed 1 windows, 1 syllables" in out
+    assert "frame.published_expected 3 = published syllables rows" in out
+    assert (
+        "results.json:n_all: on the published set only 3, original 4 (tol 0) -- "
+        "this number depends on rows outside the frame"
+    ) in out
+    assert "exclude 3/4" in out
+    assert "double 4/4" in out
+
+
+def test_outside_frame_declaration_exempts_name_and_prints_it(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _all_tiers_task(
+        repo, corpus, extra=FRAME_AB + "```outside_frame\nn_all  # reads every tier\n```\n"
+    )
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "exclude 3/3 (1 outside_frame by declaration: n_all)" in out
+    assert "depends on rows outside the frame" not in out
+
+
+def test_outside_frame_unknown_name_fails(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _all_tiers_task(repo, corpus, extra=FRAME_AB + "```outside_frame\nn_nope\n```\n")
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert "TASK-9.md: outside_frame names 'n_nope' which is not in the numbers block" in out
+
+
+def test_outside_frame_empty_and_duplicate_fail():
+    tol = {"n_all": 0.0}
+    with pytest.raises(relations.Fail) as ei:
+        relations.parse_outside_frame_block("b", "```outside_frame\n# only\n```\n", tol)
+    assert str(ei.value) == "b: the outside_frame block is empty"
+    with pytest.raises(relations.Fail) as ei:
+        relations.parse_outside_frame_block("b", "```outside_frame\nn_all\nn_all\n```\n", tol)
+    assert str(ei.value) == "b: outside_frame lists n_all twice"
+    assert relations.parse_outside_frame_block("b", "no fence", tol) == frozenset()
+
+
+def test_outside_frame_closure_reaches_derived_names_only():
+    routes = {
+        "n_all": ("sql", Path("a.sql")),
+        "n_count": ("sql", Path("b.sql")),
+        "gap_x_pp": ("derived", "100 * n_all / n_count"),
+        "gap_y_pp": ("derived", "gap_x_pp * 2"),
+        "gap_z_pp": ("derived", "n_count / 2"),
+    }
+    got = relations.outside_frame_closure(frozenset({"n_all"}), routes)
+    assert got == frozenset({"n_all", "gap_x_pp", "gap_y_pp"})
+
+
+def test_published_anchor_mismatch_fails(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _green_task(repo, corpus)
+    md = repo / "tasks" / "TASK-9.md"
+    md.write_text(
+        md.read_text(encoding="utf-8")
+        + "```frame\nwindows.tier IN ('A','B')\npublished_expected 99\n```\n",
+        encoding="utf-8",
+    )
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert (
+        "TASK-9: frame.published_expected is 99 but the pinned corpus holds 3 "
+        "published syllables rows (tol 0)"
+    ) in out
+
+
+def test_rare_cutoff_that_reads_tier_c_moves_under_exclude(tmp_path, capsys):
+    """Ten tokens of an A+B glyph planted in the tier-C window: on the full
+    table the glyph is common (n_char 11), without tier C it is rare. This is
+    the TASK-6 / TASK-7 situation; the brief must say so in outside_frame."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    conn = sqlite3.connect(corpus)
+    for i in range(10):
+        conn.execute(
+            "INSERT INTO syllables(syl_id, uid, video_id, char, jp_match, jp_realized, dur) "
+            "VALUES (?, 'w3', 'v2', '丙', 'tone', 'cc1', 0.1)",
+            (f"c{i}",),
+        )
+    conn.commit()
+    conn.close()
+    _green_task(repo, corpus)
+    md = repo / "tasks" / "TASK-9.md"
+    md.write_text(md.read_text(encoding="utf-8") + FRAME_AB, encoding="utf-8")
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert "results.json:rare_share_pre: on the published set only 1, original 0.6666666666666666 (tol 0.0005)" in out
+    md.write_text(
+        md.read_text(encoding="utf-8") + "```outside_frame\nrare_share_pre\n```\n",
+        encoding="utf-8",
+    )
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "exclude 2/2 (1 outside_frame by declaration: rare_share_pre)" in out
+
+
+def test_published_expected_without_predicate_fails(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _green_task(repo, corpus)
+    md = repo / "tasks" / "TASK-9.md"
+    md.write_text(
+        md.read_text(encoding="utf-8") + "```frame\npublished_expected 3\n```\n",
+        encoding="utf-8",
+    )
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert (
+        "TASK-9: frame declares published_expected but no <table>.<column> "
+        "predicate line defines the published set"
+    ) in out
+
+
+def test_predicate_on_unknown_table_or_column_fails(tmp_path):
+    corpus = tmp_path / "mini.sqlite"
+    _mini_corpus(corpus)
+    with pytest.raises(relations.Fail) as ei:
+        relations.exclude_corpus(corpus, tmp_path / "x.sqlite", tmp_path / "data", [("nope", "tier", "= 'A'")])
+    assert "names table 'nope', which is not in gate_config tables" in str(ei.value)
+    with pytest.raises(relations.Fail) as ei:
+        relations.exclude_corpus(corpus, tmp_path / "y.sqlite", tmp_path / "data", [("windows", "nope", "= 'A'")])
+    assert str(ei.value) == "relations: windows has no column nope (frame predicate)"
+    with pytest.raises(relations.Fail) as ei:
+        relations.exclude_corpus(corpus, tmp_path / "z.sqlite", tmp_path / "data", [])
+    assert str(ei.value) == "relations: exclude needs at least one frame predicate"
+
+
+def test_exclude_cascades_through_refs_and_null_is_unpublished(tmp_path):
+    corpus = tmp_path / "mini.sqlite"
+    _mini_corpus(corpus)
+    conn = sqlite3.connect(corpus)
+    conn.execute("INSERT INTO windows(uid, video_id, tier) VALUES ('w4', 'v2', NULL)")
+    conn.execute(
+        "INSERT INTO syllables(syl_id, uid, video_id, char, jp_match, jp_realized, dur) "
+        "VALUES ('s5', 'w4', 'v2', '戊', 'tone', 'ee1', 0.1)"
+    )
+    conn.commit()
+    conn.close()
+    removed = relations.exclude_corpus(
+        corpus, tmp_path / "exc.sqlite", tmp_path / "data", [("windows", "tier", "IN ('A','B')")]
+    )
+    assert removed == {"videos": 0, "windows": 2, "syllables": 2}
+    c = sqlite3.connect(tmp_path / "exc.sqlite")
+    assert c.execute("SELECT COUNT(*) FROM windows").fetchone()[0] == 2
+    assert c.execute("SELECT COUNT(*) FROM syllables").fetchone()[0] == 3
+    assert c.execute("SELECT COUNT(*) FROM videos").fetchone()[0] == 2
+    assert relations.published_units(c) == 3
+    c.close()
+
+
+def test_families_and_prefix_columns_come_from_config():
+    cfg = relations.CONFIG
+    assert relations.TABLES == tuple(cfg["tables"])
+    assert relations.UNIT_TABLE == cfg["unit_table"]
+    assert "char" in relations.PREFIX_COLUMNS["syllables"]
+    assert relations.PREFIX_COLUMNS["windows"] == frozenset({"uid", "video_id"})
+    for prefix in cfg["families"]["count"]["prefix"]:
+        assert relations.family(prefix + "x") == "count"
+    with pytest.raises(relations.Fail) as ei:
+        relations.family("zzz_nothing")
+    assert str(ei.value).startswith("relations: zzz_nothing matches no double/permute family (count: n_; rate:")
+    src = (ROOT / "scripts" / "relations.py").read_text(encoding="utf-8")
+    for token in ("'A'", "\"C\"", "syllables", "windows", "rare_share"):
+        # names appear only in prose (docstrings/comments), never in code paths
+        code_lines = [
+            l for l in src.splitlines()
+            if token in l and not l.strip().startswith("#") and not l.strip().startswith(("*", "\"", "'"))
+        ]
+        assert code_lines == [], (token, code_lines)

@@ -33,7 +33,9 @@ Task briefs ``tasks/TASK-*.md`` declare bars in fenced ``numbers``, ``fixture``,
 or deleting a whole block is a bar move. Tightening a tolerance is not.
 Declared expected values in those blocks are bars under contract rule 6: any
 change of the value, or deleting the name, is a bar move. Adding a name or a
-block is not.
+block is not. The ``outside_frame`` block is the reverse: it lists names the
+exclude invariant (relations.py) does not compare, so adding a name to it, or
+adding the block, is a bar move; removing a name is not.
 
 Usage:
   python scripts/history_audit.py --base origin/main --pr-body-file body.txt
@@ -58,8 +60,10 @@ from pathlib import Path
 GATE_FAIL_SITE_RE = r"(?:raise Fail\(|fail\.append)"
 # Live lists: globs this tree still uses. Dead paths are not deleted; they
 # sit in RETIRED (plan §7 item 2 alternative). expected/ is empty here —
-# declared bars live in task-brief fences (plan §3.3).
-BAR_FILES: list[str] = []
+# declared bars live in task-brief fences (plan §3.3). gate_config.json holds
+# the project facts every gate reads (tables, sides, number families); a change
+# to it changes what the gates measure, so any edit is a bar move.
+BAR_FILES: list[str] = ["scripts/gate_config.json"]
 BAR_COUNTED = {
     "scripts/*.py": (GATE_FAIL_SITE_RE, "fail sites"),
     "scripts/**/*.py": (GATE_FAIL_SITE_RE, "fail sites"),
@@ -245,6 +249,9 @@ DECL_FENCE = re.compile(
     re.M | re.S,
 )
 TOLERANCE_NAMES = frozenset({"tol", "tolerance"})
+# Names exempt from relations.py's exclude invariant (one per line, no value).
+EXEMPT_KIND = "outside_frame"
+EXEMPT_FENCE = re.compile(r"^```outside_frame\s*$(.*?)^```\s*$", re.M | re.S)
 
 
 def run(*args: str) -> str:
@@ -328,11 +335,35 @@ def parse_declaration_blocks(text: str) -> dict[str, dict[str, tuple[float, ...]
     return blocks
 
 
+def parse_exempt_names(text: str) -> list[str]:
+    """Names in the first ``outside_frame`` fence, in order; [] when there is none."""
+    m = EXEMPT_FENCE.search(text)
+    if not m:
+        return []
+    out: list[str] = []
+    for raw in m.group(1).splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line and line not in out:
+            out.append(line.split()[0])
+    return out
+
+
+def exempt_bars(path: str, old_text: str, new_text: str) -> list[str]:
+    """A name newly listed in ``outside_frame`` leaves the exclude invariant."""
+    was = set(parse_exempt_names(old_text))
+    now = parse_exempt_names(new_text)
+    return [
+        f"{path} ```{EXEMPT_KIND} {name} added (exempt from the exclude invariant)"
+        for name in now
+        if name not in was
+    ]
+
+
 def declaration_bars(path: str, old_text: str, new_text: str) -> list[str]:
     """Bar moves in fenced declaration blocks of a task brief (plan §3.3)."""
     old_blocks = parse_declaration_blocks(old_text)
     new_blocks = parse_declaration_blocks(new_text)
-    hits: list[str] = []
+    hits: list[str] = exempt_bars(path, old_text, new_text)
     for kind in DECL_KINDS:
         was = old_blocks.get(kind)
         now = new_blocks.get(kind)

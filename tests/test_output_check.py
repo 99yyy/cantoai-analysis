@@ -869,8 +869,8 @@ def test_parse_brief_task_6_n_and_frame():
         brief.n_decl["gap_contract_pp"]
         == "derived:n_judgeable_pre + n_judgeable_post"
     )
-    assert brief.frame[output_check.VIDEOS_EXPECTED] == 567.0
-    assert brief.frame[output_check.VIDEOS_EXPECTED_TOL] == 0.0
+    assert brief.frame["videos_expected"] == 567.0
+    assert brief.frame["videos_expected_tol"] == 0.0
     assert brief.corpus_sha == CORPUS_SHA
     assert len(brief.identities) == 3
     assert brief.identities[0].right == "frame.videos_expected"
@@ -970,109 +970,45 @@ def test_derived_n_uses_replayed_value(conn, tmp_path):
     assert fail == []
 
 
-def test_period_identity_holds_on_replayed_sum():
-    fail: list[str] = []
-    note = output_check.check_period_identity(
-        "6",
-        "results.json",
-        {
-            "n_videos_pre": 0.0,
-            "n_videos_post": 0.0,
-            "n_unassigned_period": 0.0,
-        },
-        {
-            "n_videos_pre": 391.0,
-            "n_videos_post": 176.0,
-            "n_unassigned_period": 0.0,
-        },
-        {"videos_expected": 567.0, "videos_expected_tol": 0.0},
-        fail,
-    )
-    assert fail == []
-    assert note is not None
-    assert "frame.videos_expected" in note
-    assert "567" in note
-
-
-def test_period_identity_fails_against_frame_field_not_a_literal():
-    fail: list[str] = []
-    note = output_check.check_period_identity(
-        "6",
-        "results.json",
-        {
-            "n_videos_pre": 0.0,
-            "n_videos_post": 0.0,
-            "n_unassigned_period": 0.0,
-        },
-        {
-            "n_videos_pre": 391.0,
-            "n_videos_post": 176.0,
-            "n_unassigned_period": 0.0,
-        },
-        {"videos_expected": 1.0, "videos_expected_tol": 0.0},
-        fail,
-    )
-    assert note is None
-    assert fail == [
-        "TASK-6: results.json: n_videos_pre + n_videos_post + n_unassigned_period "
-        "= 391 + 176 + 0 = 567, but frame.videos_expected is 1 (tol 0)"
-    ]
-
-
-def test_period_identity_skipped_without_videos_expected():
-    fail: list[str] = []
-    note = output_check.check_period_identity(
-        "6",
-        "results.json",
-        {
-            "n_videos_pre": 0.0,
-            "n_videos_post": 0.0,
-            "n_unassigned_period": 0.0,
-        },
-        {
-            "n_videos_pre": 391.0,
-            "n_videos_post": 176.0,
-            "n_unassigned_period": 0.0,
-        },
-        {},
-        fail,
-    )
-    assert note is None
-    assert fail == []
-
-
-def test_period_identity_skipped_when_the_three_names_are_not_declared():
-    fail: list[str] = []
-    note = output_check.check_period_identity(
-        "7",
-        "results.json",
-        {"n_count": 0.0},
-        {"n_count": 567.0},
-        {"videos_expected": 567.0},
-        fail,
-    )
-    assert note is None
-    assert fail == []
-
-
-def test_period_identity_source_does_not_hardcode_567():
-    src = (ROOT / "scripts" / "output_check.py").read_text(encoding="utf-8")
-    start = src.index("def check_period_identity")
-    end = src.index("\ndef parse_rows")
-    body = src[start:end]
-    assert "567" not in body
-    assert "VIDEOS_EXPECTED" in body
-
-
-def test_full_check_task_6_declared_n_and_period_identity(conn, capsys):
+def test_full_check_task_6_declared_n_and_frame_identity(conn, capsys):
+    """The period identity is an ordinary ``identities`` line binding
+    ``frame.videos_expected``; no code special-cases those three names."""
     md = ROOT / "tasks" / "TASK-6.md"
     fail: list[str] = []
     output_check.check_task(ROOT, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     out = capsys.readouterr().out
     assert fail == []
     assert "41/41 n declared" in out
-    assert "period identity" in out
-    assert "frame.videos_expected" in out
+    assert "identity n_videos_pre + n_videos_post + n_unassigned_period = frame.videos_expected -> 567 = 567" in out
+    src = (ROOT / "scripts" / "output_check.py").read_text(encoding="utf-8")
+    assert "n_videos_pre" not in src
+    assert "567" not in src
+
+
+def test_frame_predicates_parse_and_reject_comments():
+    text = (
+        "```frame\nwindows.tier IN ('A','B')  # published\nvideos_expected 567\n"
+        "videos.upload_date GLOB '[0-9]*'\n```\n"
+    )
+    got = output_check.parse_frame_predicates("b", text)
+    assert got == [
+        ("windows", "tier", "IN ('A','B')"),
+        ("videos", "upload_date", "GLOB '[0-9]*'"),
+    ]
+    assert output_check.parse_frame_predicates("b", "no fence") == []
+    with pytest.raises(output_check.Fail) as ei:
+        output_check.parse_frame_predicates("b", "```frame\nwindows.tier = 'A'; DROP TABLE x\n```\n")
+    assert "may not contain ';' or a comment" in str(ei.value)
+
+
+def test_gate_config_drives_sides_tables_and_corpus():
+    cfg = output_check.GATE_CONFIG
+    assert output_check.WORKER == cfg["sides"]["worker"]
+    assert output_check.VERIFIER == cfg["sides"]["verifier"]
+    assert output_check.CORPUS_TABLES == frozenset(cfg["tables"]) | frozenset(cfg["other_tables"])
+    assert output_check.CORPUS_PATH_DEFAULT == cfg["corpus"]
+    assert output_check.PIN_FILE == cfg["pin_file"]
+    assert (ROOT / "scripts" / "gate_config.json").is_file()
 
 
 # --------------------------------------------------------------------------- §2.6 orphan outputs without a matching brief
@@ -1780,3 +1716,104 @@ def test_unknown_task_flag_fails(tmp_path, capsys):
     assert "no tasks/TASK-99.md" in out
     assert "output_check: FAIL" in out
 
+
+
+# --------------------------------------------------------------------------- derived: needs a name; identities unchecked on both sides
+
+
+def test_derived_constant_is_not_a_route(tmp_path):
+    with pytest.raises(output_check.Fail) as ei:
+        output_check.route("results.json", "7", "n_count", "derived: 567", tmp_path)
+    assert str(ei.value) == (
+        "results.json:n_count: derived: '567' names no declared number; "
+        "a constant is not a route"
+    )
+    with pytest.raises(output_check.Fail) as ei:
+        output_check.route("results.json", "7", "gap_pp", "derived: 100 * (2 - 1)", tmp_path)
+    assert "names no declared number" in str(ei.value)
+    kind, expr = output_check.route(
+        "results.json", "7", "gap_pp", "derived: 100 * (n_a - n_b)", tmp_path
+    )
+    assert (kind, expr) == ("derived", "100 * (n_a - n_b)")
+
+
+def _both_sides_derive_identity_name(root: Path, n: str, conn: sqlite3.Connection) -> Path:
+    """n_a, n_b are SQL on both sides; n_c is derived: n_a + n_b on both.
+
+    The brief's identity ``n_a + n_b = n_c`` is then a tautology on each side
+    and is skipped on each side.
+    """
+    md = _write_brief(
+        root,
+        n,
+        name="n_a",
+        extra_numbers="n_b  0\nn_c  0\n",
+        identities_block="n_a + n_b = n_c  0",
+    )
+    task = root / "tasks" / f"TASK-{n}"
+    n_a = conn.execute("SELECT COUNT(*) FROM videos").fetchone()[0]
+    n_b = conn.execute("SELECT COUNT(*) FROM windows").fetchone()[0]
+    sides = {
+        "results.json": ("sql", "SELECT COUNT(*) FROM videos;\n", "SELECT COUNT(*) FROM windows;\n"),
+        "mine.json": ("mine_sql", "SELECT COUNT(video_id) FROM videos v;\n", "SELECT COUNT(uid) FROM windows w;\n"),
+    }
+    for out_name, (sub, qa, qb) in sides.items():
+        d = task / sub
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "a.sql").write_text(qa, encoding="utf-8")
+        (d / "b.sql").write_text(qb, encoding="utf-8")
+        rows = [
+            {"name": "n_a", "value": n_a, "n": 1, "query": f"tasks/TASK-{n}/{sub}/a.sql"},
+            {"name": "n_b", "value": n_b, "n": 1, "query": f"tasks/TASK-{n}/{sub}/b.sql"},
+            {"name": "n_c", "value": n_a + n_b, "n": 1, "query": "derived: n_a + n_b"},
+        ]
+        (task / out_name).write_text(json.dumps(rows, indent=2) + "\n", encoding="utf-8")
+    return md
+
+
+def test_identity_unchecked_on_both_sides_fails_on_open_task(conn, tmp_path, capsys):
+    md = _both_sides_derive_identity_name(tmp_path, "10", conn)
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
+    out = capsys.readouterr().out
+    msg = (
+        "TASK-10: identity n_a + n_b = n_c  0 is checked on neither side "
+        "(results.json and mine.json both route a name in it as derived:)"
+    )
+    assert msg in fail, fail
+    assert "results.json skipped 1 identities" in out
+    assert "mine.json skipped 1 identities" in out
+
+
+def test_identity_unchecked_on_both_sides_is_a_note_on_closed_task(conn, tmp_path, capsys):
+    md = _both_sides_derive_identity_name(tmp_path, "7", conn)
+    md.write_text(
+        md.read_text(encoding="utf-8")
+        .replace("status: open", "status: closed", 1)
+        .replace("status: closed\n", f"status: closed\ncorpus_sha: {CORPUS_SHA}\n", 1),
+        encoding="utf-8",
+    )
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
+    out = capsys.readouterr().out
+    assert not any("checked on neither side" in m for m in fail), fail
+    assert (
+        "identity n_a + n_b = n_c  0 is checked on neither side "
+        "(results.json and mine.json both route a name in it as derived:); "
+        "closed before this rule, not failed"
+    ) in out
+
+
+def test_identity_checked_on_one_side_is_enough(conn, tmp_path):
+    md = _both_sides_derive_identity_name(tmp_path, "10", conn)
+    task = tmp_path / "tasks" / "TASK-10"
+    (task / "mine_sql" / "c.sql").write_text(
+        "SELECT (SELECT COUNT(*) FROM videos) + (SELECT COUNT(*) FROM windows);\n",
+        encoding="utf-8",
+    )
+    rows = json.loads((task / "mine.json").read_text(encoding="utf-8"))
+    rows[2]["query"] = "tasks/TASK-10/mine_sql/c.sql"
+    (task / "mine.json").write_text(json.dumps(rows, indent=2) + "\n", encoding="utf-8")
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
+    assert not any("checked on neither side" in m for m in fail), fail
