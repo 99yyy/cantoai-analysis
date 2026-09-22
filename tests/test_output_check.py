@@ -1324,7 +1324,7 @@ def test_mine_first_then_merge_same_author_is_red(tmp_path, capsys):
     code, _ = _run_main(repo, "--base-ref", base, "--head-ref", head)
     out = capsys.readouterr().out
     assert code == 1, out
-    assert "have the same author Agent <agent@example.com>" in out
+    assert "have the same identity Agent <agent@example.com> (committed by probe <probe@example.com>)" in out
     assert "the two computations are not independent" in out
     assert "output_check: FAIL" in out
 
@@ -1437,7 +1437,7 @@ def test_check_independence_same_author_message_is_stable(tmp_path):
     assert fail == [
         "TASK-7: results.json introduced in "
         f"{w[:8]} and mine.json introduced in {v[:8]} "
-        "have the same author Agent <agent@example.com>; "
+        "have the same identity Agent <agent@example.com> (committed by probe <probe@example.com>); "
         "the two computations are not independent"
     ]
 
@@ -1817,3 +1817,167 @@ def test_identity_checked_on_one_side_is_enough(conn, tmp_path):
     fail: list[str] = []
     output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
     assert not any("checked on neither side" in m for m in fail), fail
+
+
+# --------------------------------------------------------------------------- identity per side; closed tasks frozen
+
+
+def _both_sides_merged(repo: Path, n: str = "7") -> str:
+    """main holds both sides, each introduced on its own branch from the start ref."""
+    start = _brief_repo(repo, n)
+    _git(repo, "checkout", "-b", "worker")
+    _write_side(repo, n, output_check.WORKER)
+    _commit(repo, "worker results", author=WORKER_AUTHOR)
+    _git(repo, "checkout", "-b", "verifier", start)
+    _write_side(repo, n, output_check.VERIFIER)
+    _commit(repo, "verifier mine", author=VERIFIER_AUTHOR)
+    _git(repo, "checkout", "main")
+    _merge(repo, "worker", "merge worker")
+    _merge(repo, "verifier", "merge verifier")
+    return _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def _rewrite_worker(repo: Path, n: str = "7") -> None:
+    _write_rows(
+        repo / "tasks" / f"TASK-{n}" / "results.json",
+        "n_count",
+        567,
+        f"tasks/TASK-{n}/sql/count_videos.sql",
+        n=2,
+    )
+
+
+def test_independence_prints_same_committer_note(tmp_path, capsys):
+    """Two declared authors, one committer (the test's git config): passes,
+    and says so."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    base, head = _mine_first_then_merge(repo, VERIFIER_AUTHOR, WORKER_AUTHOR)
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", head)
+    out = capsys.readouterr().out
+    assert "same identity" not in out
+    assert (
+        "identity differs only by the declared author (Worker <worker@example.com> "
+        "vs Verifier <verifier@example.com>); both sides were committed by "
+        "probe <probe@example.com>"
+    ) in out
+
+
+def test_side_rewritten_by_another_identity_is_red_on_open_task(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    base = _both_sides_merged(repo)
+    _git(repo, "checkout", "-b", "worker-2")
+    _rewrite_worker(repo)
+    sha = _commit(repo, "worker retry", author=VERIFIER_AUTHOR)
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 1, out
+    intro = output_check.first_added(repo, "HEAD", "tasks/TASK-7/results.json")
+    assert (
+        f"TASK-7: results.json was introduced by Worker <worker@example.com> "
+        f"(committed by probe <probe@example.com>) ({intro[:8]}) but {sha[:8]} rewrites "
+        f"it as Verifier <verifier@example.com> (committed by probe <probe@example.com>); "
+        f"a side does not change hands"
+    ) in out
+
+
+def test_side_rewritten_by_its_own_identity_passes_and_prints(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    base = _both_sides_merged(repo)
+    _git(repo, "checkout", "-b", "worker-2")
+    _rewrite_worker(repo)
+    _commit(repo, "worker retry", author=WORKER_AUTHOR)
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert "does not change hands" not in out
+    assert "results.json: 1 commit(s) in this PR, identity Worker <worker@example.com> (committed by probe <probe@example.com>)" in out
+
+
+def _close_brief(repo: Path, n: str = "7") -> None:
+    md = repo / "tasks" / f"TASK-{n}.md"
+    md.write_text(
+        md.read_text(encoding="utf-8").replace("status: open", f"status: closed\ncorpus_sha: {CORPUS_SHA}", 1),
+        encoding="utf-8",
+    )
+
+
+def test_closed_task_output_edit_is_red(tmp_path, capsys):
+    """The 4918765 case: both sides rewritten after the brief was closed."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _both_sides_merged(repo)
+    _close_brief(repo)
+    base = _commit(repo, "close TASK-7")
+    _git(repo, "checkout", "-b", "late-edit")
+    _rewrite_worker(repo)
+    _commit(repo, "touch closed output", author=WORKER_AUTHOR)
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert (
+        "TASK-7: status is closed on both base and head, but this pull request "
+        "changes tasks/TASK-7/results.json; reopen the brief (status: open) before "
+        "touching a closed task's files"
+    ) in out
+    assert "does not change hands" not in out  # identity rule is for open tasks
+
+
+def test_closed_task_untouched_prints_frozen(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _both_sides_merged(repo)
+    _close_brief(repo)
+    base = _commit(repo, "close TASK-7")
+    _git(repo, "checkout", "-b", "notes")
+    (repo / "notes.md").write_text("x\n", encoding="utf-8")
+    _commit(repo, "notes")
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    # not touched by the PR: the PR-scope summary applies, no full check
+    assert "TASK-7 [closed]: frozen (not touched by this PR)" in out
+    assert code == 0, out
+
+
+def test_closed_task_touched_outside_outputs_prints_frozen(tmp_path, capsys):
+    """A brief-only edit that keeps status closed (a typo fix) is full-checked;
+    the files under tasks/TASK-N/ are unchanged and the note says so."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _both_sides_merged(repo)
+    _close_brief(repo)
+    base = _commit(repo, "close TASK-7")
+    _git(repo, "checkout", "-b", "typo")
+    md = repo / "tasks" / "TASK-7.md"
+    md.write_text(md.read_text(encoding="utf-8") + "\nA note.\n", encoding="utf-8")
+    _commit(repo, "brief note")
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "TASK-7 [closed]: closed on base and head; tasks/TASK-7/ unchanged (frozen)" in out
+
+
+def test_reopening_in_the_same_pr_lifts_the_freeze(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _both_sides_merged(repo)
+    _close_brief(repo)
+    base = _commit(repo, "close TASK-7")
+    _git(repo, "checkout", "-b", "reopen")
+    md = repo / "tasks" / "TASK-7.md"
+    md.write_text(
+        md.read_text(encoding="utf-8").replace("status: closed", "status: open", 1),
+        encoding="utf-8",
+    )
+    _rewrite_worker(repo)
+    _commit(repo, "reopen and retry", author=WORKER_AUTHOR)
+    code, _ = _run_main(repo, "--base-ref", base, "--head-ref", "HEAD")
+    out = capsys.readouterr().out
+    assert "touching a closed task's files" not in out
+    assert "unchanged (frozen)" not in out
+
+
+def test_status_at_reads_the_base_brief():
+    assert output_check.status_at(ROOT, "HEAD", "6") == "closed"
+    assert output_check.status_at(ROOT, "HEAD", "99") is None

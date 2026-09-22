@@ -111,7 +111,19 @@ What this enforces, in order:
                did not have the other agent's file in its tree, nor did any
                ancestor of that commit; the two introducing commits have no
                ancestor relationship, were not both introduced on this branch,
-               and do not share an author identity (plan §2.7).
+               and do not share an identity, identity being the author AND
+               the committer of the commit (plan §2.7). Two identities that
+               differ only in the declared author, with one committer, are
+               printed as such: the author line is self-declared.
+  identity     (pull requests only, open tasks) every commit in the PR that
+               touches one side's output file carries the identity of that
+               side's introducing commit. A side does not change hands
+               mid-task, and a merge that rewrites an output file is a commit
+               touching it.
+  frozen       (pull requests only) a task whose brief is ``closed`` on the
+               base branch and still ``closed`` on the head may not change
+               anything under ``tasks/TASK-N/``. Reopening is a brief edit
+               (owner-only), in the same PR or before.
   blocked-commit
                an empty commit whose subject starts with ``BLOCKED:`` is
                recognized and printed. It is the durable marker when the
@@ -552,8 +564,36 @@ def commit_author(root: Path, sha: str) -> str:
     return ident
 
 
+def commit_identity(root: Path, sha: str) -> tuple[str, str]:
+    """(author, committer) of ``sha``, each as ``Name <email>``.
+
+    The author line is whatever the committing process declared; the
+    committer is set by the process that wrote the commit. Neither proves who
+    ran the computation, so the gate compares both and prints both.
+    """
+    out = git(root, "log", "-1", "--format=%an <%ae>%x00%cn <%ce>", sha).strip()
+    author, _, committer = out.partition("\x00")
+    if not author or author == "<>":
+        raise Fail(f"{sha}: git author is empty")
+    if not committer or committer == "<>":
+        raise Fail(f"{sha}: git committer is empty")
+    return author, committer
+
+
+def identity_text(ident: tuple[str, str]) -> str:
+    author, committer = ident
+    if author == committer:
+        return author
+    return f"{author} (committed by {committer})"
+
+
 def check_independence(
-    root: Path, n: str, base: str, head: str, fail: list[str]
+    root: Path,
+    n: str,
+    base: str,
+    head: str,
+    fail: list[str],
+    notes: list[str] | None = None,
 ) -> None:
     """Plan §2.7: the two introducing commits are independent.
 
@@ -630,17 +670,114 @@ def check_independence(
         )
 
     try:
-        aw = commit_author(root, w)
-        av = commit_author(root, v)
+        iw = commit_identity(root, w)
+        iv = commit_identity(root, v)
     except Fail as e:
         fail.append(str(e))
         return
-    if aw == av:
+    if iw == iv:
         fail.append(
             f"TASK-{n}: {WORKER} introduced in {w[:8]} and {VERIFIER} "
-            f"introduced in {v[:8]} have the same author {aw}; "
+            f"introduced in {v[:8]} have the same identity {identity_text(iw)}; "
             f"the two computations are not independent"
         )
+    elif iw[1] == iv[1] and notes is not None:
+        notes.append(
+            f"identity differs only by the declared author ({iw[0]} vs {iv[0]}); "
+            f"both sides were committed by {iw[1]}"
+        )
+
+
+def commits_touching(root: Path, rng: str, path: str) -> list[str]:
+    """Commits in ``rng`` in which ``path`` differs from every parent
+    (git's history simplification: a clean merge is not listed, a merge that
+    rewrote the file is)."""
+    out = git(root, "log", rng, "--format=%H", "--", path)
+    return [l.strip() for l in out.splitlines() if l.strip()]
+
+
+def check_side_identity(
+    root: Path, n: str, base: str, head: str, fail: list[str]
+) -> list[str]:
+    """Every PR commit touching a side's file carries that side's identity.
+
+    The introducing commit (first add in ``head``'s history) fixes the
+    identity; a later commit by another author or committer means the side
+    changed hands, or an output was rewritten inside a merge. Returns the
+    lines to print.
+    """
+    notes: list[str] = []
+    for k in (WORKER, VERIFIER):
+        rel = f"tasks/TASK-{n}/{k}"
+        try:
+            if not in_tree(root, head, rel):
+                continue
+            intro = first_added(root, head, rel)
+            if intro is None:
+                continue
+            edits = commits_touching(root, f"{base}..{head}", rel)
+            if not edits:
+                continue
+            ident = commit_identity(root, intro)
+        except Fail as e:
+            fail.append(str(e))
+            continue
+        for sha in edits:
+            if sha == intro:
+                continue
+            try:
+                got = commit_identity(root, sha)
+            except Fail as e:
+                fail.append(str(e))
+                continue
+            if got != ident:
+                fail.append(
+                    f"TASK-{n}: {k} was introduced by {identity_text(ident)} "
+                    f"({intro[:8]}) but {sha[:8]} rewrites it as "
+                    f"{identity_text(got)}; a side does not change hands"
+                )
+        notes.append(f"{k}: {len(edits)} commit(s) in this PR, identity {identity_text(ident)}")
+    return notes
+
+
+def status_at(root: Path, rev: str, n: str) -> str | None:
+    """The brief's status at ``rev``; None when the brief is absent there."""
+    rel = f"tasks/TASK-{n}.md"
+    try:
+        if not in_tree(root, rev, rel):
+            return None
+        text = git(root, "show", f"{rev}:{rel}")
+    except Fail:
+        return None
+    st = STATUS.findall(text)
+    return st[0] if len(st) == 1 else None
+
+
+def check_closed_frozen(
+    root: Path, n: str, status: str, base: str, head: str, fail: list[str]
+) -> str | None:
+    """A task closed at base and still closed at head keeps ``tasks/TASK-N/``.
+
+    Returns a note when the rule applied and held; None when it did not
+    apply. Reopening (status changed in this PR) lifts the freeze: the brief
+    is an owner-only file, so an agent branch cannot do that itself.
+    """
+    if status != "closed" or status_at(root, base, n) != "closed":
+        return None
+    prefix = f"tasks/TASK-{n}/"
+    try:
+        touched = sorted(p for p in pr_diff_names(root, base, head) if p.startswith(prefix))
+    except Fail as e:
+        fail.append(str(e))
+        return None
+    if touched:
+        fail.append(
+            f"TASK-{n}: status is closed on both base and head, but this pull request "
+            f"changes {', '.join(touched)}; reopen the brief (status: open) before "
+            f"touching a closed task's files"
+        )
+        return None
+    return "closed on base and head; tasks/TASK-{n}/ unchanged (frozen)".replace("{n}", n)
 
 
 def task_ids_from_paths(paths: Iterable[str]) -> frozenset[str]:
@@ -660,7 +797,7 @@ def task_ids_from_paths(paths: Iterable[str]) -> frozenset[str]:
 
 def pr_diff_names(root: Path, base: str, head: str) -> list[str]:
     """Repo-relative paths in ``base...head`` (the pull-request triple-dot)."""
-    out = git(root, "diff", "--name-only", f"{base}...{head}")
+    out = git(root, "diff", "--name-only", "--no-renames", f"{base}...{head}")
     return [l.strip() for l in out.splitlines() if l.strip()]
 
 
@@ -2730,6 +2867,10 @@ def check_task(
     check_round_result(
         root, n, brief, task_dir, corpus_sha, base, head, fail
     )
+    if base and head:
+        frozen = check_closed_frozen(root, n, status, base, head, fail)
+        if frozen:
+            print(f"  TASK-{n} [{status}]: {frozen}")
 
     if status in SUSPEND_STATUS:
         print(
@@ -2869,7 +3010,13 @@ def check_task(
 
     # Neither branch may have started from the other's answer (plan §2.7).
     if base and head:
-        check_independence(root, n, base, head, fail)
+        ind_notes: list[str] = []
+        check_independence(root, n, base, head, fail, ind_notes)
+        for note in ind_notes:
+            print(f"  TASK-{n} [{status}]: {note}")
+        if status == "open":
+            for note in check_side_identity(root, n, base, head, fail):
+                print(f"  TASK-{n} [{status}]: {note}")
 
     if status == "closed":
         for k in sorted(set(paths) - set(present)):
