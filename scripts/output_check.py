@@ -149,7 +149,8 @@ What this enforces, in order:
                mismatched machine fields fail: success requires both
                outputs, pairwise agreement within tol, and a live closed
                brief; out_of_turns requires the post-reset rewrite count
-               to be at cap; corpus_sha must equal the README pin.
+               to be at cap; corpus_sha must equal the brief's close
+               stamp (the pin, when the brief carries no stamp).
                ``turns_used`` must equal ``len(tasks/TASK-N/launches.json)``
                for that task: a repo-local ledger of ``{id, role, at}``
                records the coordinator or auditor appends (worker/verifier
@@ -2281,7 +2282,8 @@ def parse_result(
         )
     if sha != corpus_sha:
         raise Fail(
-            f"TASK-{n}: RESULT.json corpus_sha is {sha}, README pin is {corpus_sha}"
+            f"TASK-{n}: RESULT.json corpus_sha is {sha}, the brief's close stamp "
+            f"(or the pin when the brief has none) is {corpus_sha}"
         )
 
     forked = data["forked_from"]
@@ -2446,8 +2448,13 @@ def check_round_result(
             )
         return
 
+    # RESULT records the corpus its numbers were computed on: the brief's own
+    # close stamp when there is one, the current pin otherwise. On a re-pin the
+    # brief goes STALE and RESULT stays consistent with the stamp; nothing
+    # under tasks/TASK-N/ is rewritten to a corpus it never ran on.
+    expected_sha = brief.corpus_sha or corpus_sha
     try:
-        data = parse_result(path, n, brief.tol, corpus_sha)
+        data = parse_result(path, n, brief.tol, expected_sha)
     except Fail as e:
         fail.append(str(e))
         return
