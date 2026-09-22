@@ -196,13 +196,13 @@ def test_parse_result_turn_cap_is_three(tmp_path):
         output_check.parse_result(path, "7", {"n_count": 0.0}, CORPUS_SHA)
 
 
-def test_parse_result_corpus_sha_must_match_readme_pin(tmp_path):
+def test_parse_result_corpus_sha_must_match_the_expected_sha(tmp_path):
     path = tmp_path / "RESULT.json"
     wrong = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     _write_result(path, _base_payload(corpus_sha=wrong))
     with pytest.raises(
         output_check.Fail,
-        match=r"corpus_sha is a{64}, README pin is",
+        match=r"corpus_sha is a{64}, the brief's close stamp \(or the pin when the brief has none\) is",
     ):
         output_check.parse_result(path, "7", {"n_count": 0.0}, CORPUS_SHA)
 
@@ -452,3 +452,40 @@ def test_parse_result_forked_from_rejects_letter_d(tmp_path):
         match=r"forked_from must be null or TASK-N",
     ):
         output_check.parse_result(path, "7-b", {"n_count": 0.0}, CORPUS_SHA)
+
+
+# --------------------------------------------------------------------------- RESULT.corpus_sha follows the brief's close stamp (re-pin)
+
+OLD_PIN = "b" * 64
+
+
+def test_after_repin_result_matching_the_stale_stamp_passes(conn, tmp_path):
+    """The corpus was re-pinned (README now CORPUS_SHA); this task was closed
+    on the old corpus and stamped OLD_PIN. Its RESULT records OLD_PIN and stays
+    consistent; the task is STALE (skipped), not red."""
+    md = _closed_agreeing(tmp_path)
+    _set_corpus_sha(md, OLD_PIN)
+    _write_result(
+        tmp_path / "tasks" / "TASK-7" / "RESULT.json",
+        _base_payload(subtype="stale", verdict=None, corpus_sha=OLD_PIN),
+    )
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
+    assert not any("corpus_sha" in m for m in fail), fail
+
+
+def test_after_repin_result_rewritten_to_the_new_pin_is_red(conn, tmp_path):
+    """Rewriting RESULT.corpus_sha to a corpus the numbers never ran on is red."""
+    md = _closed_agreeing(tmp_path)
+    _set_corpus_sha(md, OLD_PIN)
+    _write_result(
+        tmp_path / "tasks" / "TASK-7" / "RESULT.json",
+        _base_payload(subtype="stale", verdict=None, corpus_sha=CORPUS_SHA),
+    )
+    fail: list[str] = []
+    output_check.check_task(tmp_path, md, conn, 60.0, None, None, fail, CORPUS_SHA)
+    assert any(
+        f"RESULT.json corpus_sha is {CORPUS_SHA}, the brief's close stamp (or the pin "
+        f"when the brief has none) is {OLD_PIN}" in m
+        for m in fail
+    ), fail
