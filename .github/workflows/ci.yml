@@ -34,16 +34,20 @@ jobs:
           python-version: "3.12"
       - name: Take the gates from the base branch, not from this PR
         if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           mkdir -p /tmp/gate
           for f in output_check history_audit scope_check; do
-            git show origin/${{ github.base_ref }}:scripts/$f.py > /tmp/gate/$f.py
+            git show "origin/$BASE_REF:scripts/$f.py" > /tmp/gate/$f.py
           done
       - name: Replay every number, and make the two computations agree
         if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           python /tmp/gate/output_check.py \
-            --base-ref "origin/${{ github.base_ref }}" \
+            --base-ref "origin/$BASE_REF" \
             --head-ref HEAD
       - name: The same on main, where there is no branch point to check
         if: github.event_name != 'pull_request'
@@ -68,19 +72,31 @@ jobs:
         with:
           python-version: "3.12"
       - name: Take the gates from the base branch, not from this PR
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           mkdir -p /tmp/gate
           for f in output_check history_audit scope_check; do
-            git show origin/${{ github.base_ref }}:scripts/$f.py > /tmp/gate/$f.py
+            git show "origin/$BASE_REF:scripts/$f.py" > /tmp/gate/$f.py
           done
       - name: Every branch must belong to a known class
+        # Everything GitHub-controlled goes through env, never into the script
+        # text: a branch name is attacker-chosen and `${{ }}` inside run: is a
+        # shell injection. The PR author is who authorizes repair/ and chore/;
+        # the actor changes to cursor[bot] on every agent push and is only the
+        # fallback for runs without a pull request. SCOPE_AUTHOR is read from
+        # the environment, not passed as a flag: the gate copy comes from the
+        # base branch, and an older copy must still accept this command line.
         env:
+          SCOPE_BRANCH: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
           SCOPE_ACTOR: ${{ github.actor }}
+          SCOPE_AUTHOR: ${{ github.event.pull_request.user.login }}
           SCOPE_OWNERS: ${{ github.repository_owner }}
         run: |
           python /tmp/gate/scope_check.py \
-            --branch "${{ github.head_ref }}" \
-            --base "origin/${{ github.base_ref }}" \
+            --branch "$SCOPE_BRANCH" \
+            --base "origin/$BASE_REF" \
             --actor "$SCOPE_ACTOR" \
             --owners "$SCOPE_OWNERS"
 
@@ -95,17 +111,21 @@ jobs:
         with:
           python-version: "3.12"
       - name: Take the gates from the base branch, not from this PR
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           mkdir -p /tmp/gate
           for f in output_check history_audit scope_check; do
-            git show origin/${{ github.base_ref }}:scripts/$f.py > /tmp/gate/$f.py
+            git show "origin/$BASE_REF:scripts/$f.py" > /tmp/gate/$f.py
           done
       - name: Capture the pull-request body without interpolating it into a shell
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: printf '%s' "$PR_BODY" > /tmp/pr_body.txt
       - name: A bar may not move in the change that moves what it measures
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           python /tmp/gate/history_audit.py \
-            --base "origin/${{ github.base_ref }}" \
+            --base "origin/$BASE_REF" \
             --pr-body-file /tmp/pr_body.txt
