@@ -105,7 +105,7 @@ main 上不跑 scope-check / history-audit（与 CI 一致）。`./verify probe`
 9. 引入某一边文件的那个 commit，它自己的树和**所有祖先**的树里都没有另一边的文件。两边的引入 commit 不能有祖先关系，必须来自不同分支、身份不同（plan §2.7）。身份 = author 加 committer：author 是提交方自己填的，改一行 `--author` 就能换（TASK-9 worker `ac1ee4f` 就是这样过的旧检查），所以两边只在 author 上不同、committer 相同时闸门会打印一句，但不红——两个 Cursor Cloud Agent 的 committer 本来就同一个。CI 能证明的是「两边没有从对方的树出发」，证明不了「是两个不同的 agent 算的」；后者靠 fyp 记的启动账本和模型家族分配。只看引入 commit 自己那一棵树，挡不住「先提交自己的、再 merge 对方」或同一条分支上分三次写出两边。
     - **一边不换手**：open 任务里，PR 中每个动到 `results.json` 或 `mine.json` 的 commit 都要与该边引入 commit 同一身份（author 和 committer）。merge commit 里改了输出文件也算动到。force-push 抹掉的历史 CI 看不见，要靠分支保护禁 force-push（阶段 0 第 6 项）。
     - **已关闭任务冻结**：任务书在 base 和 head 上都是 `closed`，PR 就不得改 `tasks/TASK-N/` 下任何文件（两边输出、SQL、RESULT、账本都算）。要改就先在任务书上把 `status` 改回 `open`，同一个 PR 里改也行，但任务书是 owner 的文件，agent 分支做不到。`4918765` 那种关闭之后再改两边输出的情况以后直接红。
-10. 若 `tasks/TASK-N/RESULT.json` 存在于 `closed` / `escalated` / `blocked` 任务，按 schema 核对：`subtype` 与 `verdict` 独立，后者只在 `subtype: success` 时非空；`success` 要求两边齐、数字在容差内一致、live closed；`out_of_turns` 要求改写次数已到上限 3；`corpus_sha` 必须等于当前 README pin。`turns_used` 必须等于该任务 `tasks/TASK-N/launches.json` 的记录数（每条 `{id, role, at}`）；根任务与 `-b`/`-c` 的账本长度之和是这一轮家族的启动次数，上限 16。`subtype` 不是 `out_of_budget` / `blocked` 而家族合计 `> 16` → 红（已有子任务书的父 RESULT 不再按后来的家族增长重判（父 RESULT 分叉后不可改），但父任务自己的账本已经 `> 16` 仍红）；`subtype: out_of_budget` 而家族合计 `< 16` → 红。账本由 coordinator / auditor 追加（记下 worker / verifier / auditor / repair 启动），worker / verifier 不得自造启动记录。本 PR 新收成终态的任务必须有 RESULT（因而也必须有账本）；落地前已关闭的任务可以没有。存在于 `open` 则红。没有 `cost_usd` / `budget_usd` / `val_iterations`。根任务 `forked_from` 为 null、`fork_depth` 为 0；字母后缀任务必须是父 id 与父 depth+1，且 `fork_depth ≤ 2`。
+10. 若 `tasks/TASK-N/RESULT.json` 存在于 `closed` / `escalated` / `blocked` 任务，按 schema 核对：`subtype` 与 `verdict` 独立，后者只在 `subtype: success` 时非空；`success` 要求两边齐、数字在容差内一致、live closed；`out_of_turns` 要求改写次数已到上限 3；`corpus_sha` 必须等于任务书的 `corpus_sha:` stamp（任务书没 stamp 时对当前 README pin）。`turns_used` 必须等于该任务 `tasks/TASK-N/launches.json` 的记录数（每条 `{id, role, at}`）；根任务与 `-b`/`-c` 的账本长度之和是这一轮家族的启动次数，上限 16。`subtype` 不是 `out_of_budget` / `blocked` 而家族合计 `> 16` → 红（已有子任务书的父 RESULT 不再按后来的家族增长重判（父 RESULT 分叉后不可改），但父任务自己的账本已经 `> 16` 仍红）；`subtype: out_of_budget` 而家族合计 `< 16` → 红。账本由 coordinator / auditor 追加（记下 worker / verifier / auditor / repair 启动），worker / verifier 不得自造启动记录。本 PR 新收成终态的任务必须有 RESULT（因而也必须有账本）；落地前已关闭的任务可以没有。存在于 `open` 则红。没有 `cost_usd` / `budget_usd` / `val_iterations`。根任务 `forked_from` 为 null、`fork_depth` 为 0；字母后缀任务必须是父 id 与父 depth+1，且 `fork_depth ≤ 2`。
 11. 若存在 `tasks/TASK-N-b.md`（深度 2 为 `-c`）：```numbers``` 与 ```n``` 围栏（以及父任务书上已有的 ```frame``` / ```identities```）必须与直接父任务书**字节级相同**——改一个容差就红，那是新任务，不是分叉。子任务书必须有 `## Prior Attempts`（父假说、verdict 或 `out_of_turns` 的 subtype、why、父 RESULT 的关键数字）。父任务保持 `closed` 或 `escalated`，父 `RESULT.json` 在子任务书加入之后不得改、不得删。父 RESULT 须为 `verdict: refuted` 或 `subtype: out_of_turns`。开 `-d`（第三次分叉）红，应把该轮标 `blocked` 而不是再开一份任务书。无输出的子任务书也跑这一条。Bot 的 `check-brief` 不在本仓库，不顶替这一关。
 
 同一 job 里、在 `/tmp/gate/output_check.py`（PR）或 `scripts/output_check.py`（main）之后，另跑 `python scripts/relations.py`。这一步读的是 **HEAD 工作树**，不是 `/tmp/gate`：A1 之后 PR 上的闸门脚本是 base 的拷贝，新加的 `relations.py` 在合入之前 base 看不见。临时语料只写 `$RUNNER_TEMP`（或本地 tempfile），跑完删除，**从不写进 `data/`**。它不做 PR freeze。数字来自重放，不来自 agent 写下的值。除 double / permute 外还跑 **exclude**（按 ```frame``` 谓词删掉不发布的行再重放，仅在 `frame` 有 `published_expected` 时）和 **anchor**（`published_expected` 必须等于排除后单位表的行数）；按定义读 frame 之外的行的名字写进任务书 ```outside_frame``` 块豁免 exclude，往这块加名字是 history-audit 的移动栅。
@@ -215,9 +215,9 @@ git 推不出 Cursor 启动次数，所以仓库里必须有一份可核对的�
 
 ## 语料更换
 
-语料变动走 `repair/` PR（agent 碰不了 `data/` 与 `README.md`）：**同一条 PR**
-里改 `data/corpus_v2.sqlite`、`README.md` 的 sha256 pin，以及每份
-`status: closed` 任务书上的 `corpus_sha`。只改 README 不改 stamp，关闭任务
-变成 STALE（跳过重放，不红，也不打 N/N agree）。要让关闭任务继续活着，stamp
-必须改成新 pin，并且数字仍能在新语料上重放——活着的关闭任务不会因为「两边写
-下的值彼此相等」就绿灯，重放对的是新语料。
+语料变动走 `repair/` PR（agent 碰不了 `data/` 与 `README.md`）：把新语料放到配置里的路径，跑 `python scripts/repin.py`，它只改 `README.md` 那一行 sha256 pin，并列出哪些 `status: closed` 任务书会变成 STALE。**同一条 PR**里提交语料和 pin，别的不动。
+
+- 关闭任务书上的 `corpus_sha:` 是收口时的语料，**不改**。stamp 与新 pin 不符 → 该任务 STALE：跳过重放，不红，不打 N/N agree。
+- `RESULT.json` 的 `corpus_sha` 必须等于**任务书的 stamp**（任务书没 stamp 时才对 README pin）。它记录的是这些数字在哪份语料上算出来的，不随 re-pin 改写；改写成没跑过的语料直接红。
+- 已关闭任务在 base 与 head 上都 `closed` 时 `tasks/TASK-N/` 下什么都不能改（冻结），所以 re-pin 的 PR 本来也碰不到 RESULT。
+- 要让某个关闭任务在新语料上重新活过来：`chore/` 把它改回 `status: open`，重新跑一轮，收口时盖新 stamp、写新 RESULT。「两边写下的值彼此相等」不算数，重放对的是新语料。
