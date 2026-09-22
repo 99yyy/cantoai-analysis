@@ -443,7 +443,7 @@ def test_dead_paths_are_retired_not_live():
     assert live.isdisjoint(retired)
     assert "expected/*" not in history_audit.BAR_FILES
     assert "expected/**" not in history_audit.BAR_FILES
-    assert history_audit.BAR_FILES == []
+    assert history_audit.BAR_FILES == ["scripts/gate_config.json"]
     assert "scripts/contract_check.py" not in history_audit.BAR_COUNTED
     assert history_audit.BAR_YAML_FILES == []
     assert "sql/*" in history_audit.MEASURED
@@ -543,3 +543,27 @@ def test_yaml_bar_helper_is_preserved_alongside_retired_paths():
     assert callable(history_audit.yaml_bar_keys_touched)
     assert history_audit.BAR_YAML_KEYS.search("expected_rows: 164693")
 
+
+
+def test_adding_outside_frame_name_is_a_bar_removing_is_not():
+    old = NUMBERS + "```outside_frame\nrare_share_pre\n```\n"
+    new = NUMBERS + "```outside_frame\nrare_share_pre  # cutoff\nrare_share_post\n```\n"
+    hits = history_audit.declaration_bars(PATH, old, new)
+    assert hits == [
+        "tasks/TASK-6.md ```outside_frame rare_share_post added "
+        "(exempt from the exclude invariant)"
+    ]
+    assert history_audit.declaration_bars(PATH, new, old) == []
+    assert history_audit.declaration_bars(PATH, new, new) == []
+
+
+def test_adding_outside_frame_block_to_existing_brief_is_a_bar():
+    new = NUMBERS + "```outside_frame\nn_all\n```\n"
+    hits = history_audit.declaration_bars(PATH, NUMBERS, new)
+    assert hits == [
+        "tasks/TASK-6.md ```outside_frame n_all added (exempt from the exclude invariant)"
+    ]
+
+
+def test_gate_config_is_a_bar_file():
+    assert "scripts/gate_config.json" in history_audit.BAR_FILES

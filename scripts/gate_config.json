@@ -1,0 +1,30 @@
+{
+  "_about": [
+    "Project-specific facts the gate scripts read. The scripts themselves name no",
+    "table, column, tier, side file or number prefix; everything of that kind is",
+    "here. CI copies this file next to the base-branch gate copies (/tmp/gate),",
+    "so a pull request cannot change the gate it is judged by. Any change to",
+    "this file is a bar move (history-audit)."
+  ],
+  "corpus": "data/corpus_v2.sqlite",
+  "pin_file": "README.md",
+  "sides": {
+    "worker": "results.json",
+    "verifier": "mine.json"
+  },
+  "tables": {
+    "videos": {"key": "video_id"},
+    "windows": {"key": "uid", "refs": {"video_id": "videos"}},
+    "syllables": {
+      "key": "syl_id",
+      "refs": {"uid": "windows", "video_id": "videos"},
+      "type_columns": ["char"]
+    }
+  },
+  "other_tables": ["runs"],
+  "unit_table": "syllables",
+  "families": {
+    "count": {"prefix": ["n_"]},
+    "rate": {"prefix": ["agree_", "rare_share_", "gap_", "did_"], "prefix_suffix": [["rate_", "_pm"]]}
+  }
+}
