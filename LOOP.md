@@ -31,7 +31,7 @@
 | `verifier` | `cursor/t<N>-verifier-…` | `tasks/TASK-N/mine.json`、`mine_sql/` | 任务书、语料。**不读 worker 的代码、对话、PR** |
 | `auditor` | `repair/task-N-close-…`（Cursor 以 Tom 的账号开 PR；这一类分支只能写本行的写集加任务书） | `review/TASK-N/audit.md`、`tasks/TASK-N/RESULT.json`、`launches.json`、`backlog.md` | 本任务的 commit 与 PR 正文 |
 
-碰写集之外的路径 → OUT；碰受保护路径（`.cursor/` `.github/` `data/` `scripts/`、`README.md`、`LOOP.md`）→ DENY；分支名里的角色在配置里没有写集 → 直接红。任何 agent 都不能改任务书 `tasks/TASK-N.md`；`chore/` 与 `repair/` 由开 PR 的人授权（必须是 owner），开了之后 agent 可以往上推，不用重开。
+碰写集之外的路径 → OUT；碰受保护路径（`.cursor/` `.github/` `data/` `scripts/`、`README.md`、`LOOP.md`）→ DENY；分支名里的角色在配置里没有写集 → 直接红。`cursor/…` 分支上的 agent 都不能改任务书 `tasks/TASK-N.md`，任务书只在 coordinator 的 `chore/` 和 auditor 的收口分支上改；`chore/` 与 `repair/` 由开 PR 的人授权（必须是 owner），开了之后 agent 可以往上推，不用重开。
 
 两个算数的节点交**同一种文件**，形状一样，都不含任何判定字段：
 
