@@ -1,32 +1,57 @@
 #!/usr/bin/env python3
-"""Double and permute invariants on every declared SQL route.
+"""Double, permute and exclude invariants on every declared SQL route.
 
 A number that agrees on the live corpus can still be a constant in disguise:
 ``SELECT 391 FROM videos`` and ``rate / 122208`` both replay. Copying every
-row, or shuffling row order, has no expected answer to special-case.
+row, shuffling row order, or dropping the rows the brief says are not
+published, has no expected answer to special-case.
 
 This script is a step of the ``output-check`` *job*, run from the pull-request
 workspace (HEAD). After A1, PR CI copies ``output_check.py`` from base into
 ``/tmp/gate``; that copy cannot see this file until the PR merges. Do not call
 this module from ``/tmp/gate/output_check.py``.
 
-Construction (never writes under ``data/``):
+Nothing project-specific is written here. Table names, keys, the columns to
+namespace, the unit table and the number families come from
+``gate_config.json`` (read through ``output_check.GATE_CONFIG``); the
+published set comes from each brief's ``frame`` fence.
+
+Construction (never writes next to the corpus):
 
   double   copy the corpus to ``$RUNNER_TEMP`` (or a local tempfile); re-insert
-           every ``videos`` / ``windows`` / ``syllables`` row with primary keys
-           prefixed ``dup:`` and ``video_id`` / ``uid`` updated to match.
-           ``syllables.char`` is also prefixed so a type-count cutoff
-           (``rare_share_*``, ``n_char < 10``) stays homogeneous of degree 0.
-  permute  copy; rebuild those three tables with ``INSERT ... ORDER BY random()``.
+           every row of every configured table with its key, its refs and its
+           ``type_columns`` prefixed ``dup:``. Namespacing the type column
+           keeps an absolute type-frequency cutoff homogeneous of degree 0.
+  permute  copy; rebuild the configured tables with ``INSERT ... ORDER BY random()``.
+  exclude  copy; apply every ``frame`` predicate ``<table>.<column> <sql>`` as
+           ``DELETE ... WHERE NOT (column sql)``; then delete rows whose refs
+           no longer resolve, until nothing changes. One excluded corpus per
+           distinct predicate list.
 
 Invariants, by declared name, against the original-corpus replay (not the
 values the agent wrote):
 
-  n_*                         exactly double
-  agree_*  rare_share_*       stay within the brief's original tolerance
-  rate_*_pm  gap_*  did_*
+  count family   exactly double under double; unchanged under permute/exclude
+  rate family    within the brief's tolerance under all three
 
-Permute: every declared number matches the original-corpus replay (same tols).
+Exclude runs when the brief's ``frame`` declares ``published_expected``;
+dropping that line to opt out is a bar (history-audit). A number that moves
+when the unpublished rows disappear was computed over the wrong set. Two
+agents that share that mistake agree with each other and replay, and nothing
+else in the gate can see it.
+
+A brief may declare, in a fenced ``outside_frame`` block, names whose
+definition reads rows outside the frame on purpose (a type-frequency cutoff
+over the full table). Those names are not compared under exclude, and neither
+is a ``derived:`` name whose expression reaches one of them. Every listed name
+must be in the numbers block, and the exemption is printed per side. Adding a
+name to that block is a bar move (history-audit). Double and permute still
+apply to every name.
+
+Anchor: when ``frame`` declares ``published_expected``, the excluded corpus
+must hold exactly that many rows of the unit table (``published_expected_tol``,
+default 0). A frame that no longer matches the corpus is a stale frame, not
+a smaller published set.
 
 An unclassified name is a failure. Suspended and STALE tasks are skipped, as
 in output-check. Relations does not freeze on PR diff: a hardcoded denominator
@@ -54,20 +79,30 @@ _SPEC.loader.exec_module(output_check)
 
 Fail = output_check.Fail
 
-TABLES = ("videos", "windows", "syllables")
+CONFIG = output_check.GATE_CONFIG
+# Tables double/permute rewrite, in config order (parents before children).
+TABLES = tuple(CONFIG["tables"])
+UNIT_TABLE = str(CONFIG["unit_table"])
 DUP_PREFIX = "dup:"
-# Primary keys plus the FKs the brief names. Snapshot-then-insert, so the
-# INSERT does not re-read the rows it just wrote.
+# Columns namespaced under double: each table's key, every column that refers
+# to another table's key, and the declared ``type_columns`` (a categorical
+# column that a type-frequency cutoff counts over: duplicated tokens must not
+# keep the same type, or an absolute ``n < 10`` cutoff would move while still
+# agreeing on the live corpus). Snapshot-then-insert, so the INSERT does not
+# re-read the rows it just wrote.
 PREFIX_COLUMNS = {
-    "videos": frozenset({"video_id"}),
-    "windows": frozenset({"uid", "video_id"}),
-    # syllables.char is namespaced too. An absolute n_char < 10 cutoff is
-    # not degree-0 if duplicated tokens keep the same glyph: 515 types on
-    # this corpus sit in 5–9 occurrences, so rare_share_* would move while
-    # still agreeing on the live corpus. Prefixing char keeps the listed
-    # rare_share_* invariance and still catches a hardcoded denominator.
-    "syllables": frozenset({"syl_id", "uid", "video_id", "char"}),
+    t: frozenset(
+        [spec["key"], *spec.get("refs", {}).keys(), *spec.get("type_columns", [])]
+    )
+    for t, spec in CONFIG["tables"].items()
 }
+FAMILIES = CONFIG["families"]
+_KNOWN_FAMILIES = ("count", "rate")
+for _fam in FAMILIES:
+    if _fam not in _KNOWN_FAMILIES:
+        raise Fail(
+            f"relations: gate_config families has {_fam!r}; known: {', '.join(_KNOWN_FAMILIES)}"
+        )
 _IDENT = r"[A-Za-z_][A-Za-z0-9_]*"
 
 
@@ -78,24 +113,81 @@ def ident(name: str) -> str:
     return name
 
 
+def family_rules() -> str:
+    bits: list[str] = []
+    for fam, rule in FAMILIES.items():
+        pats = list(rule.get("prefix", [])) + [
+            f"{p}*{sfx}" for p, sfx in rule.get("prefix_suffix", [])
+        ]
+        bits.append(f"{fam}: {' '.join(pats)}")
+    return "; ".join(bits)
+
+
 def family(name: str) -> str:
-    """``count`` (must 2×) or ``rate`` (must stay). Unclassified raises."""
-    if name.startswith("n_"):
-        return "count"
-    if name.startswith("agree_"):
-        return "rate"
-    if name.startswith("rare_share_"):
-        return "rate"
-    if name.startswith("rate_") and name.endswith("_pm"):
-        return "rate"
-    if name.startswith("gap_"):
-        return "rate"
-    if name.startswith("did_"):
-        return "rate"
+    """``count`` (must 2×) or ``rate`` (must stay), by the config's name
+    prefixes. Unclassified raises."""
+    for fam, rule in FAMILIES.items():
+        for prefix in rule.get("prefix", []):
+            if name.startswith(prefix):
+                return fam
+        for prefix, suffix in rule.get("prefix_suffix", []):
+            if name.startswith(prefix) and name.endswith(suffix):
+                return fam
     raise Fail(
-        f"relations: {name} matches no double/permute family "
-        f"(n_ / agree_ / rare_share_ / rate_*_pm / gap_ / did_)"
+        f"relations: {name} matches no double/permute family ({family_rules()})"
     )
+
+
+OUTSIDE_FRAME_FENCE = re.compile(r"^```outside_frame\s*$(.*?)^```\s*$", re.M | re.S)
+
+
+def parse_outside_frame_block(label: str, text: str, declared: dict[str, float]) -> frozenset[str]:
+    """Names whose definition reads rows outside the frame by declaration. One name per
+    line, ``#`` comments allowed. The fence is optional; when present it must
+    not be empty, must not repeat a name, and every name must be in the
+    numbers block."""
+    m = OUTSIDE_FRAME_FENCE.search(text)
+    if not m:
+        return frozenset()
+    out: list[str] = []
+    for raw in m.group(1).splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if len(line.split()) != 1:
+            raise Fail(f"{label}: outside_frame line is not one '<name>': {line!r}")
+        if line in out:
+            raise Fail(f"{label}: outside_frame lists {line} twice")
+        if line not in declared:
+            raise Fail(
+                f"{label}: outside_frame names {line!r} which is not in the numbers block"
+            )
+        out.append(line)
+    if not out:
+        raise Fail(f"{label}: the outside_frame block is empty")
+    return frozenset(out)
+
+
+def outside_frame_closure(
+    declared: frozenset[str], routes: dict[str, tuple[str, object]]
+) -> frozenset[str]:
+    """The declared names plus every ``derived:`` name whose expression reaches
+    one of them (transitively). SQL routes are never added."""
+    out = set(declared)
+    changed = True
+    while changed:
+        changed = False
+        for name, (kind, payload) in routes.items():
+            if name in out or kind != "derived":
+                continue
+            try:
+                names, _fields = output_check.parse_identity_expr(name, str(payload))
+            except Fail:
+                continue
+            if names & out:
+                out.add(name)
+                changed = True
+    return frozenset(out)
 
 
 def column_names(conn: sqlite3.Connection, table: str) -> list[str]:
@@ -205,6 +297,111 @@ def permute_corpus(src: Path, dest: Path, data_DIR: Path) -> None:
         conn.commit()
     finally:
         conn.close()
+
+
+PUBLISHED_EXPECTED = "published_expected"
+PUBLISHED_EXPECTED_TOL = "published_expected_tol"
+
+Predicate = tuple[str, str, str]
+
+
+def exclude_corpus(
+    src: Path, dest: Path, data_DIR: Path, predicates: list[Predicate]
+) -> dict[str, int]:
+    """Keep only the published set. Returns rows removed per table.
+
+    Every ``frame`` predicate ``<table>.<column> <fragment>`` is applied as
+    ``DELETE FROM table WHERE NOT (column fragment)`` (NULL counts as not
+    published). Then rows whose ``refs`` no longer resolve are deleted, table
+    by table, until nothing changes: a child of an excluded row is excluded.
+    Tables without a predicate and without a dangling ref are untouched.
+    """
+    if not predicates:
+        raise Fail("relations: exclude needs at least one frame predicate")
+    copy_corpus(src, dest, data_DIR)
+    conn = sqlite3.connect(dest)
+    removed: dict[str, int] = {t: 0 for t in TABLES}
+    try:
+        for table, column, frag in predicates:
+            if table not in CONFIG["tables"]:
+                raise Fail(
+                    f"relations: frame predicate names table {table!r}, which is "
+                    f"not in gate_config tables"
+                )
+            if column not in column_names(conn, table):
+                raise Fail(f"relations: {table} has no column {column} (frame predicate)")
+            qt, qc = ident(table), ident(column)
+            removed[table] += conn.execute(
+                f"DELETE FROM {qt} WHERE COALESCE(({qt}.{qc} {frag}), 0) = 0"
+            ).rowcount
+        changed = True
+        while changed:
+            changed = False
+            for table in TABLES:
+                for col, parent in CONFIG["tables"][table].get("refs", {}).items():
+                    if parent not in CONFIG["tables"]:
+                        raise Fail(
+                            f"relations: gate_config {table}.refs.{col} names unknown table {parent!r}"
+                        )
+                    pkey = CONFIG["tables"][parent]["key"]
+                    qt, qc, qp, qk = ident(table), ident(col), ident(parent), ident(pkey)
+                    n = conn.execute(
+                        f"DELETE FROM {qt} WHERE NOT EXISTS "
+                        f"(SELECT 1 FROM {qp} p WHERE p.{qk} = {qt}.{qc})"
+                    ).rowcount
+                    if n:
+                        removed[table] += n
+                        changed = True
+        conn.commit()
+        return removed
+    finally:
+        conn.close()
+
+
+def published_units(conn: sqlite3.Connection) -> int:
+    """Rows of the unit table that survive exclusion."""
+    return int(conn.execute(f"SELECT COUNT(*) FROM {ident(UNIT_TABLE)}").fetchone()[0])
+
+
+def removed_note(removed: dict[str, int]) -> str:
+    return ", ".join(f"{n} {t}" for t, n in removed.items() if n)
+
+
+def check_exclude_value(
+    label: str, name: str, orig: float, got: float, tol: float, fail: list[str]
+) -> bool:
+    try:
+        fam = family(name)
+    except Fail as e:
+        fail.append(str(e))
+        return False
+    t = 0.0 if fam == "count" else tol
+    if not output_check.close(got, orig, t):
+        fail.append(
+            f"{label}:{name}: on the published set only {output_check.num(got)}, original "
+            f"{output_check.num(orig)} (tol {t:g}) -- this number depends on rows "
+            f"outside the frame"
+        )
+        return False
+    return True
+
+
+def check_published_anchor(
+    n: str, frame: dict[str, float], exc_conn: sqlite3.Connection, fail: list[str]
+) -> str | None:
+    """``frame.published_expected`` must equal the published unit count."""
+    if PUBLISHED_EXPECTED not in frame:
+        return None
+    want = frame[PUBLISHED_EXPECTED]
+    tol = frame.get(PUBLISHED_EXPECTED_TOL, 0.0)
+    got = published_units(exc_conn)
+    if not output_check.close(float(got), want, tol):
+        fail.append(
+            f"TASK-{n}: frame.{PUBLISHED_EXPECTED} is {output_check.num(want)} but the "
+            f"pinned corpus holds {got} published {UNIT_TABLE} rows (tol {tol:g})"
+        )
+        return None
+    return f"frame.{PUBLISHED_EXPECTED} {output_check.num(want)} = published {UNIT_TABLE} rows"
 
 
 def replay_values(
@@ -327,12 +524,35 @@ def side_routes(
     return routes
 
 
+class ExcludeCache:
+    """One excluded corpus per distinct predicate list, built on first use."""
+
+    def __init__(self, corpus: Path, tmpdir: Path, data_DIR: Path) -> None:
+        self.corpus = corpus
+        self.tmpdir = tmpdir
+        self.data_DIR = data_DIR
+        self.built: dict[tuple[Predicate, ...], Path] = {}
+
+    def get(self, predicates: list[Predicate]) -> Path:
+        key = tuple(predicates)
+        if key not in self.built:
+            dest = self.tmpdir / f"corpus_exclude_{len(self.built)}.sqlite"
+            removed = exclude_corpus(self.corpus, dest, self.data_DIR, predicates)
+            print(
+                f"relations: exclude by {'; '.join(f'{t}.{c} {f}' for t, c, f in predicates)} "
+                f"removed {removed_note(removed) or 'nothing'}"
+            )
+            self.built[key] = dest
+        return self.built[key]
+
+
 def check_task(
     root: Path,
     md: Path,
     orig_conn: sqlite3.Connection,
     doubled: Path,
     permuted: Path,
+    excludes: ExcludeCache,
     seconds: float,
     fail: list[str],
     corpus_sha: str,
@@ -344,6 +564,13 @@ def check_task(
         fail.append(str(e))
         return
     status, tol, _n_decl, frame, stamp, identities = brief
+    try:
+        text = md.read_text(encoding="utf-8")
+        outside_frame = parse_outside_frame_block(md.name, text, tol)
+        predicates = output_check.parse_frame_predicates(md.name, text)
+    except Fail as e:
+        fail.append(str(e))
+        return
 
     if status in output_check.SUSPEND_STATUS:
         print(
@@ -363,6 +590,25 @@ def check_task(
     if not present:
         print(f"  TASK-{n} [{status}]: no output yet; double/permute not run")
         return
+
+    run_exclude = PUBLISHED_EXPECTED in frame
+    exc_conn: sqlite3.Connection | None = None
+    if run_exclude:
+        if not predicates:
+            fail.append(
+                f"TASK-{n}: frame declares {PUBLISHED_EXPECTED} but no "
+                f"<table>.<column> predicate line defines the published set"
+            )
+            return
+        try:
+            excluded = excludes.get(predicates)
+        except Fail as e:
+            fail.append(str(e))
+            return
+        exc_conn = sqlite3.connect(f"file:{excluded}?mode=ro", uri=True)
+        anchor = check_published_anchor(n, frame, exc_conn, fail)
+        if anchor:
+            print(f"  TASK-{n} [{status}]: {anchor}")
 
     dup_conn = sqlite3.connect(f"file:{doubled}?mode=ro", uri=True)
     perm_conn = sqlite3.connect(f"file:{permuted}?mode=ro", uri=True)
@@ -384,8 +630,15 @@ def check_task(
             perm_v = replay_values(
                 f"{k}:permute", routes, perm_conn, seconds, fail
             )
+            exc_v: dict[str, float] = {}
+            if exc_conn is not None:
+                exc_v = replay_values(
+                    f"{k}:exclude", routes, exc_conn, seconds, fail
+                )
+            exempt = outside_frame_closure(outside_frame, routes) if run_exclude else frozenset()
             d_ok = 0
             p_ok = 0
+            e_ok = 0
             for name in sorted(routes):
                 if name not in orig:
                     continue
@@ -398,15 +651,25 @@ def check_task(
                     f"{k}", name, orig[name], perm_v[name], t, fail
                 ):
                     p_ok += 1
+                if name in exempt:
+                    continue
+                if name in exc_v and check_exclude_value(
+                    f"{k}", name, orig[name], exc_v[name], t, fail
+                ):
+                    e_ok += 1
+            if run_exclude:
+                exclude_note = f" exclude {e_ok}/{len(routes) - len(exempt)}"
+                if exempt:
+                    exclude_note += (
+                        f" ({len(exempt)} outside_frame by declaration: "
+                        f"{', '.join(sorted(exempt))})"
+                    )
+            else:
+                exclude_note = f" exclude not run (frame has no {PUBLISHED_EXPECTED})"
             print(
                 f"  TASK-{n} [{status}]: {k} double {d_ok}/{len(routes)} "
-                f"permute {p_ok}/{len(routes)}"
+                f"permute {p_ok}/{len(routes)}{exclude_note}"
             )
-            note = output_check.check_period_identity(
-                n, k, tol, orig, frame, fail
-            )
-            if note:
-                print(f"  TASK-{n} [{status}]: period identity {note}")
             held, skipped = output_check.check_identities(
                 n, k, identities, tol, orig, routes, frame, fail
             )
@@ -420,6 +683,8 @@ def check_task(
     finally:
         dup_conn.close()
         perm_conn.close()
+        if exc_conn is not None:
+            exc_conn.close()
 
 
 def confirm_corpus(corpus: Path, readme: Path) -> str:
@@ -447,7 +712,7 @@ def confirm_corpus(corpus: Path, readme: Path) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo-root", default=".")
-    ap.add_argument("--corpus", default="data/corpus_v2.sqlite")
+    ap.add_argument("--corpus", default=output_check.CORPUS_PATH_DEFAULT)
     ap.add_argument("--sql-seconds", type=float, default=60.0)
     ap.add_argument("--head-ref", default=None)
     ap.add_argument("--task", default=None, metavar="N")
@@ -459,15 +724,16 @@ def main() -> int:
         alt = Path(args.corpus).resolve()
         if alt.is_file():
             corpus = alt
-    readme = root / "README.md"
-    data_DIR = (root / "data").resolve()
+    readme = root / output_check.PIN_FILE
+    # Never write next to the corpus the gate reads.
+    data_DIR = corpus.resolve().parent
 
     try:
         sha = confirm_corpus(corpus, readme)
     except Fail as e:
         print(f"relations: FAIL\n  {e}")
         return 1
-    print(f"relations: corpus {sha[:16]}… matches README.md")
+    print(f"relations: corpus {sha[:16]}… matches {output_check.PIN_FILE}")
     if args.head_ref:
         print(f"relations: head {args.head_ref}; double/permute from this checkout")
 
@@ -492,7 +758,8 @@ def main() -> int:
         refuse_data_dir(tmpdir, data_DIR)
         doubled = tmpdir / "corpus_double.sqlite"
         permuted = tmpdir / "corpus_permute.sqlite"
-        print(f"relations: temp corpora under {tmpdir} (not data/)")
+        excludes = ExcludeCache(corpus, tmpdir, data_DIR)
+        print(f"relations: temp corpora under {tmpdir} (not {data_DIR.name}/)")
         double_corpus(corpus, doubled, data_DIR)
         permute_corpus(corpus, permuted, data_DIR)
 
@@ -506,6 +773,7 @@ def main() -> int:
                     orig_conn,
                     doubled,
                     permuted,
+                    excludes,
                     args.sql_seconds,
                     fail,
                     sha,

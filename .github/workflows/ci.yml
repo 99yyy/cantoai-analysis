@@ -41,6 +41,11 @@ jobs:
           for f in output_check history_audit scope_check; do
             git show "origin/$BASE_REF:scripts/$f.py" > /tmp/gate/$f.py
           done
+          # The project facts the gates read travel with the gate copies, so a
+          # PR is judged by the base's config, not its own. A base without the
+          # file (before it landed) leaves the scripts to their fallback.
+          git show "origin/$BASE_REF:scripts/gate_config.json" > /tmp/gate/gate_config.json \
+            || rm -f /tmp/gate/gate_config.json
       - name: Replay every number, and make the two computations agree
         if: github.event_name == 'pull_request'
         env:
@@ -79,6 +84,11 @@ jobs:
           for f in output_check history_audit scope_check; do
             git show "origin/$BASE_REF:scripts/$f.py" > /tmp/gate/$f.py
           done
+          # The project facts the gates read travel with the gate copies, so a
+          # PR is judged by the base's config, not its own. A base without the
+          # file (before it landed) leaves the scripts to their fallback.
+          git show "origin/$BASE_REF:scripts/gate_config.json" > /tmp/gate/gate_config.json \
+            || rm -f /tmp/gate/gate_config.json
       - name: Every branch must belong to a known class
         # Everything GitHub-controlled goes through env, never into the script
         # text: a branch name is attacker-chosen and `${{ }}` inside run: is a
@@ -118,6 +128,11 @@ jobs:
           for f in output_check history_audit scope_check; do
             git show "origin/$BASE_REF:scripts/$f.py" > /tmp/gate/$f.py
           done
+          # The project facts the gates read travel with the gate copies, so a
+          # PR is judged by the base's config, not its own. A base without the
+          # file (before it landed) leaves the scripts to their fallback.
+          git show "origin/$BASE_REF:scripts/gate_config.json" > /tmp/gate/gate_config.json \
+            || rm -f /tmp/gate/gate_config.json
       - name: Capture the pull-request body without interpolating it into a shell
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
