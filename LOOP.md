@@ -10,13 +10,13 @@
 
 | 层 | 在哪 | 谁 | 做什么 | 不做什么 |
 |---|---|---|---|---|
-| 上层 | Grok 群「CantoAI 研究」 | fyp、质询员、审稿员、音频员、分析员 | 提案、质询、调度、探索、证据 | **不算 gated 数字**，不开 PR，不改仓库 |
+| 上层 | Grok 群「CantoAI 研究」 | fyp、质询员、审稿员、音频员、分析员 | 提案、质询、调度、探索、证据 | **不算 gated 数字**，不开 PR，不改仓库文件（fyp 合入 agent 的 PR，见下） |
 | 下层 | Cursor Cloud Agent | coordinator、worker、verifier、auditor | 起草任务书、双算、审计 | **不选题**，不改闸门，不改任务书状态 |
 | 人 | GitHub + 群 | Tom（`99yyy`） | 采纳、开 `chore/` `repair/` PR、合入受保护路径、听证据包 | — |
 
 上层五个角色各一句：
 
-- **fyp**：唯一入口。派活只给路径和 phase 名，不把一边的数字传给另一边。每个任务留一份决策日志（时间、做了什么、依据）。启动账本由它写（见 `launches.json` 一节）。
+- **fyp**：唯一入口。派活只给路径和 phase 名，不把一边的数字传给另一边。每个任务留一份决策日志（时间、做了什么、依据）。启动账本由它写（见 `launches.json` 一节）。Cloud Agent 没有合并权限，agent 开的 PR 由 fyp 在四道检查全绿后合入，只合 coordinator 的任务书、worker 与 verifier 的输出、auditor 的收口；碰受保护路径或正文带 `BAR-CHANGE:` 的一律不合，那些由人合。
 - **质询员**：开跑前拿清单打任务书，收口后拿同一张清单打结论句。产出留在群里，不含可引用的数值，不写任务书，不提议课题。任务结束后读一遍 fyp 的决策日志，违规就开 issue。
 - **审稿员**：只审文稿和闸门改动，多模型；不批准、不合并。
 - **音频员**：每个关闭的任务做一个证据包（头条数字两边各随机抽 3–5 个窗口：窗口号、时间、两路转写、判定）；长音频和转写任务归它；不写标签。
@@ -26,12 +26,12 @@
 
 | 角色 | 分支 | 写集（`{task}` = 分支名里的任务号，含 `-b`/`-c`） | 读什么 |
 |---|---|---|---|
-| `coordinator` | `chore/…`（Tom 开 PR，它往上推） | 任务书 `tasks/TASK-N.md`、`backlog.md`、docs、investigations | backlog、上一轮审计、契约 |
+| `coordinator` | `chore/task-N-…`（Cursor 以 Tom 的账号开 PR） | 任务书 `tasks/TASK-N.md`、`backlog.md`、docs、investigations | backlog、上一轮审计、契约 |
 | `worker` | `cursor/t<N>-worker-…` | `tasks/TASK-N/results.json`、`sql/`、开放分析文件（`open_analysis.md` `manifest.json` `bootstrap.json` `decomposition.json` `run_worker.py` `STATUS.json`）、`src/`、`tests/` | 任务书、语料 |
 | `verifier` | `cursor/t<N>-verifier-…` | `tasks/TASK-N/mine.json`、`mine_sql/` | 任务书、语料。**不读 worker 的代码、对话、PR** |
-| `auditor` | `cursor/t<N>-auditor-…`，或推到 Tom 开的 `repair/task-N-close-…` | `review/TASK-N/audit.md`、`tasks/TASK-N/RESULT.json`、`launches.json`、`backlog.md` | 本任务的 commit 与 PR 正文 |
+| `auditor` | `repair/task-N-close-…`（Cursor 以 Tom 的账号开 PR；这一类分支只能写本行的写集加任务书） | `review/TASK-N/audit.md`、`tasks/TASK-N/RESULT.json`、`launches.json`、`backlog.md` | 本任务的 commit 与 PR 正文 |
 
-碰写集之外的路径 → OUT；碰受保护路径（`.cursor/` `.github/` `data/` `scripts/`、`README.md`、`LOOP.md`）→ DENY；分支名里的角色在配置里没有写集 → 直接红。任何 agent 都不能改任务书 `tasks/TASK-N.md`；`chore/` 与 `repair/` 由开 PR 的人授权（必须是 owner），开了之后 agent 可以往上推，不用重开。
+碰写集之外的路径 → OUT；碰受保护路径（`.cursor/` `.github/` `data/` `scripts/`、`README.md`、`LOOP.md`）→ DENY；分支名里的角色在配置里没有写集 → 直接红。`cursor/…` 分支上的 agent 都不能改任务书 `tasks/TASK-N.md`，任务书只在 coordinator 的 `chore/` 和 auditor 的收口分支上改；`chore/` 与 `repair/` 由开 PR 的人授权（必须是 owner），开了之后 agent 可以往上推，不用重开。
 
 两个算数的节点交**同一种文件**，形状一样，都不含任何判定字段：
 
@@ -55,11 +55,12 @@
 采纳     Tom 回「采纳 / 不采纳 / 先记下」。沉默不是采纳；质询员打回不等于 Tom 否决。
          没有采纳，谁也不启动算数。
 PLAN     coordinator 在 chore/ 上起草 tasks/TASK-N.md：数字名、定义、容差、frame、
-         identities、status: open。Tom 开 PR、合入。合入的 merge commit = starting_ref。
+         identities、status: open。Cursor 以 Tom 的账号开 PR，四道闸全绿后 fyp 合入。合入的 merge commit = starting_ref。
 质询①    质询员拿清单打任务书。打回后仍可开跑，但任务书要写一行「明知 Qn 不满足，理由是……」。
 EXECUTE  fyp 同时启动 worker 与 verifier，各自从 starting_ref 出发算出这些数字，各开一条 PR。
+         两边每个 commit 都带角色 author：cantoai-worker / cantoai-verifier（邮箱 @cantoai.invalid），见第 9 条。
 CHECK    四道闸判两条 PR：重放、比对、写集、独立性、exclude、anchor（见下）。
-ITERATE  哪几个不一致，就只把那几行发回去，其余不动。重新启动失败的那一侧，只带闸门名，
+ITERATE  哪几个不一致，就只把那几行发回去，其余不动。给失败那一侧的同一个 agent 发 follow-up，只带闸门名和报错行，
          不带值；每次尝试是一个新 commit（分支规则已禁 force-push）；输出 PR 不 rebase 到
          main，用 merge 把 main 并进来。并行的其他任务不受影响。
 STOP     全部一致 → 收口（见「收口」一节）。
@@ -98,6 +99,7 @@ backlog  auditor 的结论只进 backlog.md，不自动变成下一题。
 - **`.github/CODEOWNERS`**：`.github/**`、`scripts/**`、`tests/**`、`data/**`、`LOOP.md`、`README.md`、`.cursor/**`、`tasks/TASK-*.md` 归 owner。碰这些路径的 PR 会自动请 owner 审阅。**没有开**「Require review from Code Owners」：仓库只有一个人，main 又不允许 bypass，开了 owner 自己开的 `repair/` PR 就没人能批，闸门修复合不进去。守门的是四道检查和 history-audit，CODEOWNERS 的作用是通知。
 - **main 的必需检查**：`tests`、`output-check`、`scope-check`、`history-audit` 四个都必需。必需检查按 job 名对上，改 `ci.yml` 里的 job 名要同步改设置。main 不允许 force-push 和删除。
 - **agent 分支规则集**「agent, chore and repair branches: no force-push, no deletion」：`cursor/**`、`box/**`、`chore/**`、`repair/**` 禁 force-push、禁删分支，别的不管。「3 次改写」数的是留下来的 commit，force-push 抹掉旧版本就数不到（TASK-8、TASK-9 各推过三个 worker 版本，main 上每个输出文件只剩 1 个 commit）；identity 检查同理。
+- **2026-09-23 改写过一次 main 的历史**：9/17–9/19 一批 commit 的作者邮箱误用了别人的 GitHub 地址，贡献者列表里因此混进了无关的人。改写只换了作者名，文件一字未变，所有 commit 编号随之改变；此前文档和审计里引用的编号指旧历史。旧 clone 要删掉重新 clone。
 
 ## 本地 `./verify`
 
@@ -126,9 +128,9 @@ main 上不跑 scope-check / history-audit（与 CI 一致）。`./verify probe`
 6. 每个数字都等于它自己那条算路跑出来的结果，误差在容差内。`derived:` 用的是**重放出来的**值，不是 agent 自己写下的值——所以「把输入写错、再把推导写成与错输入自洽」这条路是走不通的，两行都会红。
 7. 两套数字每个 `value` 在容差内相等，每个 `n` 完全相等。不一致的把两个数都打出来。只两边 `n` 相等不够（plan §2.5）：若有 `n` 块，每个写下的 `n` 还必须等于声明的常数或 `derived:`（代入的是重放值）。两道检查一起做。没有 `n` 块时，声明 n 那一道不激活。若有 `identities` 块，每一行 `<expr> = <expr>  <tol>` 用重放值求；只在**该文件**里每个数字名都是 SQL 算路时才计，否则跳过（不合并两边的字典）。一条恒等式在 worker 与 verifier 两边都被跳过（两边都把其中某个名字写成 `derived:`）就等于从没检查过：`open` 的任务直接红，规则落地前已 `closed` 的任务只打印一行 `closed before this rule, not failed`。期间恒等式 `n_videos_pre + n_videos_post + n_unassigned_period = frame.videos_expected` 不再是脚本里的特例：它就是每份任务书 ```identities``` 块里的一行，按上面同一规则求。
 8. 动过同一个输出文件的 commit 不超过三个，从该任务书最近一次改动那个 reset commit 计起。`escalated` / `blocked` 不计。
-9. 引入某一边文件的那个 commit，它自己的树和**所有祖先**的树里都没有另一边的文件。两边的引入 commit 不能有祖先关系，必须来自不同分支、身份不同（plan §2.7）。身份 = author 加 committer：author 是提交方自己填的，改一行 `--author` 就能换（TASK-9 worker `ac1ee4f` 就是这样过的旧检查），所以两边只在 author 上不同、committer 相同时闸门会打印一句，但不红——两个 Cursor Cloud Agent 的 committer 本来就同一个。CI 能证明的是「两边没有从对方的树出发」，证明不了「是两个不同的 agent 算的」；后者靠 fyp 记的启动账本和模型家族分配。只看引入 commit 自己那一棵树，挡不住「先提交自己的、再 merge 对方」或同一条分支上分三次写出两边。
+9. 引入某一边文件的那个 commit，它自己的树和**所有祖先**的树里都没有另一边的文件。两边的引入 commit 不能有祖先关系，必须来自不同分支、身份不同（plan §2.7）。身份 = author 加 committer：author 是提交方自己填的，改一行 `--author` 就能换（TASK-9 worker `dfaedb8` 就是这样过的旧检查），所以两边只在 author 上不同、committer 相同时闸门会打印一句，但不红——两个 Cursor Cloud Agent 的 committer 本来就同一个。所以两边的 author 必须不同：worker 每个 commit 用 `cantoai-worker <worker@cantoai.invalid>`，verifier 用 `cantoai-verifier <verifier@cantoai.invalid>`。两边都用默认的 `Cursor Agent` 时后到的一边红，而且同一条分支上补不回来（换 author 再提交会撞上「一边不换手」）。CI 能证明的是「两边没有从对方的树出发」，证明不了「是两个不同的 agent 算的」；后者靠 fyp 记的启动账本和模型家族分配。只看引入 commit 自己那一棵树，挡不住「先提交自己的、再 merge 对方」或同一条分支上分三次写出两边。
     - **一边不换手**：open 任务里，PR 中每个动到 `results.json` 或 `mine.json` 的 commit 都要与该边引入 commit 同一身份（author 和 committer）。merge commit 里改了输出文件也算动到。force-push 抹掉的历史 CI 看不见，要靠分支保护禁 force-push（阶段 0 第 6 项）。
-    - **已关闭任务冻结**：任务书在 base 和 head 上都是 `closed`，PR 就不得改 `tasks/TASK-N/` 下任何文件（两边输出、SQL、RESULT、账本都算）。要改就先在任务书上把 `status` 改回 `open`，同一个 PR 里改也行，但任务书是 owner 的文件，agent 分支做不到。`4918765` 那种关闭之后再改两边输出的情况以后直接红。
+    - **已关闭任务冻结**：任务书在 base 和 head 上都是 `closed`，PR 就不得改 `tasks/TASK-N/` 下任何文件（两边输出、SQL、RESULT、账本都算）。要改就先在任务书上把 `status` 改回 `open`，同一个 PR 里改也行，但任务书是 owner 的文件，agent 分支做不到。`4b38009` 那种关闭之后再改两边输出的情况以后直接红。
 10. 若 `tasks/TASK-N/RESULT.json` 存在于 `closed` / `escalated` / `blocked` 任务，按 schema 核对：`subtype` 与 `verdict` 独立，后者只在 `subtype: success` 时非空；`success` 要求两边齐、数字在容差内一致、live closed；`out_of_turns` 要求改写次数已到上限 3；`corpus_sha` 必须等于任务书的 `corpus_sha:` stamp（任务书没 stamp 时对当前 README pin）。`turns_used` 必须等于该任务 `tasks/TASK-N/launches.json` 的记录数（每条 `{id, role, at}`）；根任务与 `-b`/`-c` 的账本长度之和是这一轮家族的启动次数，上限 16。`subtype` 不是 `out_of_budget` / `blocked` 而家族合计 `> 16` → 红（已有子任务书的父 RESULT 不再按后来的家族增长重判（父 RESULT 分叉后不可改），但父任务自己的账本已经 `> 16` 仍红）；`subtype: out_of_budget` 而家族合计 `< 16` → 红。账本由 coordinator / auditor 追加（记下 worker / verifier / auditor / repair 启动），worker / verifier 不得自造启动记录。本 PR 新收成终态的任务必须有 RESULT（因而也必须有账本）；落地前已关闭的任务可以没有。存在于 `open` 则红。没有 `cost_usd` / `budget_usd` / `val_iterations`。根任务 `forked_from` 为 null、`fork_depth` 为 0；字母后缀任务必须是父 id 与父 depth+1，且 `fork_depth ≤ 2`。
 11. 若存在 `tasks/TASK-N-b.md`（深度 2 为 `-c`）：```numbers``` 与 ```n``` 围栏（以及父任务书上已有的 ```frame``` / ```identities```）必须与直接父任务书**字节级相同**——改一个容差就红，那是新任务，不是分叉。子任务书必须有 `## Prior Attempts`（父假说、verdict 或 `out_of_turns` 的 subtype、why、父 RESULT 的关键数字）。父任务保持 `closed` 或 `escalated`，父 `RESULT.json` 在子任务书加入之后不得改、不得删。父 RESULT 须为 `verdict: refuted` 或 `subtype: out_of_turns`。开 `-d`（第三次分叉）红，应把该轮标 `blocked` 而不是再开一份任务书。无输出的子任务书也跑这一条。Bot 的 `check-brief` 不在本仓库，不顶替这一关。
 
