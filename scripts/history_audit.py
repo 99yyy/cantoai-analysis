@@ -29,8 +29,16 @@ glob inventory is a bar: dropping a token from both is a lowering; moving a
 token from a live list into ``RETIRED`` is not.
 
 Task briefs ``tasks/TASK-*.md`` declare bars in fenced ``numbers``, ``fixture``,
-``frame``, and ``n`` blocks (plan §3.3). Widening a tolerance, deleting a name,
-or deleting a whole block is a bar move. Tightening a tolerance is not.
+``frame``, ``n`` and ``identities`` blocks (plan §3.3). Widening a tolerance,
+deleting a name (for ``identities``: deleting or rewording a line, or widening
+its tolerance), or deleting a whole block is a bar move. Tightening a
+tolerance is not.
+
+The gate itself is a bar: any byte change to an existing file under
+``scripts/`` or ``.github/``, or to a test file of a gate script
+(``tests/test_<gate>*.py``, ``tests/mutations/``, ``tests/fixtures/``), is a
+bar move. Such a change travels in its own pull request with a ``BAR-CHANGE:``
+line naming the paths, and never together with measured paths.
 Declared expected values in those blocks are bars under contract rule 6: any
 change of the value, or deleting the name, is a bar move. Adding a name or a
 block is not. The ``outside_frame`` block is the reverse: it lists names the
@@ -63,7 +71,19 @@ GATE_FAIL_SITE_RE = r"(?:raise Fail\(|fail\.append)"
 # declared bars live in task-brief fences (plan §3.3). gate_config.json holds
 # the project facts every gate reads (tables, sides, number families); a change
 # to it changes what the gates measure, so any edit is a bar move.
-BAR_FILES: list[str] = ["scripts/gate_config.json"]
+BAR_FILES: list[str] = [
+    "scripts/gate_config.json",
+    # The gate and the CI that runs it: any byte change is a bar move.
+    "scripts/*", "scripts/**",
+    ".github/*", ".github/**",
+    # Tests of the gate scripts, their mutation probes and fixtures.
+    "tests/test_output_check*.py", "tests/test_relations*.py",
+    "tests/test_scope_check*.py", "tests/test_history_audit*.py",
+    "tests/test_verify*.py", "tests/test_message_inventory*.py",
+    "tests/test_mutations*.py", "tests/test_assertions*.py",
+    "tests/mutations/*", "tests/mutations/**",
+    "tests/fixtures/*", "tests/fixtures/**",
+]
 BAR_COUNTED = {
     "scripts/*.py": (GATE_FAIL_SITE_RE, "fail sites"),
     "scripts/**/*.py": (GATE_FAIL_SITE_RE, "fail sites"),
@@ -133,7 +153,7 @@ LIVE_INVENTORY_STRS = frozenset({"MUTATION_GLOB"})
 # Top-level task briefs only. fnmatch '*' matches a slash, so tasks/TASK-*.md
 # would also hit tasks/TASK-6/open_analysis.md.
 TASK_BRIEF_RE = re.compile(r"^tasks/TASK-[^/]+\.md$")
-DECL_KINDS = ("numbers", "fixture", "frame", "n")
+DECL_KINDS = ("numbers", "fixture", "frame", "n", "identities")
 
 
 def retired_block(text: str) -> str:
@@ -288,7 +308,7 @@ def _fmt_num(x: float) -> str:
 
 
 def _is_tolerance(kind: str, name: str) -> bool:
-    if kind == "numbers":
+    if kind in ("numbers", "identities"):
         return True
     n = name.casefold()
     return n.endswith("_tol") or n in TOLERANCE_NAMES
@@ -324,6 +344,28 @@ def parse_decl_entries(body: str) -> dict[str, tuple[float, ...]]:
     return out
 
 
+def parse_identity_entries(body: str) -> dict[str, tuple[float, ...]]:
+    """``<expr> = <expr>  <tol>`` lines keyed by the equation with whitespace
+    collapsed; the value is the tolerance. Lines that do not parse are absent,
+    so rewording an identity reads as deleting it."""
+    out: dict[str, tuple[float, ...]] = {}
+    for raw in body.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.rsplit(None, 1)
+        if len(parts) != 2 or parts[0].count("=") != 1:
+            continue
+        try:
+            tol = float(parts[1])
+        except ValueError:
+            continue
+        key = " ".join(parts[0].split())
+        if key not in out:
+            out[key] = (tol,)
+    return out
+
+
 def parse_declaration_blocks(text: str) -> dict[str, dict[str, tuple[float, ...]]]:
     """First fenced block per kind. Later duplicates of the same kind are ignored."""
     blocks: dict[str, dict[str, tuple[float, ...]]] = {}
@@ -331,7 +373,8 @@ def parse_declaration_blocks(text: str) -> dict[str, dict[str, tuple[float, ...]
         kind = m.group(1)
         if kind in blocks:
             continue
-        blocks[kind] = parse_decl_entries(m.group(2))
+        body = m.group(2)
+        blocks[kind] = parse_identity_entries(body) if kind == "identities" else parse_decl_entries(body)
     return blocks
 
 
