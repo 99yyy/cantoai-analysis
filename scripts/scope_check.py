@@ -35,16 +35,21 @@ the PR. Cloud Agents open their PRs through that same account, so this is
 consent, not identity. Telling a human commit from an agent commit would need
 signature checks against a pinned key; that is a separate change.
 
-What each class may touch:
+What each class may touch comes from the ``scope`` section of
+``gate_config.json`` (read beside this file first, so CI's base-branch copy in
+/tmp/gate judges by the base's config):
 
-    agent   anything except DENY and the task briefs; it writes its outputs
-            under tasks/TASK-N/, which is allowed. DENY includes the gates
-            under scripts/, the corpus pin in README.md, and LOOP.md
-    chore   only CHORE_ALLOW, and never DENY (same deny list as agent)
-    repair  anything, once the actor is a repository owner
+    agent   only its role's write set, with {task} bound to the task id in the
+            branch name: worker -> results.json, sql/ and the open-analysis
+            files of its task; verifier -> mine.json and mine_sql/; auditor ->
+            review/TASK-N/, RESULT.json and the launch ledger. A role with no
+            write set in the config fails. Protected paths and the task briefs
+            are denied on top of that.
+    chore   only its allow list, and never a protected path
+    repair  anything, once the PR author is a repository owner
 
-Per-scope path lists are not checked here. They belong to a task declaration,
-and until one exists again they are a matter for review.
+The diff is taken with ``--no-renames``: a rename shows as a delete plus an
+add, so moving a protected file cannot hide the delete behind the new name.
 
 Usage:
     SCOPE_AUTHOR="$PR_AUTHOR" python scripts/scope_check.py --branch "$HEAD_REF" \\
@@ -59,45 +64,61 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import json
 import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 from typing import NamedTuple
 
-AGENT_RE = re.compile(r"^(?:cursor|box)/[rt](?P<task>\d+)-(?P<scope>[a-z0-9_]+)-")
-REPAIR_RE = re.compile(r"^(?:repair/|cursor/repair-)")
-CHORE_RE = re.compile(r"^chore/")
+GATE_CONFIG_NAME = "gate_config.json"
 
+
+def load_scope_config() -> dict:
+    """The ``scope`` section of gate_config.json, beside this file first."""
+    here = Path(__file__).resolve().parent / GATE_CONFIG_NAME
+    cwd = Path.cwd() / "scripts" / GATE_CONFIG_NAME
+    for cand in (here, cwd):
+        if cand.is_file():
+            cfg = json.loads(cand.read_text(encoding="utf-8"))
+            if "scope" not in cfg:
+                raise ValueError(f"scope_check: {cand} has no 'scope' section")
+            return cfg["scope"]
+    raise ValueError(f"scope_check: {GATE_CONFIG_NAME} not found beside {__file__} or under ./scripts/")
+
+
+SCOPE = load_scope_config()
 # Only the owner changes the rules, the corpus, the loop docs, or the CI that
 # enforces them. An agent that needs one of these changed writes an empty
 # commit whose subject starts with BLOCKED: instead (plan §4.4); the owner
 # then sets status: blocked or escalated on the brief.
-# scripts/ is the gate that judges the agent; README.md pins the corpus sha;
-# LOOP.md is the procedure the gate enforces. Changing README sha alone is not
-# a full walk-through (data/** is already denied); it is still DENY.
-DENY = [
-    ".cursor/*", ".cursor/**",
-    ".github/*", ".github/**",
-    "data/*", "data/**",
-    "scripts/*", "scripts/**",
-    "README.md", "LOOP.md",
-]
-
+DENY: list[str] = list(SCOPE["protected"])
 # The brief is the agent's scoresheet: the numbers it owes and the tolerance each
 # one gets are not its to move. Its outputs sit beside it, under tasks/TASK-N/,
-# and it must be able to write those. fnmatch cannot express that distinction --
-# its * crosses a slash, so "tasks/*" would deny tasks/TASK-N/results.json as
-# well, and every worker and verifier pull request would fail. This matches the
-# brief itself and nothing below it.
-BRIEF_RE = re.compile(r"^tasks/[^/]+\.md$")
+# and it must be able to write those.
+BRIEF_RE = re.compile(SCOPE["brief"])
+CLASSES: list[dict] = list(SCOPE["classes"])
 
-CHORE_ALLOW = [
-    "BACKGROUND.md", "PIPELINE.md", "REPORT.md", "RESEARCH_LOG.md",
-    "backlog.md", "STOP", "tasks/*", "tasks/**", "docs/*", "docs/**",
-    # Campaign notes. LOOP.md stays DENY; numbers/RESULT stay under tasks/.
-    "investigations/*", "investigations/**",
-]
+
+def _class(name: str) -> dict:
+    for c in CLASSES:
+        if c["name"] == name:
+            return c
+    raise ValueError(f"scope_check: gate_config scope has no class {name!r}")
+
+
+def _deny_of(c: dict) -> list[str]:
+    d = c.get("deny", "protected")
+    return DENY if d == "protected" else list(d)
+
+
+# Kept as names for ./verify, tests and messages. Match order is CLASSES order.
+AGENT_RE = re.compile(_class("agent")["match"])
+REPAIR_RE = re.compile(_class("repair")["match"])
+CHORE_RE = re.compile(_class("chore")["match"])
+CHORE_ALLOW: list[str] = list(_class("chore")["allow"])
+ROLES: dict[str, list[str]] = dict(_class("agent")["roles"])
 
 
 class BranchClass(NamedTuple):
@@ -105,6 +126,8 @@ class BranchClass(NamedTuple):
     allow: list[str] | None
     deny: list[str]
     no_brief: bool
+    role: str | None = None
+    task: str | None = None
 
 
 def run(*args: str) -> str:
@@ -112,7 +135,12 @@ def run(*args: str) -> str:
 
 
 def changed(base: str) -> list[str]:
-    return sorted(p for p in run("git", "diff", "--name-only", f"{base}...HEAD").splitlines() if p.strip())
+    # --no-renames: a moved file is a delete plus an add, and both are judged.
+    return sorted(
+        p
+        for p in run("git", "diff", "--name-only", "--no-renames", f"{base}...HEAD").splitlines()
+        if p.strip()
+    )
 
 
 def match_any(path: str, globs: list[str]) -> bool:
@@ -150,24 +178,31 @@ def classify(
     owners: frozenset[str],
     author: str | None = None,
 ) -> BranchClass:
-    """Return the branch class. AGENT_RE is matched first (plan §3.1)."""
-    if AGENT_RE.match(branch):
-        return BranchClass("agent", None, DENY, True)
+    """Return the branch class, in CLASSES order (agent first, plan §3.1)."""
     kind, who = principal(actor, author)
-    if REPAIR_RE.match(branch):
-        if not actor_is_owner(who, owners):
+    for c in CLASSES:
+        m = re.match(c["match"], branch)
+        if not m:
+            continue
+        if c.get("owner_only") and not actor_is_owner(who, owners):
             raise ValueError(
-                f"scope_check: FAIL branch {branch!r} class repair is not authorized "
+                f"scope_check: FAIL branch {branch!r} class {c['name']} is not authorized "
                 f"for {kind} {who!r}"
             )
-        return BranchClass("repair", None, [], False)
-    if CHORE_RE.match(branch):
-        if not actor_is_owner(who, owners):
-            raise ValueError(
-                f"scope_check: FAIL branch {branch!r} class chore is not authorized "
-                f"for {kind} {who!r}"
-            )
-        return BranchClass("chore", CHORE_ALLOW, DENY, False)
+        if "roles" in c:
+            task = m.group("task")
+            role = m.group("role")
+            if role not in c["roles"]:
+                raise ValueError(
+                    f"scope_check: FAIL branch {branch!r} class {c['name']} role {role!r} "
+                    f"has no write set (roles: {', '.join(sorted(c['roles']))})"
+                )
+            allow = [g.replace("{task}", task) for g in c["roles"][role]]
+            return BranchClass(c["name"], allow, _deny_of(c), bool(c.get("no_brief")), role, task)
+        allow = c.get("allow")
+        return BranchClass(
+            c["name"], list(allow) if allow is not None else None, _deny_of(c), bool(c.get("no_brief"))
+        )
     raise ValueError(f"scope_check: FAIL branch {branch!r} matches no branch class")
 
 
@@ -205,18 +240,20 @@ def main() -> int:
         cls = classify(branch, actor, owners, author=author)
     except ValueError as e:
         print(str(e))
-        if "matches no branch class" in str(e):
-            print("  allowed prefixes: cursor/t<N>-<scope>-, box/t<N>-<scope>-, chore/, repair/")
-        else:
+        prefixes = ", ".join(f"{c['name']}: {c['match']}" for c in CLASSES)
+        if "has no write set" in str(e):
+            print("  an agent branch names a role that has a write set in gate_config scope")
+        elif "matches no branch class" not in str(e):
             print("  repair/ and chore/ require the pull-request author (--author),")
             print("  or --actor when there is no pull request, on the --owners allowlist")
-            print("  allowed prefixes: cursor/t<N>-<scope>-, box/t<N>-<scope>-, chore/, repair/")
+        print(f"  classes: {prefixes}")
         return 1
 
     files = changed(args.base)
     kind, who = principal(actor, author)
+    role_note = f" role={cls.role} task={cls.task}" if cls.role else ""
     print(
-        f"scope_check: branch={branch} class={cls.name} {kind}={who!r} "
+        f"scope_check: branch={branch} class={cls.name}{role_note} {kind}={who!r} "
         f"files={len(files)}"
     )
 
@@ -235,8 +272,8 @@ def main() -> int:
     if bad:
         print(f"scope_check: FAIL {len(bad)} file(s) this branch class may not touch")
         if cls.allow is not None:
-            print(f"  chore/ may touch: {cls.allow}")
-        print(f"  no class but repair/ may touch: {DENY}")
+            print(f"  {cls.name}{' ' + cls.role if cls.role else ''} may touch: {cls.allow}")
+        print(f"  no class but repair may touch: {DENY}")
         if cls.no_brief:
             print("  a task brief tasks/<name>.md is the owner's; an agent writes only under tasks/TASK-N/")
         return 1

@@ -72,10 +72,15 @@ def test_chore_class_uses_deny_list():
 
 
 def test_agent_is_classified_before_repair_even_on_cursor_r_names():
-    # AGENT_RE is cursor|box / [rt] <task> - <scope> -
-    # This is an agent branch; it must not fall through to repair.
-    cls = scope_check.classify("cursor/r4-audit-x", actor="99yyy", owners=OWNERS)
-    assert cls.name == "agent"
+    # AGENT_RE is cursor|box / [rt] <task> - <role> -
+    # This is an agent branch; it must not fall through to repair even with an
+    # owner actor. Its role "audit" has no write set, and that is the failure.
+    with pytest.raises(ValueError) as ei:
+        scope_check.classify("cursor/r4-audit-x", actor="99yyy", owners=OWNERS)
+    assert str(ei.value) == (
+        "scope_check: FAIL branch 'cursor/r4-audit-x' class agent role 'audit' "
+        "has no write set (roles: auditor, verifier, worker)"
+    )
 
 
 def test_chore_owner_may_edit_brief_but_not_github():
@@ -100,7 +105,8 @@ def test_agent_may_not_edit_scripts_readme_or_loop():
     assert scope_check.path_blocked("scripts/nested/x.py", cls) == "DENY"
     assert scope_check.path_blocked("README.md", cls) == "DENY"
     assert scope_check.path_blocked("LOOP.md", cls) == "DENY"
-    assert scope_check.path_blocked("BACKGROUND.md", cls) is None
+    # outside the worker's write set, not a protected path: OUT, not DENY
+    assert scope_check.path_blocked("BACKGROUND.md", cls) == "OUT"
 
 
 def test_chore_may_not_edit_scripts_readme_or_loop():
@@ -122,7 +128,9 @@ def test_repair_owner_may_edit_scripts_readme_and_loop():
     assert scope_check.path_blocked("LOOP.md", cls) is None
 
 
-def test_investigations_allowed_on_repair_chore_and_agent():
+def test_investigations_allowed_on_repair_and_chore_not_agent():
+    """investigations/ holds human notes (LOOP.md); an agent role's write set
+    does not include it."""
     chore = scope_check.classify("chore/notes-x", actor="99yyy", owners=OWNERS)
     agent = scope_check.classify("cursor/t6-worker-x", actor="agent-bot", owners=OWNERS)
     repair = scope_check.classify("repair/notes-x", actor="99yyy", owners=OWNERS)
@@ -133,7 +141,7 @@ def test_investigations_allowed_on_repair_chore_and_agent():
     )
     for path in paths:
         assert scope_check.path_blocked(path, chore) is None
-        assert scope_check.path_blocked(path, agent) is None
+        assert scope_check.path_blocked(path, agent) == "OUT"
         assert scope_check.path_blocked(path, repair) is None
     assert "LOOP.md" not in scope_check.CHORE_ALLOW
     assert scope_check.path_blocked("LOOP.md", chore) == "DENY"
@@ -193,3 +201,78 @@ def test_agent_class_ignores_author():
     cls = scope_check.classify("cursor/t9-worker-x", actor="cursor[bot]", owners=OWNERS, author="99yyy")
     assert cls.name == "agent"
     assert cls.deny == scope_check.DENY
+
+
+# --------------------------------------------------------------------------- per-role write sets
+
+
+def _blocked(branch: str, path: str) -> str | None:
+    cls = scope_check.classify(branch, actor="agent-bot", owners=OWNERS)
+    return scope_check.path_blocked(path, cls)
+
+
+def test_worker_writes_its_own_output_and_sql_only():
+    assert _blocked("cursor/t6-worker-x", "tasks/TASK-6/results.json") is None
+    assert _blocked("cursor/t6-worker-x", "tasks/TASK-6/sql/n_total_pre.sql") is None
+    assert _blocked("cursor/t6-worker-x", "tasks/TASK-6/sql/nested/x.sql") is None
+    assert _blocked("cursor/t6-worker-x", "tasks/TASK-6/open_analysis.md") is None
+    assert _blocked("cursor/t6-worker-x", "tasks/TASK-6/manifest.json") is None
+    assert _blocked("cursor/t6-worker-x", "src/tables.py") is None
+    assert _blocked("cursor/t6-worker-x", "tests/test_src_sql_literals.py") is None
+    # the other side's files, the verdict, the ledger, another task
+    assert _blocked("cursor/t6-worker-x", "tasks/TASK-6/mine.json") == "OUT"
+    assert _blocked("cursor/t6-worker-x", "tasks/TASK-6/mine_sql/n_total_pre.sql") == "OUT"
+    assert _blocked("cursor/t6-worker-x", "tasks/TASK-6/RESULT.json") == "OUT"
+    assert _blocked("cursor/t6-worker-x", "tasks/TASK-6/launches.json") == "OUT"
+    assert _blocked("cursor/t6-worker-x", "tasks/TASK-7/results.json") == "OUT"
+    assert _blocked("cursor/t6-worker-x", "review/TASK-6/audit.md") == "OUT"
+    assert _blocked("cursor/t6-worker-x", "tasks/TASK-6.md") == "DENY"
+
+
+def test_verifier_writes_mine_and_mine_sql_only():
+    assert _blocked("cursor/t6-verifier-x", "tasks/TASK-6/mine.json") is None
+    assert _blocked("cursor/t6-verifier-x", "tasks/TASK-6/mine_sql/n_total_pre.sql") is None
+    assert _blocked("cursor/t6-verifier-x", "tasks/TASK-6/results.json") == "OUT"
+    assert _blocked("cursor/t6-verifier-x", "tasks/TASK-6/sql/n_total_pre.sql") == "OUT"
+    assert _blocked("cursor/t6-verifier-x", "tasks/TASK-6/open_analysis.md") == "OUT"
+    assert _blocked("cursor/t6-verifier-x", "tasks/TASK-6/RESULT.json") == "OUT"
+    assert _blocked("cursor/t6-verifier-x", "src/tables.py") == "OUT"
+
+
+def test_auditor_writes_review_result_and_ledger_only():
+    assert _blocked("cursor/t7-auditor-x", "review/TASK-7/audit.md") is None
+    assert _blocked("cursor/t7-auditor-x", "tasks/TASK-7/RESULT.json") is None
+    assert _blocked("cursor/t7-auditor-x", "tasks/TASK-7/launches.json") is None
+    assert _blocked("cursor/t7-auditor-x", "backlog.md") is None
+    assert _blocked("cursor/t7-auditor-x", "tasks/TASK-7/results.json") == "OUT"
+    assert _blocked("cursor/t7-auditor-x", "tasks/TASK-7/mine.json") == "OUT"
+    assert _blocked("cursor/t7-auditor-x", "tasks/TASK-7/sql/x.sql") == "OUT"
+    assert _blocked("cursor/t7-auditor-x", "review/TASK-8/audit.md") == "OUT"
+    assert _blocked("cursor/t7-auditor-x", "scripts/output_check.py") == "DENY"
+
+
+def test_fork_task_id_binds_the_write_set():
+    cls = scope_check.classify("cursor/t9-b-worker-x", actor="agent-bot", owners=OWNERS)
+    assert (cls.role, cls.task) == ("worker", "9-b")
+    assert scope_check.path_blocked("tasks/TASK-9-b/results.json", cls) is None
+    assert scope_check.path_blocked("tasks/TASK-9/results.json", cls) == "OUT"
+    cls = scope_check.classify("cursor/t9-worker-x", actor="agent-bot", owners=OWNERS)
+    assert (cls.role, cls.task) == ("worker", "9")
+
+
+def test_scope_config_drives_classes_and_protected_paths():
+    scope = scope_check.SCOPE
+    assert [c["name"] for c in scope["classes"]] == ["agent", "repair", "chore"]
+    assert scope_check.DENY == scope["protected"]
+    assert scope_check.CHORE_ALLOW == scope["classes"][2]["allow"]
+    assert set(scope_check.ROLES) == {"worker", "verifier", "auditor"}
+    src = (ROOT / "scripts" / "scope_check.py").read_text(encoding="utf-8")
+    body = src[src.index('"""', src.index('"""') + 3) + 3:]  # after the module docstring
+    for token in ('"tasks/*"', '"scripts/*"', 'results.json', 'mine_sql', 'cursor/t'):
+        code = [l for l in body.splitlines() if token in l and not l.strip().startswith("#")]
+        assert code == [], (token, code)
+
+
+def test_changed_uses_no_renames():
+    import inspect
+    assert "--no-renames" in inspect.getsource(scope_check.changed)
