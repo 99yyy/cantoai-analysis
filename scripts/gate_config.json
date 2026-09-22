@@ -13,18 +13,137 @@
     "verifier": "mine.json"
   },
   "tables": {
-    "videos": {"key": "video_id"},
-    "windows": {"key": "uid", "refs": {"video_id": "videos"}},
+    "videos": {
+      "key": "video_id"
+    },
+    "windows": {
+      "key": "uid",
+      "refs": {
+        "video_id": "videos"
+      }
+    },
     "syllables": {
       "key": "syl_id",
-      "refs": {"uid": "windows", "video_id": "videos"},
-      "type_columns": ["char"]
+      "refs": {
+        "uid": "windows",
+        "video_id": "videos"
+      },
+      "type_columns": [
+        "char"
+      ]
     }
   },
-  "other_tables": ["runs"],
+  "other_tables": [
+    "runs"
+  ],
   "unit_table": "syllables",
   "families": {
-    "count": {"prefix": ["n_"]},
-    "rate": {"prefix": ["agree_", "rare_share_", "gap_", "did_"], "prefix_suffix": [["rate_", "_pm"]]}
+    "count": {
+      "prefix": [
+        "n_"
+      ]
+    },
+    "rate": {
+      "prefix": [
+        "agree_",
+        "rare_share_",
+        "gap_",
+        "did_"
+      ],
+      "prefix_suffix": [
+        [
+          "rate_",
+          "_pm"
+        ]
+      ]
+    }
+  },
+  "scope": {
+    "_about": [
+      "Branch classes for scope_check.py. Match order is the list order of",
+      "'classes': the first regex that matches names the class. An agent branch",
+      "carries a task id and a role; the role's write set is the only thing it",
+      "may touch ({task} is the task id from the branch name). Owner-only classes",
+      "need the pull-request author on the owner allowlist."
+    ],
+    "protected": [
+      ".cursor/*",
+      ".cursor/**",
+      ".github/*",
+      ".github/**",
+      "data/*",
+      "data/**",
+      "scripts/*",
+      "scripts/**",
+      "README.md",
+      "LOOP.md"
+    ],
+    "brief": "^tasks/[^/]+\\.md$",
+    "classes": [
+      {
+        "name": "agent",
+        "match": "^(?:cursor|box)/[rt](?P<task>\\d+(?:-[a-z])?)-(?P<role>[a-z0-9_]+)-",
+        "owner_only": false,
+        "no_brief": true,
+        "roles": {
+          "worker": [
+            "tasks/TASK-{task}/results.json",
+            "tasks/TASK-{task}/sql/*",
+            "tasks/TASK-{task}/sql/**",
+            "tasks/TASK-{task}/open_analysis.md",
+            "tasks/TASK-{task}/manifest.json",
+            "tasks/TASK-{task}/bootstrap.json",
+            "tasks/TASK-{task}/decomposition.json",
+            "tasks/TASK-{task}/run_worker.py",
+            "tasks/TASK-{task}/STATUS.json",
+            "src/*",
+            "src/**",
+            "tests/*",
+            "tests/**"
+          ],
+          "verifier": [
+            "tasks/TASK-{task}/mine.json",
+            "tasks/TASK-{task}/mine_sql/*",
+            "tasks/TASK-{task}/mine_sql/**"
+          ],
+          "auditor": [
+            "review/TASK-{task}/*",
+            "review/TASK-{task}/**",
+            "tasks/TASK-{task}/RESULT.json",
+            "tasks/TASK-{task}/launches.json",
+            "backlog.md"
+          ]
+        }
+      },
+      {
+        "name": "repair",
+        "match": "^(?:repair/|cursor/repair-)",
+        "owner_only": true,
+        "no_brief": false,
+        "allow": null,
+        "deny": []
+      },
+      {
+        "name": "chore",
+        "match": "^chore/",
+        "owner_only": true,
+        "no_brief": false,
+        "allow": [
+          "BACKGROUND.md",
+          "PIPELINE.md",
+          "REPORT.md",
+          "RESEARCH_LOG.md",
+          "backlog.md",
+          "STOP",
+          "tasks/*",
+          "tasks/**",
+          "docs/*",
+          "docs/**",
+          "investigations/*",
+          "investigations/**"
+        ],
+        "deny": "protected"
+      }
+    ]
   }
 }
