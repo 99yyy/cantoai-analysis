@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 from pathlib import Path
 
 import pytest
@@ -156,8 +157,9 @@ def test_investigations_allowed_on_repair_and_chore_not_agent():
 def test_repair_is_authorized_by_the_owner_who_opened_the_pr_even_when_an_agent_pushed():
     # The TASK-9 close (#98): opened by 99yyy, then pushed by cursor[bot].
     # The actor check went red and the same head had to be re-opened as #99.
+    # A repair name that is not task-N-close stays class repair.
     cls = scope_check.classify(
-        "repair/task-9-close-1f66", actor="cursor[bot]", owners=OWNERS, author="99yyy"
+        "repair/task-9-reopen-1f66", actor="cursor[bot]", owners=OWNERS, author="99yyy"
     )
     assert cls.name == "repair"
 
@@ -262,9 +264,9 @@ def test_fork_task_id_binds_the_write_set():
 
 def test_scope_config_drives_classes_and_protected_paths():
     scope = scope_check.SCOPE
-    assert [c["name"] for c in scope["classes"]] == ["agent", "repair", "chore"]
+    assert [c["name"] for c in scope["classes"]] == ["agent", "close", "repair", "chore"]
     assert scope_check.DENY == scope["protected"]
-    assert scope_check.CHORE_ALLOW == scope["classes"][2]["allow"]
+    assert scope_check.CHORE_ALLOW == scope["classes"][3]["allow"]
     assert set(scope_check.ROLES) == {"worker", "verifier", "auditor"}
     src = (ROOT / "scripts" / "scope_check.py").read_text(encoding="utf-8")
     body = src[src.index('"""', src.index('"""') + 3) + 3:]  # after the module docstring
@@ -276,3 +278,66 @@ def test_scope_config_drives_classes_and_protected_paths():
 def test_changed_uses_no_renames():
     import inspect
     assert "--no-renames" in inspect.getsource(scope_check.changed)
+
+
+# --------------------------------------------------------------------------- close write set
+
+
+def test_close_branch_may_write_its_six_paths():
+    cls = scope_check.classify(
+        "repair/task-9-close-1f66", actor="cursor[bot]", owners=OWNERS, author="99yyy"
+    )
+    assert cls.name == "close"
+    assert cls.task == "9"
+    for path in (
+        "tasks/TASK-9.md",
+        "tasks/TASK-9/RESULT.json",
+        "tasks/TASK-9/launches.json",
+        "review/TASK-9/audit.md",
+        "review/TASK-9/notes/extra.md",
+        "backlog.md",
+    ):
+        assert scope_check.path_blocked(path, cls) is None
+    fork = scope_check.classify(
+        "repair/task-9-b-close-ab12", actor="99yyy", owners=OWNERS
+    )
+    assert fork.task == "9-b"
+    assert scope_check.path_blocked("tasks/TASK-9-b.md", fork) is None
+    assert scope_check.path_blocked("tasks/TASK-9.md", fork) == "OUT"
+
+
+def test_close_branch_denies_scripts():
+    cls = scope_check.classify("repair/task-9-close-1f66", actor="99yyy", owners=OWNERS)
+    assert scope_check.path_blocked("scripts/scope_check.py", cls) == "DENY"
+
+
+def test_close_branch_rejects_side_outputs():
+    cls = scope_check.classify("repair/task-9-close-1f66", actor="99yyy", owners=OWNERS)
+    assert scope_check.path_blocked("tasks/TASK-9/results.json", cls) == "OUT"
+
+
+def test_plain_repair_branch_is_still_unrestricted():
+    cls = scope_check.classify("repair/xxx", actor="99yyy", owners=OWNERS)
+    assert cls.name == "repair"
+    assert cls.allow is None
+    assert cls.deny == []
+    assert scope_check.path_blocked("scripts/scope_check.py", cls) is None
+    assert scope_check.path_blocked("tasks/TASK-9/results.json", cls) is None
+
+
+def test_non_role_allow_task_placeholder_without_a_task_group_is_a_config_error():
+    bad = {
+        "name": "plain",
+        "match": "^repair/",
+        "allow": ["tasks/TASK-{task}.md"],
+    }
+    matched = re.match(bad["match"], "repair/xxx")
+    assert matched is not None
+    with pytest.raises(
+        ValueError,
+        match=(
+            r"^scope_check: FAIL class 'plain' allow uses \{task\} "
+            r"but its match has no task group$"
+        ),
+    ):
+        scope_check.bound_allow(bad, matched)

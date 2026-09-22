@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Every branch must belong to a known class.
 
-Four classes, and nothing else:
+The classes in gate_config, and nothing else:
 
     cursor/t<N>-<scope>-...          a Cloud Agent working on task N
     box/t<N>-<scope>-...             the same, on the shared machine
+    repair/task-<N>-close-...        an owner-opened close; only that task's close write set
     chore/...                        declarations and top-level documents
     repair/... | cursor/repair-...   a tool fix asked for by the repository owner
 
@@ -45,6 +46,10 @@ What each class may touch comes from the ``scope`` section of
             review/TASK-N/, RESULT.json and the launch ledger. A role with no
             write set in the config fails. Protected paths and the task briefs
             are denied on top of that.
+    close   a repair/task-<N>-close- branch, matched before repair: the brief,
+            RESULT.json, the launch ledger, review/TASK-N/ and backlog.md for
+            that task, and never a protected path. {task} in that allow list
+            comes from the named group in the class match.
     chore   only its allow list, and never a protected path
     repair  anything, once the PR author is a repository owner
 
@@ -172,6 +177,27 @@ def principal(actor: str | None, author: str | None) -> tuple[str, str | None]:
     return "actor", actor.strip() if actor else actor
 
 
+def bound_allow(c: dict, matched: re.Match[str]) -> list[str] | None:
+    """Allow list for a class that has no roles.
+
+    ``None`` stays unrestricted. ``{task}`` is replaced from the match's named
+    group ``task``. A placeholder whose match has no such group is a bad config.
+    """
+    allow = c.get("allow")
+    if allow is None:
+        return None
+    globs = [str(g) for g in allow]
+    if not any("{task}" in g for g in globs):
+        return globs
+    if "task" not in matched.re.groupindex:
+        raise ValueError(
+            "scope_check: FAIL class "
+            f"{c['name']!r} allow uses {{task}} but its match has no task group"
+        )
+    task = matched.group("task")
+    return [g.replace("{task}", task) for g in globs]
+
+
 def classify(
     branch: str,
     actor: str | None,
@@ -199,9 +225,9 @@ def classify(
                 )
             allow = [g.replace("{task}", task) for g in c["roles"][role]]
             return BranchClass(c["name"], allow, _deny_of(c), bool(c.get("no_brief")), role, task)
-        allow = c.get("allow")
+        task = m.group("task") if "task" in m.re.groupindex else None
         return BranchClass(
-            c["name"], list(allow) if allow is not None else None, _deny_of(c), bool(c.get("no_brief"))
+            c["name"], bound_allow(c, m), _deny_of(c), bool(c.get("no_brief")), None, task
         )
     raise ValueError(f"scope_check: FAIL branch {branch!r} matches no branch class")
 
@@ -243,6 +269,8 @@ def main() -> int:
         prefixes = ", ".join(f"{c['name']}: {c['match']}" for c in CLASSES)
         if "has no write set" in str(e):
             print("  an agent branch names a role that has a write set in gate_config scope")
+        elif "has no task group" in str(e):
+            print("  a non-role allow list uses {task} only when its match names a task group")
         elif "matches no branch class" not in str(e):
             print("  repair/ and chore/ require the pull-request author (--author),")
             print("  or --actor when there is no pull request, on the --owners allowlist")

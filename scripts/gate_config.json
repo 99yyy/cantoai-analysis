@@ -63,8 +63,9 @@
       "Branch classes for scope_check.py. Match order is the list order of",
       "'classes': the first regex that matches names the class. An agent branch",
       "carries a task id and a role; the role's write set is the only thing it",
-      "may touch ({task} is the task id from the branch name). Owner-only classes",
-      "need the pull-request author on the owner allowlist."
+      "may touch ({task} is the task id from the branch name). A non-role class's",
+      "allow may also use {task}, taken from the named group in its match.",
+      "Owner-only classes need the pull-request author on the owner allowlist."
     ],
     "protected": [
       ".cursor/*",
@@ -114,6 +115,21 @@
             "backlog.md"
           ]
         }
+      },
+      {
+        "name": "close",
+        "match": "^repair/task-(?P<task>\\d+(?:-[a-z])?)-close-",
+        "owner_only": true,
+        "no_brief": false,
+        "allow": [
+          "tasks/TASK-{task}.md",
+          "tasks/TASK-{task}/RESULT.json",
+          "tasks/TASK-{task}/launches.json",
+          "review/TASK-{task}/*",
+          "review/TASK-{task}/**",
+          "backlog.md"
+        ],
+        "deny": "protected"
       },
       {
         "name": "repair",
