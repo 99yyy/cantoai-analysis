@@ -8,6 +8,31 @@
   ],
   "corpus": "data/corpus_v2.sqlite",
   "pin_file": "README.md",
+  "gate_tests": {
+    "_about": [
+      "Tests of the gate scripts, by exact path. CI runs them first, before any",
+      "code a worker wrote, from a copy of the tree whose tests/ holds only these",
+      "files, their fixtures and mutation probes, and which has no src/: worker",
+      "branches may write tests/** and src/**, and a module (or a native",
+      "extension) there could otherwise change what these tests check. None of",
+      "them may import src/. A pull request is judged by the union of this list",
+      "on the base branch and on its own head, so a change cannot drop a test.",
+      "The files are gate files (history-audit)."
+    ],
+    "files": [
+      "tests/test_budget.py",
+      "tests/test_fork.py",
+      "tests/test_history_audit.py",
+      "tests/test_identities.py",
+      "tests/test_message_inventory.py",
+      "tests/test_output_check.py",
+      "tests/test_output_check_scoring.py",
+      "tests/test_relations.py",
+      "tests/test_result_json.py",
+      "tests/test_scope_check.py",
+      "tests/test_verify.py"
+    ]
+  },
   "sides": {
     "worker": "results.json",
     "verifier": "mine.json"

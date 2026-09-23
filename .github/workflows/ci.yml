@@ -29,12 +29,66 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - name: pytest; green while the repository has no test yet
+      - name: Take the gate config from the base branch, not from this PR
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          rm -rf /tmp/gate && mkdir -p /tmp/gate
+          git archive "origin/$BASE_REF" scripts | tar -x -C /tmp/gate --strip-components=1
+      - name: The gate tests first, from a tree that holds no worker file
+        # Worker branches may write tests/** and src/**. A module there, or a
+        # native extension that shadows a gate test's name, can change what the
+        # gate tests check once it shares their process, and any code of theirs
+        # that runs can rewrite files on disk. So the gate tests run before
+        # anything else, from a copy of the tree whose tests/ holds only the
+        # listed gate tests with their fixtures and mutation probes, and which
+        # has no src/. The list is the union of the base's and this change's
+        # (gate_config.json, gate_tests), so a change cannot drop a test. No
+        # conftest, no cache, importlib mode.
+        env:
+          GATE_DIR: ${{ github.event_name == 'pull_request' && '/tmp/gate' || 'scripts' }}
+        run: |
+          python -I - > /tmp/gate_tests.txt <<'EOF'
+          import json, os, subprocess
+          names = set()
+          for d in sorted({os.environ["GATE_DIR"], "scripts"}):
+              path = os.path.join(d, "gate_config.json")
+              if os.path.isfile(path):
+                  with open(path, encoding="utf-8") as f:
+                      names.update(json.load(f).get("gate_tests", {}).get("files", []))
+          tracked = set(subprocess.run(
+              ["git", "ls-files", "tests"], capture_output=True, text=True, check=True
+          ).stdout.split())
+          for name in sorted(names):
+              if name in tracked and name.count("/") == 1 and name.endswith(".py"):
+                  print(name)
+          EOF
+          if [ ! -s /tmp/gate_tests.txt ]; then
+            echo "::error::gate_config.json lists no gate test that exists in this tree"
+            exit 1
+          fi
+          mapfile -t gate_tests < /tmp/gate_tests.txt
+          echo "gate tests: ${gate_tests[*]}"
+          tree="$RUNNER_TEMP/gate-tests-tree"
+          rm -rf "$tree" && mkdir -p "$tree"
+          cp -a . "$tree/"
+          rm -rf "$tree/tests" "$tree/src"
+          mkdir "$tree/tests"
+          cp "${gate_tests[@]}" "$tree/tests/"
+          for d in fixtures mutations; do
+            if [ -d "tests/$d" ]; then cp -a "tests/$d" "$tree/tests/"; fi
+          done
+          cd "$tree"
+          python -I -m pytest -q -c pyproject.toml --noconftest -p no:cacheprovider \
+            --import-mode=importlib "${gate_tests[@]}"
+      - name: Every test; green while the repository has no test yet
         run: |
           if find tests -name 'test_*.py' -print -quit 2>/dev/null | grep -q .; then
             pytest -q

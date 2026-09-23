@@ -20,10 +20,10 @@ Two rules, both mechanical:
    the round audit, which is where judgement belongs.
 3. A pull request that adds, changes, renames or deletes a gate file
    (anything under ``scripts/``, ``.github/`` or ``benchmarks/``; the gate
-   tests, their fixtures and mutation probes; any test that reaches a gate or
-   another test module; and the files that decide what pytest collects and
-   imports: ``conftest.py``, ``tests/__init__.py``, the pytest configuration
-   and the requirements) also needs a line beginning
+   tests listed in the gate config, their fixtures and mutation probes; and the
+   files that decide what pytest collects and imports: ``conftest.py``,
+   ``tests/__init__.py``, the pytest configuration and the requirements) also
+   needs a line beginning
    ``Gate-review:`` in its body that names the reviewed head commit (at least
    seven hex digits of it). The owner adds it after a fresh review session
    has read the diff; a later push makes the line stale until it is renewed.
@@ -113,6 +113,7 @@ BAR_FILES: list[str] = [
     "conftest.py", "*/conftest.py",
     "tests/__init__.py", "tests/*/__init__.py",
     "pyproject.toml", "pytest.ini", "setup.cfg", "tox.ini",
+    "*/pyproject.toml", "*/pytest.ini", "*/setup.cfg", "*/tox.ini",
     "requirements*.txt",
     # Reference sets a score route is judged against (owner-only).
     "benchmarks/*", "benchmarks/**",
@@ -308,14 +309,11 @@ TOLERANCE_NAMES = frozenset({"tol", "tolerance"})
 # Names exempt from relations.py's exclude invariant (one per line, no value).
 EXEMPT_KIND = "outside_frame"
 EXEMPT_FENCE = output_check.DECLARATION_FENCES[EXEMPT_KIND]
-# A test is a gate test when it reaches a gate script or another test module,
-# directly or through a dynamic import, in its base or head version. Tests of
-# src/ written by a worker do neither.
-GATE_TEST_GLOB = "tests/*.py"
-GATE_TEST_RE = re.compile(
-    r"\bscripts\b|\b(?:from|import)\s+tests\b|importlib|__import__|\brunpy\b|"
-    r"sys\.modules|\bexec\s*\(|\beval\s*\("
-)
+# Tests of the gate scripts, by exact path, from the gate config (the base's
+# copy on a pull request). CI runs them first, from a copy of the tree that
+# holds no worker test and no src/, so nothing a worker writes reaches them;
+# here they are gate files.
+GATE_TESTS: frozenset[str] = frozenset(output_check.GATE_CONFIG.get("gate_tests", {}).get("files", []))
 
 
 def run(*args: str) -> str:
@@ -349,17 +347,8 @@ def match_any(path: str, globs: list[str]) -> bool:
     return any(fnmatch.fnmatch(path, g) for g in globs)
 
 
-def is_gate_test(base: str, path: str) -> bool:
-    """A test file that reaches a gate or another test, in base or at HEAD."""
-    if not fnmatch.fnmatch(path, GATE_TEST_GLOB):
-        return False
-    return any(
-        GATE_TEST_RE.search(file_at(ref, path) or "") for ref in (base, "HEAD")
-    )
-
-
-def is_gate_file(base: str, path: str) -> bool:
-    return match_any(path, BAR_FILES) or is_gate_test(base, path)
+def is_gate_file(path: str) -> bool:
+    return match_any(path, BAR_FILES) or path in GATE_TESTS
 
 
 def count_in(ref: str, path: str, pattern: str) -> int:
@@ -633,7 +622,7 @@ def main() -> int:
     base_tree = run("git", "ls-tree", "-r", "--name-only", args.base).splitlines()
     for f in files:
         # A file under expected/ counts only if it existed before this change.
-        if f in base_tree and is_gate_file(args.base, f):
+        if f in base_tree and is_gate_file(f):
             bars.append(f)
     b_pat = [p for p in base_tree if fnmatch.fnmatch(p, MUTATION_GLOB)]
     h_pat = [p for p in run("git", "ls-tree", "-r", "--name-only", "HEAD").splitlines()
@@ -702,7 +691,7 @@ def main() -> int:
     # Added, renamed and deleted gate files count too, not only bars that
     # existed in base: a new scripts/json.py would shadow the standard
     # library for every gate that runs from that directory.
-    gate_files = sorted(f for f in files if is_gate_file(args.base, f))
+    gate_files = sorted(f for f in files if is_gate_file(f))
     if gate_files:
         body = Path(args.body_FILE).read_text(encoding="utf-8") if args.body_FILE and Path(args.body_FILE).is_file() else ""
         head = reviewed_head()

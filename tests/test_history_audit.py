@@ -846,23 +846,57 @@ def test_worker_test_of_src_is_not_a_gate_file(tmp_path, monkeypatch, capsys):
     assert "history_audit: PASS" in out
 
 
-def test_new_test_reaching_a_gate_dynamically_needs_review(tmp_path, monkeypatch, capsys):
+def test_worker_test_calling_eval_is_not_a_gate_file(tmp_path, monkeypatch, capsys):
+    """Words in a worker's test do not make it a gate file; the gate list does."""
     repo, base = _tests_repo(tmp_path)
-    (repo / "tests" / "test_zz.py").write_text(
-        'import importlib\nm = importlib.import_module("tests.test_" + "output_check")\n',
+    (repo / "tests" / "test_model.py").write_text(
+        "# compares with the scripts in tasks/\nimport importlib.resources\n\n"
+        "def test_m():\n    net = type('N', (), {'eval': lambda self: 1})()\n    assert net.eval() == 1\n",
         encoding="utf-8",
     )
     _git(repo, "add", "-A")
-    _git(repo, "commit", "-q", "-m", "sneaky")
+    _git(repo, "commit", "-q", "-m", "worker test")
     code, out = _audit(repo, base, "", monkeypatch, capsys)
-    assert code == 1, out
-    assert "a gate file changed (tests/test_zz.py)" in out
+    assert code == 0, out
+    assert "bars touched:     none" in out
 
 
 def test_pytest_configuration_files_are_gate_files():
     for f in ["conftest.py", "tests/conftest.py", "tests/sub/conftest.py", "tests/__init__.py",
               "tests/sub/__init__.py", "pyproject.toml", "pytest.ini", "setup.cfg", "tox.ini",
-              "requirements.txt", "requirements-dev.txt"]:
+              "tests/pytest.ini", "tests/pyproject.toml", "requirements.txt", "requirements-dev.txt"]:
         assert history_audit.match_any(f, history_audit.BAR_FILES), f
     for f in ["src/__init__.py", "tasks/TASK-9/requirements.md"]:
         assert not history_audit.match_any(f, history_audit.BAR_FILES), f
+
+
+def _imports(path: Path) -> set[str]:
+    import ast
+
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    out: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            out.update(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            out.add(node.module)
+    return out
+
+
+def test_gate_test_list_matches_the_tree():
+    """The isolated gate-test run covers every test of a gate script and no src/ code."""
+    listed = sorted(history_audit.GATE_TESTS)
+    assert listed, "gate_config.json lists no gate tests"
+    for name in listed:
+        assert (ROOT / name).is_file(), name
+        bad = sorted(m for m in _imports(ROOT / name) if m == "src" or m.startswith("src."))
+        assert not bad, f"{name} imports {bad}; a gate test may not import worker code"
+    loads_a_gate = re.compile(r"/\s*[\"']scripts[\"']\s*/")
+    for p in sorted((ROOT / "tests").glob("test_*.py")):
+        name = f"tests/{p.name}"
+        reaches_gate = bool(loads_a_gate.search(p.read_text(encoding="utf-8"))) or any(
+            m.startswith("tests.") and m.replace(".", "/") + ".py" in history_audit.GATE_TESTS
+            for m in _imports(p)
+        )
+        if reaches_gate:
+            assert name in history_audit.GATE_TESTS, f"{name} tests a gate script but is not in gate_tests"
