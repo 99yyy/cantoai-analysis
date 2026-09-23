@@ -749,3 +749,81 @@ def test_families_and_prefix_columns_come_from_config():
             if token in l and not l.strip().startswith("#") and not l.strip().startswith(("*", "\"", "'"))
         ]
         assert code_lines == [], (token, code_lines)
+
+
+# --- anchor before any output, and score routes left to output-check ------
+
+
+def test_anchor_is_checked_before_any_output(tmp_path, capsys):
+    """A wrong published count fails on the brief's own pull request, before
+    any agent has been launched on it."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _pin_readme(repo, corpus)
+    _write_brief(
+        repo,
+        [("n_count", "0")],
+        extra="```frame\nwindows.tier IN ('A','B')\npublished_expected 99\n```\n",
+    )
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert (
+        "TASK-9: frame.published_expected is 99 but the pinned corpus holds 3 "
+        "published syllables rows (tol 0)"
+    ) in out
+    assert "no output yet" in out
+
+
+def test_anchor_before_any_output_green(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _pin_readme(repo, corpus)
+    _write_brief(repo, [("n_count", "0")], extra=FRAME_AB)
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "frame.published_expected 3 = published syllables rows" in out
+    assert "no output yet; double/permute not run" in out
+
+
+def test_score_routes_are_left_to_output_check(tmp_path, capsys):
+    """A number scored from a prediction file is not corpus-bound: relations
+    names it and leaves it out, and still runs on the SQL routes."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _pin_readme(repo, corpus)
+    _write_brief(repo, [("n_count", "0"), ("rate_cer_m_pm", "0.5")])
+    conn = sqlite3.connect(f"file:{corpus}?mode=ro", uri=True)
+    try:
+        n_count = conn.execute("SELECT COUNT(*) FROM videos").fetchone()[0]
+    finally:
+        conn.close()
+    _write_side(repo, [("n_count", float(n_count), "n_count.sql")])
+    pred = repo / "tasks" / "TASK-9" / "pred" / "m.jsonl"
+    pred.parent.mkdir(parents=True, exist_ok=True)
+    pred.write_text('{"id": "a", "hyp": "x"}\n', encoding="utf-8")
+    out_path = repo / "tasks" / "TASK-9" / "results.json"
+    rows = json.loads(out_path.read_text(encoding="utf-8"))
+    rows.append(
+        {
+            "name": "rate_cer_m_pm",
+            "value": 0.0,
+            "n": 1,
+            "query": "score:cer:tasks/TASK-9/pred/m.jsonl",
+        }
+    )
+    out_path.write_text(json.dumps(rows), encoding="utf-8")
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert (
+        "results.json 1 name(s) scored from predictions, not corpus-bound: rate_cer_m_pm"
+    ) in out
+    assert "double 1/1 permute 1/1" in out

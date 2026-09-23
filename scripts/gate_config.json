@@ -74,6 +74,8 @@
       ".github/**",
       "data/*",
       "data/**",
+      "benchmarks/*",
+      "benchmarks/**",
       "scripts/*",
       "scripts/**",
       "README.md",
@@ -91,6 +93,8 @@
             "tasks/TASK-{task}/results.json",
             "tasks/TASK-{task}/sql/*",
             "tasks/TASK-{task}/sql/**",
+            "tasks/TASK-{task}/pred/*",
+            "tasks/TASK-{task}/pred/**",
             "tasks/TASK-{task}/open_analysis.md",
             "tasks/TASK-{task}/manifest.json",
             "tasks/TASK-{task}/bootstrap.json",
@@ -105,7 +109,9 @@
           "verifier": [
             "tasks/TASK-{task}/mine.json",
             "tasks/TASK-{task}/mine_sql/*",
-            "tasks/TASK-{task}/mine_sql/**"
+            "tasks/TASK-{task}/mine_sql/**",
+            "tasks/TASK-{task}/mine_pred/*",
+            "tasks/TASK-{task}/mine_pred/**"
           ],
           "auditor": [
             "review/TASK-{task}/*",

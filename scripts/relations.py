@@ -6,10 +6,11 @@ A number that agrees on the live corpus can still be a constant in disguise:
 row, shuffling row order, or dropping the rows the brief says are not
 published, has no expected answer to special-case.
 
-This script is a step of the ``output-check`` *job*, run from the pull-request
-workspace (HEAD). After A1, PR CI copies ``output_check.py`` from base into
-``/tmp/gate``; that copy cannot see this file until the PR merges. Do not call
-this module from ``/tmp/gate/output_check.py``.
+This script is a step of the ``output-check`` *job*. On a pull request CI
+runs the base branch's copy from ``/tmp/gate`` (the whole ``scripts/``
+directory as the base has it), like every other gate: a pull request is never
+judged by the relations it brings. It imports ``output_check.py`` from its
+own directory, so the two always come from the same branch.
 
 Nothing project-specific is written here. Table names, keys, the columns to
 namespace, the unit table and the number families come from
@@ -51,7 +52,15 @@ apply to every name.
 Anchor: when ``frame`` declares ``published_expected``, the excluded corpus
 must hold exactly that many rows of the unit table (``published_expected_tol``,
 default 0). A frame that no longer matches the corpus is a stale frame, not
-a smaller published set.
+a smaller published set. The anchor is checked as soon as the brief exists,
+before either output does, so a wrong count fails on the brief's own pull
+request instead of after two agents have been launched on it.
+
+Score routes (``score:<metric>:<file>.jsonl``) are replayed by output-check
+from prediction files, not from the corpus. They, and any ``derived:`` name
+that reaches one, are left out here and printed as such. A side whose
+corpus-bound routes exist but of which no number was compared under double
+fails: a relation that checks nothing must not read as a pass.
 
 An unclassified name is a failure. Suspended and STALE tasks are skipped, as
 in output-check. Relations does not freeze on PR diff: a hardcoded denominator
@@ -581,16 +590,6 @@ def check_task(
         print(output_check.stale_closed_line(n, stamp, corpus_sha))
         return
 
-    task_dir = root / "tasks" / f"TASK-{n}"
-    paths = {
-        output_check.WORKER: task_dir / output_check.WORKER,
-        output_check.VERIFIER: task_dir / output_check.VERIFIER,
-    }
-    present = {k: p for k, p in paths.items() if p.is_file()}
-    if not present:
-        print(f"  TASK-{n} [{status}]: no output yet; double/permute not run")
-        return
-
     run_exclude = PUBLISHED_EXPECTED in frame
     exc_conn: sqlite3.Connection | None = None
     if run_exclude:
@@ -610,6 +609,18 @@ def check_task(
         if anchor:
             print(f"  TASK-{n} [{status}]: {anchor}")
 
+    task_dir = root / "tasks" / f"TASK-{n}"
+    paths = {
+        output_check.WORKER: task_dir / output_check.WORKER,
+        output_check.VERIFIER: task_dir / output_check.VERIFIER,
+    }
+    present = {k: p for k, p in paths.items() if p.is_file()}
+    if not present:
+        if exc_conn is not None:
+            exc_conn.close()
+        print(f"  TASK-{n} [{status}]: no output yet; double/permute not run")
+        return
+
     dup_conn = sqlite3.connect(f"file:{doubled}?mode=ro", uri=True)
     perm_conn = sqlite3.connect(f"file:{permuted}?mode=ro", uri=True)
     try:
@@ -623,6 +634,16 @@ def check_task(
                     family(name)
                 except Fail as e:
                     fail.append(str(e))
+            scored = frozenset(nm for nm, (kind, _t) in routes.items() if kind == "score")
+            if scored:
+                off = outside_frame_closure(scored, routes)
+                print(
+                    f"  TASK-{n} [{status}]: {k} {len(off)} name(s) scored from "
+                    f"predictions, not corpus-bound: {', '.join(sorted(off))}"
+                )
+                routes = {nm: r for nm, r in routes.items() if nm not in off}
+                if not routes:
+                    continue
             orig = replay_values(f"{k}", routes, orig_conn, seconds, fail)
             doubled_v = replay_values(
                 f"{k}:double", routes, dup_conn, seconds, fail
@@ -657,6 +678,11 @@ def check_task(
                     f"{k}", name, orig[name], exc_v[name], t, fail
                 ):
                     e_ok += 1
+            if not any(name in orig and name in doubled_v for name in routes):
+                fail.append(
+                    f"TASK-{n}: {k}: double compared none of {len(routes)} corpus-bound "
+                    f"number(s); a relation that checks nothing is not a pass"
+                )
             if run_exclude:
                 exclude_note = f" exclude {e_ok}/{len(routes) - len(exempt)}"
                 if exempt:

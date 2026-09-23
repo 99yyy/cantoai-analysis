@@ -76,6 +76,32 @@ What this enforces, in order:
                share a definition but not an implementation. A shared
                *derivation* is allowed, because each of its inputs was replayed
                on its own.
+  frame        every non-comment line of a ``frame`` fence is either
+               ``<name> <number>`` (plain identifier) or a predicate
+               ``<table>.<column> <sql>``; anything else fails, because a line
+               such as ``published_expected: 3`` used to read as a number with
+               another name and silently switched exclude and anchor off. A
+               fence that defines the published set must also declare
+               ``published_expected``.
+  score        a row may be routed ``score:<metric>:tasks/TASK-<N>/<file>.jsonl``
+               when the brief carries an ``eval`` fence with one line
+               ``set benchmarks/<name>``. That directory's ``manifest.jsonl``
+               holds one ``{"id", "ref"}`` object per item; ``benchmarks/`` is
+               owner-only, so an agent cannot edit the references it is scored
+               against. The prediction file holds one ``{"id", "hyp"}`` object
+               per item: exactly the manifest's ids, none missing, none extra,
+               none repeated. ``<file>.run.json`` beside it records the run:
+               ``script_commit`` (an ancestor of the head) and
+               ``model_revision`` as full 40-character hashes, ``model``,
+               ``decoding``, ``device`` and ``dirty: false``. This script then
+               scores the predictions itself -- NFKC, lower case, OpenCC
+               Traditional->Simplified characters (``opencc_TSCharacters.txt``),
+               punctuation, symbols and spaces dropped -- and pools edits over
+               the whole set: ``cer`` counts characters, ``mer`` counts CJK
+               characters and Latin words. The value is per mille (the name
+               ends in ``_pm``) and ``n`` must equal the number of reference
+               tokens. The agent's own scorer is never used, and an empty
+               reference fails.
   replay       every number equals what its own route produces, within tol.
                A SQL route whose plan never SCAN/SEARCHes a corpus table
                fails, so two constant SELECTs cannot certify agreement.
@@ -215,6 +241,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+import unicodedata
 from collections.abc import Iterable
 from pathlib import Path
 from typing import NamedTuple
@@ -223,6 +250,7 @@ BLOCK = re.compile(r"^```numbers\s*$(.*?)^```\s*$", re.M | re.S)
 N_FENCE = re.compile(r"^```n\s*$(.*?)^```\s*$", re.M | re.S)
 FRAME_FENCE = re.compile(r"^```frame\s*$(.*?)^```\s*$", re.M | re.S)
 IDENTITIES_FENCE = re.compile(r"^```identities\s*$(.*?)^```\s*$", re.M | re.S)
+EVAL_FENCE = re.compile(r"^```eval\s*$(.*?)^```\s*$", re.M | re.S)
 STATUS = re.compile(
     r"^status:[ \t]*(open|closed|escalated|blocked)[ \t]*$", re.M
 )
@@ -233,6 +261,9 @@ CORPUS_SHA_VALUE = re.compile(r"^`?([0-9a-f]{64})`?$")
 README_SHA = re.compile(r"sha256:\s*`?([0-9a-f]{64})`?")
 ROW_KEYS = {"name", "value", "n", "query"}
 DERIVED = "derived:"
+SCORE = "score:"
+SCORE_METRICS = ("cer", "mer")
+PUBLISHED_EXPECTED_KEY = "published_expected"
 EPS = 1e-9
 MAX_ATTEMPTS = 3
 
@@ -328,7 +359,7 @@ FORKED_FROM_RE = re.compile(r"^TASK-\d+(?:-[bc])?$")
 MAX_FORK_DEPTH = 2
 FORK_LETTER = {1: "b", 2: "c"}
 FORK_DEPTH = {"b": 1, "c": 2}
-FORK_FENCES = ("numbers", "n", "frame", "identities")
+FORK_FENCES = ("numbers", "n", "frame", "identities", "eval")
 PRIOR_ATTEMPTS_RE = re.compile(r"^## Prior Attempts[ \t]*$", re.M)
 FORK_TRIGGER_VERDICT = "refuted"
 FORK_TRIGGER_SUBTYPE = "out_of_turns"
@@ -1115,37 +1146,53 @@ def parse_n_block(label: str, text: str) -> dict[str, str] | None:
     return out
 
 
+FRAME_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
 def parse_frame_block(label: str, text: str) -> dict[str, float]:
     """Numeric ``frame`` entries. Predicate lines are skipped. Empty if no fence.
 
     Predicate lines (``<table>.<column> <sql>``) are not numeric entries; see
     ``parse_frame_predicates``. Identities bind ``frame.<field>`` to these.
+
+    Every other non-comment line must be ``<name> <number>`` with a plain
+    identifier as the name; anything else fails. ``published_expected: 3``
+    used to parse as a number named ``published_expected:``, which switched
+    the exclude and anchor checks off without a word. A fence that defines
+    the published set must also declare ``published_expected``.
     """
     m = FRAME_FENCE.search(text)
     if not m:
         return {}
     out: dict[str, float] = {}
+    has_predicate = False
     for raw in m.group(1).splitlines():
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
         parts = line.split()
-        if len(parts) < 2:
-            continue
-        nums: list[float] = []
-        ok = True
-        for p in parts[1:]:
+        if len(parts) == 2 and FRAME_NAME.match(parts[0]):
             try:
-                nums.append(float(p))
+                value = float(parts[1])
             except ValueError:
-                ok = False
-                break
-        if not ok or len(nums) != 1:
+                value = None
+            if value is not None:
+                if parts[0] in out:
+                    raise Fail(f"{label}: {parts[0]} is declared twice in the frame block")
+                out[parts[0]] = value
+                continue
+        if FRAME_PREDICATE.match(line):
+            has_predicate = True
             continue
-        name = parts[0]
-        if name in out:
-            raise Fail(f"{label}: {name} is declared twice in the frame block")
-        out[name] = nums[0]
+        raise Fail(
+            f"{label}: frame line {line!r} is neither '<name> <number>' nor "
+            f"'<table>.<column> <predicate>'"
+        )
+    if has_predicate and PUBLISHED_EXPECTED_KEY not in out:
+        raise Fail(
+            f"{label}: frame defines the published set but declares no "
+            f"{PUBLISHED_EXPECTED_KEY}; without it exclude and anchor would not run"
+        )
     return out
 
 
@@ -1304,6 +1351,7 @@ def fence_interior(text: str, kind: str) -> str | None:
         "n": N_FENCE,
         "frame": FRAME_FENCE,
         "identities": IDENTITIES_FENCE,
+        "eval": EVAL_FENCE,
     }.get(kind)
     if regex is None:
         raise Fail(f"unknown fence kind {kind!r}")
@@ -1386,7 +1434,8 @@ def identity_sql_routed(
     declared: dict[str, float],
     routes: dict[str, tuple[str, object]],
 ) -> bool:
-    """True when every declared name in ``names`` is a SQL route in this file.
+    """True when every declared name in ``names`` is replayed in this file
+    (a SQL or a score route).
 
     Per-file: ``routes`` is one agent's map. Do not merge worker and verifier.
     An identity with no declared names does not count.
@@ -1394,7 +1443,9 @@ def identity_sql_routed(
     declared_names = [nm for nm in names if nm in declared]
     if not declared_names:
         return False
-    return all(routes.get(nm, (None, None))[0] == "sql" for nm in declared_names)
+    return all(
+        routes.get(nm, (None, None))[0] in ("sql", "score") for nm in declared_names
+    )
 
 
 def identity_unchecked_on_both_sides(
@@ -1957,12 +2008,39 @@ def eval_derived(
 
 
 def route(label: str, n: str, name: str, q: str, root: Path) -> tuple[str, object]:
-    """Resolve a ``query`` into ('derived', expr) or ('sql', path).
+    """Resolve a ``query`` into ('derived', expr), ('sql', path) or
+    ('score', (metric, path)).
 
     A SQL route has exactly one spelling -- repo-relative, under this task's
     directory. Two spellings of one file would let the two agents share an
-    implementation while the strings looked different.
+    implementation while the strings looked different. A score route names a
+    metric and a prediction file under this task's directory.
     """
+    if q.startswith(SCORE):
+        metric, sep, rel = q[len(SCORE):].partition(":")
+        metric, rel = metric.strip(), rel.strip()
+        if not sep or metric not in SCORE_METRICS:
+            raise Fail(
+                f"{label}:{name}: score route {q!r} must be "
+                f"score:<{'|'.join(SCORE_METRICS)}>:tasks/TASK-{n}/<file>.jsonl"
+            )
+        if not name.endswith("_pm"):
+            raise Fail(
+                f"{label}:{name}: a score route is per mille, so the name must end in _pm"
+            )
+        prefix = f"tasks/TASK-{n}/"
+        if not rel.startswith(prefix) or not rel.endswith(".jsonl"):
+            raise Fail(
+                f"{label}:{name}: score route file {rel!r} must be {prefix}<...>.jsonl"
+            )
+        p = (root / rel).resolve()
+        try:
+            p.relative_to((root / "tasks" / f"TASK-{n}").resolve())
+        except ValueError:
+            raise Fail(f"{label}:{name}: score route file {rel!r} does not resolve inside {prefix}")
+        if not p.is_file():
+            raise Fail(f"{label}:{name}: score route file {rel!r} names no file in the repository")
+        return "score", (metric, p)
     if q.startswith(DERIVED):
         expr = q[len(DERIVED):].strip()
         if not expr:
@@ -1998,6 +2076,7 @@ def replay(
     conn: sqlite3.Connection,
     seconds: float,
     fail: list[str],
+    scores: "ScoreSet | None" = None,
 ) -> dict[str, float]:
     """Return every name's replayed value, and record every disagreement."""
     got: dict[str, float] = {}
@@ -2007,6 +2086,26 @@ def replay(
         kind, target = routes[name]
         if kind == "derived":
             pending[name] = str(target)
+            continue
+        if kind == "score":
+            metric, pred = target  # type: ignore[misc]
+            try:
+                if scores is None:
+                    raise Fail(
+                        f"{label}:{name}: a score route needs an ```eval block in the "
+                        f"brief naming its reference set (set benchmarks/<name>)"
+                    )
+                value, tokens = scores.score(f"{label}:{name}", metric, pred)
+            except Fail as e:
+                fail.append(str(e))
+                continue
+            got[name] = value
+            written_n = rows[name]["n"]
+            if written_n != tokens:
+                fail.append(
+                    f"{label}:{name}: n is {written_n} but {metric} over the reference "
+                    f"set counts {tokens} reference tokens"
+                )
             continue
         try:
             got[name] = run_sql(conn, f"{label}:{name}", target, seconds)  # type: ignore[arg-type]
@@ -2050,6 +2149,244 @@ def replay(
                 f"tol {t:g})"
             )
     return got
+
+
+# ---------------------------------------------------------------- score routes
+
+EVAL_KEYS = frozenset({"set"})
+BENCHMARKS = "benchmarks"
+MANIFEST = "manifest.jsonl"
+RUN_CARD_SUFFIX = ".run.json"
+RUN_CARD_KEYS = ("script_commit", "model", "model_revision", "decoding", "device", "dirty")
+HEX40 = re.compile(r"^[0-9a-f]{40}$")
+SET_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+T2S_FILE = "opencc_TSCharacters.txt"
+SCORER = "NFKC, lower, OpenCC T->S chars, drop P/S/Z/C, pooled over the set"
+_T2S: dict[str, str] | None = None
+
+
+def parse_eval_block(label: str, text: str) -> str | None:
+    """The reference set score routes are scored against; None without a fence.
+
+    One line, ``set benchmarks/<name>``. The directory holds ``manifest.jsonl``.
+    """
+    m = EVAL_FENCE.search(text)
+    if not m:
+        return None
+    entries: dict[str, str] = {}
+    for raw in m.group(1).splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) != 2 or parts[0] not in EVAL_KEYS:
+            raise Fail(f"{label}: eval line is not 'set benchmarks/<name>': {line!r}")
+        if parts[0] in entries:
+            raise Fail(f"{label}: eval declares {parts[0]} twice")
+        entries[parts[0]] = parts[1]
+    if "set" not in entries:
+        raise Fail(f"{label}: the eval block names no reference set")
+    segs = entries["set"].rstrip("/").split("/")
+    if len(segs) != 2 or segs[0] != BENCHMARKS or not SET_NAME.match(segs[1]):
+        raise Fail(f"{label}: eval set {entries['set']!r} must be {BENCHMARKS}/<name>")
+    return "/".join(segs)
+
+
+def t2s_table() -> dict[str, str]:
+    """OpenCC's Traditional->Simplified character table, first value per key."""
+    global _T2S
+    if _T2S is None:
+        path = Path(__file__).resolve().parent / T2S_FILE
+        if not path.is_file():
+            raise Fail(
+                f"{T2S_FILE} is missing beside {Path(__file__).name}; "
+                f"a score route cannot be replayed"
+            )
+        table: dict[str, str] = {}
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            if not raw.strip() or raw.startswith("#"):
+                continue
+            key, sep, vals = raw.partition("\t")
+            first = vals.split(" ")[0] if sep else ""
+            if len(key) != 1 or not first:
+                raise Fail(f"{T2S_FILE}: malformed line {raw!r}")
+            table[key] = first
+        _T2S = table
+    return _T2S
+
+
+def _kept(ch: str) -> bool:
+    """Letters, marks and numbers count; punctuation, symbols, spaces do not."""
+    return unicodedata.category(ch)[0] in ("L", "M", "N")
+
+
+def score_tokens(text: str, metric: str) -> list[str]:
+    """Normalize ``text``, then split it into the units ``metric`` counts.
+
+    ``cer``: every kept character. ``mer``: each non-ASCII kept character on
+    its own, and each run of ASCII letters, digits and inner apostrophes as
+    one word, so code-switched English counts by word.
+    """
+    t2s = t2s_table()
+    norm = "".join(
+        t2s.get(ch, ch) for ch in unicodedata.normalize("NFKC", text).lower()
+    )
+    if metric == "cer":
+        return [ch for ch in norm if _kept(ch)]
+    out: list[str] = []
+    word: list[str] = []
+    for ch in norm:
+        if ch.isascii() and (ch.isalnum() or ch == "'"):
+            word.append(ch)
+            continue
+        w = "".join(word).strip("'")
+        if w:
+            out.append(w)
+        word = []
+        if _kept(ch):
+            out.append(ch)
+    w = "".join(word).strip("'")
+    if w:
+        out.append(w)
+    return out
+
+
+def edit_distance(a: list[str], b: list[str]) -> int:
+    """Levenshtein distance; substitution, insertion and deletion cost 1."""
+    if len(a) < len(b):
+        a, b = b, a
+    prev = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        cur = [i]
+        for j, y in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x != y)))
+        prev = cur
+    return prev[-1]
+
+
+def read_jsonl(path: Path, label: str, keys: tuple[str, ...]) -> list[dict]:
+    """JSON objects, one per non-empty line, each with string ``keys``."""
+    out: list[dict] = []
+    for i, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not raw.strip():
+            continue
+        try:
+            obj = json.loads(raw)
+        except json.JSONDecodeError as e:
+            raise Fail(f"{label} line {i}: not valid JSON: {e}")
+        if not isinstance(obj, dict):
+            raise Fail(f"{label} line {i}: each line must be a JSON object")
+        for k in keys:
+            if not isinstance(obj.get(k), str):
+                raise Fail(f"{label} line {i}: {k!r} must be a string")
+        out.append(obj)
+    if not out:
+        raise Fail(f"{label}: holds no rows")
+    return out
+
+
+def _few(ids: list[str]) -> str:
+    return ", ".join(repr(i) for i in ids[:3]) + (" ..." if len(ids) > 3 else "")
+
+
+class ScoreSet:
+    """A brief's reference set, loaded once, and the scoring of prediction files."""
+
+    def __init__(self, root: Path, set_path: str, head: str | None) -> None:
+        self.root = root
+        self.set_path = set_path
+        self.head = head
+        self._refs: list[tuple[str, str]] | None = None
+
+    def refs(self) -> list[tuple[str, str]]:
+        if self._refs is None:
+            label = f"{self.set_path}/{MANIFEST}"
+            path = self.root / self.set_path / MANIFEST
+            if not path.is_file():
+                raise Fail(f"{label} does not exist; the eval block names a set with no manifest")
+            out: list[tuple[str, str]] = []
+            seen: set[str] = set()
+            for row in read_jsonl(path, label, ("id", "ref")):
+                if row["id"] in seen:
+                    raise Fail(f"{label}: id {row['id']!r} appears twice")
+                seen.add(row["id"])
+                if not score_tokens(row["ref"], "cer"):
+                    raise Fail(f"{label}: id {row['id']!r} has an empty reference")
+                out.append((row["id"], row["ref"]))
+            self._refs = out
+        return self._refs
+
+    def check_run_card(self, label: str, pred: Path) -> None:
+        card = pred.with_name(pred.name[: -len(".jsonl")] + RUN_CARD_SUFFIX)
+        if not card.is_file():
+            raise Fail(f"{label}: {card.name} is missing; every prediction file needs its run card")
+        try:
+            data = json.loads(card.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            raise Fail(f"{label}: {card.name} is not valid JSON: {e}")
+        if not isinstance(data, dict):
+            raise Fail(f"{label}: {card.name} must be a JSON object")
+        missing = [k for k in RUN_CARD_KEYS if k not in data]
+        if missing:
+            raise Fail(f"{label}: {card.name} lacks {', '.join(missing)}")
+        for k in ("script_commit", "model_revision"):
+            if not isinstance(data[k], str) or not HEX40.match(data[k]):
+                raise Fail(
+                    f"{label}: {card.name} {k} must be a full 40-character hash, "
+                    f"got {data[k]!r}"
+                )
+        for k in ("model", "device"):
+            if not isinstance(data[k], str) or not data[k].strip():
+                raise Fail(f"{label}: {card.name} {k} must be a non-empty string")
+        if not isinstance(data["decoding"], dict) or not data["decoding"]:
+            raise Fail(
+                f"{label}: {card.name} decoding must be a non-empty object "
+                f"(language, beam, temperature, chunking, ...)"
+            )
+        if data["dirty"] is not False:
+            raise Fail(
+                f"{label}: {card.name} has dirty={data['dirty']!r}; predictions "
+                f"must come from a committed script (dirty: false)"
+            )
+        if self.head is not None:
+            try:
+                known = is_ancestor(self.root, data["script_commit"], self.head)
+            except Fail:
+                known = False
+            if not known:
+                raise Fail(
+                    f"{label}: {card.name} script_commit {data['script_commit'][:12]} is "
+                    f"not a commit in this head's history"
+                )
+
+    def score(self, label: str, metric: str, pred: Path) -> tuple[float, int]:
+        """Per-mille error rate of ``pred`` against the set, and its token count."""
+        refs = self.refs()
+        self.check_run_card(label, pred)
+        rows = read_jsonl(pred, f"{label} {pred.name}", ("id", "hyp"))
+        hyps: dict[str, str] = {}
+        for row in rows:
+            if row["id"] in hyps:
+                raise Fail(f"{label}: {pred.name} repeats id {row['id']!r}")
+            hyps[row["id"]] = row["hyp"]
+        want = [i for i, _ in refs]
+        missing = [i for i in want if i not in hyps]
+        extra = sorted(set(hyps) - set(want))
+        if missing or extra:
+            raise Fail(
+                f"{label}: {pred.name} must hold exactly the {len(want)} ids of "
+                f"{self.set_path}/{MANIFEST}; missing {len(missing)} ({_few(missing)}), "
+                f"extra {len(extra)} ({_few(extra)})"
+            )
+        edits = 0
+        total = 0
+        for i, ref in refs:
+            r_tok = score_tokens(ref, metric)
+            if not r_tok:
+                raise Fail(f"{self.set_path}/{MANIFEST}: id {i!r} has no {metric} tokens")
+            edits += edit_distance(r_tok, score_tokens(hyps[i], metric))
+            total += len(r_tok)
+        return 1000.0 * edits / total, total
 
 
 # ---------------------------------------------------------------- RESULT.json
@@ -2868,6 +3205,14 @@ def check_task(
         fail.append(str(e))
         return
     status, tol, n_decl, frame, stamp, identities = brief
+    scores: ScoreSet | None = None
+    try:
+        eval_set = parse_eval_block(md.name, md.read_text(encoding="utf-8"))
+    except Fail as e:
+        fail.append(str(e))
+        eval_set = None
+    if eval_set is not None:
+        scores = ScoreSet(root, eval_set, head)
 
     task_dir = root / "tasks" / f"TASK-{n}"
     check_fork(root, n, md, brief, head, fail)
@@ -2917,7 +3262,7 @@ def check_task(
                 routes[k][name] = route(k, n, name, str(r[name]["query"]).strip(), root)
             except Fail as e:
                 fail.append(str(e))
-        replayed = replay(k, r, tol, routes[k], conn, seconds, fail)
+        replayed = replay(k, r, tol, routes[k], conn, seconds, fail, scores)
         replayed_by[k] = replayed
         extra = ""
         if n_decl is not None:
@@ -2969,6 +3314,19 @@ def check_task(
                 f"{v[p]} in {VERIFIER}; the second computation must be its own"
             )
         fail.extend(cross_side_sql_hash_collisions(n, root, w, v))
+
+        def preds(which: str) -> dict[Path, str]:
+            return {
+                t[1]: nm  # type: ignore[index]
+                for nm, (kind, t) in routes[which].items()
+                if kind == "score"
+            }
+        wp, vp = preds(WORKER), preds(VERIFIER)
+        for p in sorted(set(wp) & set(vp)):
+            fail.append(
+                f"TASK-{n}: {p.relative_to(root.resolve())} is scored for {wp[p]} in "
+                f"{WORKER} and {vp[p]} in {VERIFIER}; the second run must be its own"
+            )
 
     paired = 0
     if WORKER in rows and VERIFIER in rows:
