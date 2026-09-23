@@ -1,2 +1,5 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
+# Only tests/ is collected: worker write sets include task folders such as
+# tasks/TASK-N/pred/**, and nothing there is a test.
+testpaths = ["tests"]

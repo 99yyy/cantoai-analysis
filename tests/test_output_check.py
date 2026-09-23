@@ -2015,3 +2015,36 @@ def test_reopening_in_the_same_pr_lifts_the_freeze(tmp_path, capsys):
 def test_status_at_reads_the_base_brief():
     assert output_check.status_at(ROOT, "HEAD", "6") == "closed"
     assert output_check.status_at(ROOT, "HEAD", "99") is None
+
+
+# ------------------------------------------------ declaration fence layout
+
+LAYOUT_OK = "status: open\n\n```numbers\nn_a 0\n```\n\n```sql\nSELECT 1;\n```\n\n```frame\nwindows 1\n```\n"
+
+
+def test_fence_layout_accepts_one_fence_per_kind():
+    assert output_check.fence_layout_errors("TASK-X.md", LAYOUT_OK) == []
+
+
+def test_fence_layout_rejects_a_second_fence_of_a_kind():
+    text = LAYOUT_OK + "\n```numbers\nn_a 5\n```\n"
+    errs = output_check.fence_layout_errors("TASK-X.md", text)
+    assert len(errs) == 1 and "a second ```numbers fence at line" in errs[0], errs
+
+
+def test_fence_layout_rejects_a_declaration_inside_another_fence():
+    text = "status: open\n\n```fixture\n```numbers\nn_a 5\n```\n"
+    errs = output_check.fence_layout_errors("TASK-X.md", text)
+    assert any("```numbers at line 4 opens inside the fence that line 3 opened" in e for e in errs), errs
+
+
+def test_fence_layout_rejects_an_unclosed_declaration_fence():
+    errs = output_check.fence_layout_errors("TASK-X.md", "status: open\n\n```numbers\nn_a 0\n")
+    assert errs == ["TASK-X.md: the ```numbers fence at line 3 is never closed"], errs
+
+
+def test_parse_brief_fails_on_an_ambiguous_layout(tmp_path):
+    md = tmp_path / "TASK-X.md"
+    md.write_text("status: open\n\n```fixture\n```numbers\nn_a 5\n```\n\n```numbers\nn_a 0\n```\n", encoding="utf-8")
+    with pytest.raises(output_check.Fail, match="opens inside the fence"):
+        output_check.parse_brief(md)

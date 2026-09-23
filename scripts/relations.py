@@ -149,7 +149,7 @@ def family(name: str) -> str:
     )
 
 
-OUTSIDE_FRAME_FENCE = re.compile(r"^```outside_frame\s*$(.*?)^```\s*$", re.M | re.S)
+OUTSIDE_FRAME_FENCE = output_check.DECLARATION_FENCES["outside_frame"]
 
 
 def parse_outside_frame_block(label: str, text: str, declared: dict[str, float]) -> frozenset[str]:

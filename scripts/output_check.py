@@ -252,6 +252,20 @@ N_FENCE = re.compile(r"^```n\s*$(.*?)^```\s*$", re.M | re.S)
 FRAME_FENCE = re.compile(r"^```frame\s*$(.*?)^```\s*$", re.M | re.S)
 IDENTITIES_FENCE = re.compile(r"^```identities\s*$(.*?)^```\s*$", re.M | re.S)
 EVAL_FENCE = re.compile(r"^```eval\s*$(.*?)^```\s*$", re.M | re.S)
+FIXTURE_FENCE = re.compile(r"^```fixture\s*$(.*?)^```\s*$", re.M | re.S)
+OUTSIDE_FRAME_FENCE = re.compile(r"^```outside_frame\s*$(.*?)^```\s*$", re.M | re.S)
+# Every declaration fence a gate reads, by kind. history_audit.py and
+# relations.py take their patterns from here, so all gates read one brief the
+# same way: each kind by its own first match.
+DECLARATION_FENCES: dict[str, re.Pattern[str]] = {
+    "numbers": BLOCK,
+    "fixture": FIXTURE_FENCE,
+    "frame": FRAME_FENCE,
+    "n": N_FENCE,
+    "identities": IDENTITIES_FENCE,
+    "outside_frame": OUTSIDE_FRAME_FENCE,
+    "eval": EVAL_FENCE,
+}
 STATUS = re.compile(
     r"^status:[ \t]*(open|closed|escalated|blocked)[ \t]*$", re.M
 )
@@ -1037,8 +1051,52 @@ def frozen_summary(root: Path, md: Path, corpus_sha: str) -> None:
 # ------------------------------------------------------------------------- brief
 
 
+def fence_layout_errors(label: str, text: str) -> list[str]:
+    """Declaration fences that different readers could take differently.
+
+    A brief holds at most one fence of each declaration kind, and none opens
+    inside another fence. Otherwise a reader that scans fences in sequence and
+    one that searches each kind separately see different blocks: an outer
+    fence can swallow the real ``numbers`` block while a decoy copy further
+    down is what one of them compares.
+    """
+    errors: list[str] = []
+    seen: dict[str, int] = {}
+    open_at = 0
+    open_kind = ""
+    for i, raw in enumerate(text.splitlines(), 1):
+        line = raw.rstrip()
+        if not line.startswith("```"):
+            continue
+        info = line[3:].strip()
+        kind = info.split()[0] if info else ""
+        if not open_at:
+            open_at, open_kind = i, kind
+            if kind in DECLARATION_FENCES:
+                if kind in seen:
+                    errors.append(
+                        f"{label}: a second ```{kind} fence at line {i} (the first is at "
+                        f"line {seen[kind]}); a brief has one fence of each kind"
+                    )
+                else:
+                    seen[kind] = i
+        elif not info:
+            open_at, open_kind = 0, ""
+        elif kind in DECLARATION_FENCES:
+            errors.append(
+                f"{label}: ```{kind} at line {i} opens inside the fence that line "
+                f"{open_at} opened; a declaration fence may not sit inside another fence"
+            )
+    if open_at and open_kind in DECLARATION_FENCES:
+        errors.append(f"{label}: the ```{open_kind} fence at line {open_at} is never closed")
+    return errors
+
+
 def parse_brief(md: Path) -> Brief:
     text = md.read_text(encoding="utf-8")
+    layout = fence_layout_errors(md.name, text)
+    if layout:
+        raise Fail("; ".join(layout))
 
     st = STATUS.findall(text)
     if len(st) != 1:

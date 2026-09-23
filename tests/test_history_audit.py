@@ -743,3 +743,160 @@ def test_added_file_that_could_shadow_a_module_needs_review(tmp_path, monkeypatc
     code, out = _audit(repo, base, "", monkeypatch, capsys)
     assert code == 1, out
     assert "a gate file changed (scripts/json.py)" in out
+
+
+# ------------------------------------------------ one fence parser for all gates
+
+SWALLOW = """# TASK-6
+status: closed
+
+```fixture
+```numbers
+# name                     tol
+n_videos_pre               0
+gap_contract_pp            5.0
+agree_film_pre             0.0005
+rate_tone_pre_pm           0.5
+```
+
+```numbers
+# name                     tol
+n_videos_pre               0
+gap_contract_pp            0.05
+agree_film_pre             0.0005
+rate_tone_pre_pm           0.5
+```
+"""
+
+
+def test_audit_reads_the_numbers_block_the_gate_applies():
+    """A fixture opener must not hide the real numbers block behind a decoy."""
+    applied = history_audit.output_check.BLOCK.search(SWALLOW).group(1)
+    assert "gap_contract_pp            5.0" in applied
+    blocks = history_audit.parse_declaration_blocks(SWALLOW)
+    assert blocks["numbers"]["gap_contract_pp"] == (5.0,)
+
+
+def test_fence_swallow_is_a_widening_and_an_ambiguity():
+    hits = history_audit.declaration_bars(PATH, NUMBERS, SWALLOW)
+    assert f"{PATH} ```numbers gap_contract_pp tolerance widened (0.05 -> 5)" in hits, hits
+    assert any("declaration fences made ambiguous" in h and "opens inside" in h for h in hits), hits
+
+
+def test_fence_layout_of_real_briefs_is_clean():
+    for md in sorted((ROOT / "tasks").glob("TASK-*.md")):
+        assert history_audit.output_check.fence_layout_errors(md.name, md.read_text(encoding="utf-8")) == []
+
+
+# ------------------------------------------------ files that steer the gate tests
+
+def _tests_repo(tmp_path: Path) -> tuple[Path, str]:
+    repo = tmp_path / "repo"
+    (repo / "tests").mkdir(parents=True)
+    _git(tmp_path, "init", "-q", str(repo))
+    (repo / "tests" / "test_fork.py").write_text(
+        "from tests.test_output_check import output_check\n\ndef test_x():\n    assert output_check\n",
+        encoding="utf-8",
+    )
+    (repo / "tests" / "test_sql.py").write_text(
+        "from src.hashing import verify_corpus_hash\n\ndef test_y():\n    assert verify_corpus_hash\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "base")
+    return repo, _git(repo, "rev-parse", "HEAD")
+
+
+def test_conftest_that_skips_gate_tests_needs_review(tmp_path, monkeypatch, capsys):
+    repo, base = _tests_repo(tmp_path)
+    (repo / "tests" / "conftest.py").write_text(
+        'collect_ignore_glob = ["test_output_check*.py", "test_fork.py"]\n', encoding="utf-8"
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "conftest")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 1, out
+    assert "a gate file changed (tests/conftest.py)" in out
+
+
+def test_deleting_a_test_that_imports_a_gate_test_is_a_bar(tmp_path, monkeypatch, capsys):
+    repo, base = _tests_repo(tmp_path)
+    _git(repo, "rm", "-q", "tests/test_fork.py")
+    _git(repo, "commit", "-q", "-m", "drop")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 1, out
+    assert "bars touched:     ['tests/test_fork.py']" in out
+    assert "a gate file changed (tests/test_fork.py)" in out
+
+
+def test_worker_test_of_src_is_not_a_gate_file(tmp_path, monkeypatch, capsys):
+    repo, base = _tests_repo(tmp_path)
+    (repo / "tests" / "test_sql.py").write_text(
+        "from src.hashing import verify_corpus_hash\n\ndef test_y():\n    assert callable(verify_corpus_hash)\n",
+        encoding="utf-8",
+    )
+    (repo / "tests" / "test_frame.py").write_text(
+        "from src.frame import load_published_frame\n\ndef test_z():\n    assert load_published_frame\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "worker tests")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 0, out
+    assert "history_audit: PASS" in out
+
+
+def test_worker_test_calling_eval_is_not_a_gate_file(tmp_path, monkeypatch, capsys):
+    """Words in a worker's test do not make it a gate file; the gate list does."""
+    repo, base = _tests_repo(tmp_path)
+    (repo / "tests" / "test_model.py").write_text(
+        "# compares with the scripts in tasks/\nimport importlib.resources\n\n"
+        "def test_m():\n    net = type('N', (), {'eval': lambda self: 1})()\n    assert net.eval() == 1\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "worker test")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 0, out
+    assert "bars touched:     none" in out
+
+
+def test_pytest_configuration_files_are_gate_files():
+    for f in ["conftest.py", "tests/conftest.py", "tests/sub/conftest.py", "tests/__init__.py",
+              "tests/sub/__init__.py", "pyproject.toml", "pytest.ini", "setup.cfg", "tox.ini",
+              "tests/pytest.ini", "tests/pyproject.toml", "requirements.txt", "requirements-dev.txt"]:
+        assert history_audit.match_any(f, history_audit.BAR_FILES), f
+    for f in ["src/__init__.py", "tasks/TASK-9/requirements.md"]:
+        assert not history_audit.match_any(f, history_audit.BAR_FILES), f
+
+
+def _imports(path: Path) -> set[str]:
+    import ast
+
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    out: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            out.update(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            out.add(node.module)
+    return out
+
+
+def test_gate_test_list_matches_the_tree():
+    """The isolated gate-test run covers every test of a gate script and no src/ code."""
+    listed = sorted(history_audit.GATE_TESTS)
+    assert listed, "gate_config.json lists no gate tests"
+    for name in listed:
+        assert (ROOT / name).is_file(), name
+        bad = sorted(m for m in _imports(ROOT / name) if m == "src" or m.startswith("src."))
+        assert not bad, f"{name} imports {bad}; a gate test may not import worker code"
+    loads_a_gate = re.compile(r"/\s*[\"']scripts[\"']\s*/")
+    for p in sorted((ROOT / "tests").glob("test_*.py")):
+        name = f"tests/{p.name}"
+        reaches_gate = bool(loads_a_gate.search(p.read_text(encoding="utf-8"))) or any(
+            m.startswith("tests.") and m.replace(".", "/") + ".py" in history_audit.GATE_TESTS
+            for m in _imports(p)
+        )
+        if reaches_gate:
+            assert name in history_audit.GATE_TESTS, f"{name} tests a gate script but is not in gate_tests"
