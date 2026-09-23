@@ -743,3 +743,126 @@ def test_added_file_that_could_shadow_a_module_needs_review(tmp_path, monkeypatc
     code, out = _audit(repo, base, "", monkeypatch, capsys)
     assert code == 1, out
     assert "a gate file changed (scripts/json.py)" in out
+
+
+# ------------------------------------------------ one fence parser for all gates
+
+SWALLOW = """# TASK-6
+status: closed
+
+```fixture
+```numbers
+# name                     tol
+n_videos_pre               0
+gap_contract_pp            5.0
+agree_film_pre             0.0005
+rate_tone_pre_pm           0.5
+```
+
+```numbers
+# name                     tol
+n_videos_pre               0
+gap_contract_pp            0.05
+agree_film_pre             0.0005
+rate_tone_pre_pm           0.5
+```
+"""
+
+
+def test_audit_reads_the_numbers_block_the_gate_applies():
+    """A fixture opener must not hide the real numbers block behind a decoy."""
+    applied = history_audit.output_check.BLOCK.search(SWALLOW).group(1)
+    assert "gap_contract_pp            5.0" in applied
+    blocks = history_audit.parse_declaration_blocks(SWALLOW)
+    assert blocks["numbers"]["gap_contract_pp"] == (5.0,)
+
+
+def test_fence_swallow_is_a_widening_and_an_ambiguity():
+    hits = history_audit.declaration_bars(PATH, NUMBERS, SWALLOW)
+    assert f"{PATH} ```numbers gap_contract_pp tolerance widened (0.05 -> 5)" in hits, hits
+    assert any("declaration fences made ambiguous" in h and "opens inside" in h for h in hits), hits
+
+
+def test_fence_layout_of_real_briefs_is_clean():
+    for md in sorted((ROOT / "tasks").glob("TASK-*.md")):
+        assert history_audit.output_check.fence_layout_errors(md.name, md.read_text(encoding="utf-8")) == []
+
+
+# ------------------------------------------------ files that steer the gate tests
+
+def _tests_repo(tmp_path: Path) -> tuple[Path, str]:
+    repo = tmp_path / "repo"
+    (repo / "tests").mkdir(parents=True)
+    _git(tmp_path, "init", "-q", str(repo))
+    (repo / "tests" / "test_fork.py").write_text(
+        "from tests.test_output_check import output_check\n\ndef test_x():\n    assert output_check\n",
+        encoding="utf-8",
+    )
+    (repo / "tests" / "test_sql.py").write_text(
+        "from src.hashing import verify_corpus_hash\n\ndef test_y():\n    assert verify_corpus_hash\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "base")
+    return repo, _git(repo, "rev-parse", "HEAD")
+
+
+def test_conftest_that_skips_gate_tests_needs_review(tmp_path, monkeypatch, capsys):
+    repo, base = _tests_repo(tmp_path)
+    (repo / "tests" / "conftest.py").write_text(
+        'collect_ignore_glob = ["test_output_check*.py", "test_fork.py"]\n', encoding="utf-8"
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "conftest")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 1, out
+    assert "a gate file changed (tests/conftest.py)" in out
+
+
+def test_deleting_a_test_that_imports_a_gate_test_is_a_bar(tmp_path, monkeypatch, capsys):
+    repo, base = _tests_repo(tmp_path)
+    _git(repo, "rm", "-q", "tests/test_fork.py")
+    _git(repo, "commit", "-q", "-m", "drop")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 1, out
+    assert "bars touched:     ['tests/test_fork.py']" in out
+    assert "a gate file changed (tests/test_fork.py)" in out
+
+
+def test_worker_test_of_src_is_not_a_gate_file(tmp_path, monkeypatch, capsys):
+    repo, base = _tests_repo(tmp_path)
+    (repo / "tests" / "test_sql.py").write_text(
+        "from src.hashing import verify_corpus_hash\n\ndef test_y():\n    assert callable(verify_corpus_hash)\n",
+        encoding="utf-8",
+    )
+    (repo / "tests" / "test_frame.py").write_text(
+        "from src.frame import load_published_frame\n\ndef test_z():\n    assert load_published_frame\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "worker tests")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 0, out
+    assert "history_audit: PASS" in out
+
+
+def test_new_test_reaching_a_gate_dynamically_needs_review(tmp_path, monkeypatch, capsys):
+    repo, base = _tests_repo(tmp_path)
+    (repo / "tests" / "test_zz.py").write_text(
+        'import importlib\nm = importlib.import_module("tests.test_" + "output_check")\n',
+        encoding="utf-8",
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "sneaky")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 1, out
+    assert "a gate file changed (tests/test_zz.py)" in out
+
+
+def test_pytest_configuration_files_are_gate_files():
+    for f in ["conftest.py", "tests/conftest.py", "tests/sub/conftest.py", "tests/__init__.py",
+              "tests/sub/__init__.py", "pyproject.toml", "pytest.ini", "setup.cfg", "tox.ini",
+              "requirements.txt", "requirements-dev.txt"]:
+        assert history_audit.match_any(f, history_audit.BAR_FILES), f
+    for f in ["src/__init__.py", "tasks/TASK-9/requirements.md"]:
+        assert not history_audit.match_any(f, history_audit.BAR_FILES), f

@@ -19,8 +19,11 @@ Two rules, both mechanical:
    not a name. The line does not make the change right; it makes it visible to
    the round audit, which is where judgement belongs.
 3. A pull request that adds, changes, renames or deletes a gate file
-   (anything under ``scripts/``, ``.github/`` or ``benchmarks/``, the gate
-   tests, their fixtures and mutation probes) also needs a line beginning
+   (anything under ``scripts/``, ``.github/`` or ``benchmarks/``; the gate
+   tests, their fixtures and mutation probes; any test that reaches a gate or
+   another test module; and the files that decide what pytest collects and
+   imports: ``conftest.py``, ``tests/__init__.py``, the pytest configuration
+   and the requirements) also needs a line beginning
    ``Gate-review:`` in its body that names the reviewed head commit (at least
    seven hex digits of it). The owner adds it after a fresh review session
    has read the diff; a later push makes the line stale until it is renewed.
@@ -64,10 +67,20 @@ from __future__ import annotations
 import argparse
 import ast
 import fnmatch
+import importlib.util
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+# The declaration fences are read with output_check.py's own patterns, so this
+# audit and the gate that applies the declarations never read a brief
+# differently. Loaded from this file's directory, like relations.py does.
+_HERE = Path(__file__).resolve().parent
+_SPEC = importlib.util.spec_from_file_location("output_check", _HERE / "output_check.py")
+assert _SPEC is not None and _SPEC.loader is not None
+output_check = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(output_check)
 
 # Adding a bar is normal: new code needs its expected value declared in the same
 # change (contract clause 9). Only a bar that already existed and then moved, or
@@ -94,6 +107,13 @@ BAR_FILES: list[str] = [
     "tests/test_mutations*.py", "tests/test_assertions*.py",
     "tests/mutations/*", "tests/mutations/**",
     "tests/fixtures/*", "tests/fixtures/**",
+    # What pytest collects and imports before any gate test runs: a conftest
+    # (fnmatch '*' crosses '/', so any depth), a package __init__ under tests/,
+    # the pytest configuration and the pinned requirements.
+    "conftest.py", "*/conftest.py",
+    "tests/__init__.py", "tests/*/__init__.py",
+    "pyproject.toml", "pytest.ini", "setup.cfg", "tox.ini",
+    "requirements*.txt",
     # Reference sets a score route is judged against (owner-only).
     "benchmarks/*", "benchmarks/**",
 ]
@@ -280,14 +300,22 @@ def retired_detector_paths() -> frozenset[str]:
     return frozenset(paths)
 
 
-DECL_FENCE = re.compile(
-    r"^```(" + "|".join(DECL_KINDS) + r")\s*$(.*?)^```\s*$",
-    re.M | re.S,
-)
+# One pattern per kind, each searched on its own (output_check.py's patterns).
+# A single sequential scan over all kinds let an outer fence swallow the real
+# block, so this audit compared a decoy the gate never read.
+DECL_FENCES = {kind: output_check.DECLARATION_FENCES[kind] for kind in DECL_KINDS}
 TOLERANCE_NAMES = frozenset({"tol", "tolerance"})
 # Names exempt from relations.py's exclude invariant (one per line, no value).
 EXEMPT_KIND = "outside_frame"
-EXEMPT_FENCE = re.compile(r"^```outside_frame\s*$(.*?)^```\s*$", re.M | re.S)
+EXEMPT_FENCE = output_check.DECLARATION_FENCES[EXEMPT_KIND]
+# A test is a gate test when it reaches a gate script or another test module,
+# directly or through a dynamic import, in its base or head version. Tests of
+# src/ written by a worker do neither.
+GATE_TEST_GLOB = "tests/*.py"
+GATE_TEST_RE = re.compile(
+    r"\bscripts\b|\b(?:from|import)\s+tests\b|importlib|__import__|\brunpy\b|"
+    r"sys\.modules|\bexec\s*\(|\beval\s*\("
+)
 
 
 def run(*args: str) -> str:
@@ -319,6 +347,19 @@ def names_head(line: str, head: str) -> bool:
 
 def match_any(path: str, globs: list[str]) -> bool:
     return any(fnmatch.fnmatch(path, g) for g in globs)
+
+
+def is_gate_test(base: str, path: str) -> bool:
+    """A test file that reaches a gate or another test, in base or at HEAD."""
+    if not fnmatch.fnmatch(path, GATE_TEST_GLOB):
+        return False
+    return any(
+        GATE_TEST_RE.search(file_at(ref, path) or "") for ref in (base, "HEAD")
+    )
+
+
+def is_gate_file(base: str, path: str) -> bool:
+    return match_any(path, BAR_FILES) or is_gate_test(base, path)
 
 
 def count_in(ref: str, path: str, pattern: str) -> int:
@@ -402,13 +443,13 @@ def parse_identity_entries(body: str) -> dict[str, tuple[float, ...]]:
 
 
 def parse_declaration_blocks(text: str) -> dict[str, dict[str, tuple[float, ...]]]:
-    """First fenced block per kind. Later duplicates of the same kind are ignored."""
+    """First fenced block per kind, each kind searched on its own (as output_check)."""
     blocks: dict[str, dict[str, tuple[float, ...]]] = {}
-    for m in DECL_FENCE.finditer(text):
-        kind = m.group(1)
-        if kind in blocks:
+    for kind in DECL_KINDS:
+        m = DECL_FENCES[kind].search(text)
+        if not m:
             continue
-        body = m.group(2)
+        body = m.group(1)
         blocks[kind] = parse_identity_entries(body) if kind == "identities" else parse_decl_entries(body)
     return blocks
 
@@ -437,8 +478,8 @@ def exempt_bars(path: str, old_text: str, new_text: str) -> list[str]:
     ]
 
 
-FRAME_FENCE = re.compile(r"^```frame\s*$(.*?)^```\s*$", re.M | re.S)
-EVAL_FENCE = re.compile(r"^```eval\s*$(.*?)^```\s*$", re.M | re.S)
+FRAME_FENCE = output_check.DECLARATION_FENCES["frame"]
+EVAL_FENCE = output_check.DECLARATION_FENCES["eval"]
 PREDICATE_LINE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*\s+\S")
 
 
@@ -481,6 +522,9 @@ def declaration_bars(path: str, old_text: str, new_text: str) -> list[str]:
     new_blocks = parse_declaration_blocks(new_text)
     hits: list[str] = exempt_bars(path, old_text, new_text)
     hits.extend(text_line_bars(path, old_text, new_text))
+    if not output_check.fence_layout_errors(path, old_text):
+        for err in output_check.fence_layout_errors(path, new_text):
+            hits.append(f"{path} declaration fences made ambiguous: {err}")
     for kind in DECL_KINDS:
         was = old_blocks.get(kind)
         now = new_blocks.get(kind)
@@ -589,7 +633,7 @@ def main() -> int:
     base_tree = run("git", "ls-tree", "-r", "--name-only", args.base).splitlines()
     for f in files:
         # A file under expected/ counts only if it existed before this change.
-        if match_any(f, BAR_FILES) and f in base_tree:
+        if f in base_tree and is_gate_file(args.base, f):
             bars.append(f)
     b_pat = [p for p in base_tree if fnmatch.fnmatch(p, MUTATION_GLOB)]
     h_pat = [p for p in run("git", "ls-tree", "-r", "--name-only", "HEAD").splitlines()
@@ -658,7 +702,7 @@ def main() -> int:
     # Added, renamed and deleted gate files count too, not only bars that
     # existed in base: a new scripts/json.py would shadow the standard
     # library for every gate that runs from that directory.
-    gate_files = sorted(f for f in files if match_any(f, BAR_FILES))
+    gate_files = sorted(f for f in files if is_gate_file(args.base, f))
     if gate_files:
         body = Path(args.body_FILE).read_text(encoding="utf-8") if args.body_FILE and Path(args.body_FILE).is_file() else ""
         head = reviewed_head()
