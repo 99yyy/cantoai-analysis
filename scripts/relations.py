@@ -6,10 +6,11 @@ A number that agrees on the live corpus can still be a constant in disguise:
 row, shuffling row order, or dropping the rows the brief says are not
 published, has no expected answer to special-case.
 
-This script is a step of the ``output-check`` *job*, run from the pull-request
-workspace (HEAD). After A1, PR CI copies ``output_check.py`` from base into
-``/tmp/gate``; that copy cannot see this file until the PR merges. Do not call
-this module from ``/tmp/gate/output_check.py``.
+This script is a step of the ``output-check`` *job*. On a pull request CI
+runs the base branch's copy from ``/tmp/gate`` (the whole ``scripts/``
+directory as the base has it), like every other gate: a pull request is never
+judged by the relations it brings. It imports ``output_check.py`` from its
+own directory, so the two always come from the same branch.
 
 Nothing project-specific is written here. Table names, keys, the columns to
 namespace, the unit table and the number families come from
@@ -51,7 +52,17 @@ apply to every name.
 Anchor: when ``frame`` declares ``published_expected``, the excluded corpus
 must hold exactly that many rows of the unit table (``published_expected_tol``,
 default 0). A frame that no longer matches the corpus is a stale frame, not
-a smaller published set.
+a smaller published set. The anchor is checked as soon as the brief exists,
+before either output does, so a wrong count fails on the brief's own pull
+request instead of after two agents have been launched on it.
+
+Score routes (``score:<metric>:<file>.jsonl``) do not read the corpus: they
+are scored from prediction files, so their value is the same on every copy.
+They are replayed here too, once, with output-check's scorer, and enter every
+relation as that constant. A ``derived:`` name that mixes a score route with a
+corpus number is therefore still checked -- ``1000 * n_count / 2 + 0 * rate_cer_pm``
+cannot hide a hard-coded denominator. A side of which no number was compared
+under double fails: a relation that checks nothing must not read as a pass.
 
 An unclassified name is a failure. Suspended and STALE tasks are skipped, as
 in output-check. Relations does not freeze on PR diff: a hardcoded denominator
@@ -410,14 +421,26 @@ def replay_values(
     conn: sqlite3.Connection,
     seconds: float,
     fail: list[str],
+    scores: "output_check.ScoreSet | None" = None,
 ) -> dict[str, float]:
-    """Replay SQL and derived names. Does not look at written values."""
+    """Replay SQL, score and derived names. Does not look at written values."""
     got: dict[str, float] = {}
     pending: dict[str, str] = {}
     for name in sorted(routes):
         kind, target = routes[name]
         if kind == "derived":
             pending[name] = str(target)
+            continue
+        if kind == "score":
+            # Corpus-independent: the same value on every copy of the corpus.
+            if scores is None:
+                fail.append(f"{label}:{name}: a score route needs an ```eval block")
+                continue
+            metric, pred = target  # type: ignore[misc]
+            try:
+                got[name] = scores.score(f"{label}:{name}", metric, pred)[0]
+            except Fail as e:
+                fail.append(str(e))
             continue
         try:
             got[name] = output_check.run_sql(
@@ -568,9 +591,13 @@ def check_task(
         text = md.read_text(encoding="utf-8")
         outside_frame = parse_outside_frame_block(md.name, text, tol)
         predicates = output_check.parse_frame_predicates(md.name, text)
+        eval_set = output_check.parse_eval_block(md.name, text)
     except Fail as e:
         fail.append(str(e))
         return
+    scores = (
+        output_check.ScoreSet(root, eval_set, None) if eval_set is not None else None
+    )
 
     if status in output_check.SUSPEND_STATUS:
         print(
@@ -579,16 +606,6 @@ def check_task(
         return
     if output_check.stale_closed(status, stamp, corpus_sha):
         print(output_check.stale_closed_line(n, stamp, corpus_sha))
-        return
-
-    task_dir = root / "tasks" / f"TASK-{n}"
-    paths = {
-        output_check.WORKER: task_dir / output_check.WORKER,
-        output_check.VERIFIER: task_dir / output_check.VERIFIER,
-    }
-    present = {k: p for k, p in paths.items() if p.is_file()}
-    if not present:
-        print(f"  TASK-{n} [{status}]: no output yet; double/permute not run")
         return
 
     run_exclude = PUBLISHED_EXPECTED in frame
@@ -610,6 +627,18 @@ def check_task(
         if anchor:
             print(f"  TASK-{n} [{status}]: {anchor}")
 
+    task_dir = root / "tasks" / f"TASK-{n}"
+    paths = {
+        output_check.WORKER: task_dir / output_check.WORKER,
+        output_check.VERIFIER: task_dir / output_check.VERIFIER,
+    }
+    present = {k: p for k, p in paths.items() if p.is_file()}
+    if not present:
+        if exc_conn is not None:
+            exc_conn.close()
+        print(f"  TASK-{n} [{status}]: no output yet; double/permute not run")
+        return
+
     dup_conn = sqlite3.connect(f"file:{doubled}?mode=ro", uri=True)
     perm_conn = sqlite3.connect(f"file:{permuted}?mode=ro", uri=True)
     try:
@@ -623,17 +652,23 @@ def check_task(
                     family(name)
                 except Fail as e:
                     fail.append(str(e))
-            orig = replay_values(f"{k}", routes, orig_conn, seconds, fail)
+            scored = sorted(nm for nm, (kind, _t) in routes.items() if kind == "score")
+            if scored:
+                print(
+                    f"  TASK-{n} [{status}]: {k} {len(scored)} score route(s) replayed "
+                    f"from predictions, constant on every copy: {', '.join(scored)}"
+                )
+            orig = replay_values(f"{k}", routes, orig_conn, seconds, fail, scores)
             doubled_v = replay_values(
-                f"{k}:double", routes, dup_conn, seconds, fail
+                f"{k}:double", routes, dup_conn, seconds, fail, scores
             )
             perm_v = replay_values(
-                f"{k}:permute", routes, perm_conn, seconds, fail
+                f"{k}:permute", routes, perm_conn, seconds, fail, scores
             )
             exc_v: dict[str, float] = {}
             if exc_conn is not None:
                 exc_v = replay_values(
-                    f"{k}:exclude", routes, exc_conn, seconds, fail
+                    f"{k}:exclude", routes, exc_conn, seconds, fail, scores
                 )
             exempt = outside_frame_closure(outside_frame, routes) if run_exclude else frozenset()
             d_ok = 0
@@ -657,6 +692,11 @@ def check_task(
                     f"{k}", name, orig[name], exc_v[name], t, fail
                 ):
                     e_ok += 1
+            if not any(name in orig and name in doubled_v for name in routes):
+                fail.append(
+                    f"TASK-{n}: {k}: double compared none of {len(routes)} "
+                    f"number(s); a relation that checks nothing is not a pass"
+                )
             if run_exclude:
                 exclude_note = f" exclude {e_ok}/{len(routes) - len(exempt)}"
                 if exempt:

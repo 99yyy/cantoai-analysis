@@ -620,3 +620,126 @@ def test_gate_and_ci_files_are_bar_paths():
         assert history_audit.match_any(f, history_audit.BAR_FILES), f
     for f in ("tests/test_src_sql_literals.py", "tasks/TASK-9/sql/x.sql", "LOOP.md", "src/tables.py"):
         assert not history_audit.match_any(f, history_audit.BAR_FILES), f
+
+
+# --- frame predicates, eval lines, and the gate-review line ------------------
+
+import subprocess
+import sys
+
+
+def test_frame_predicate_change_is_a_bar_move():
+    old = NUMBERS + "```frame\nwindows.tier IN ('A','B')\npublished_expected 164693\n```\n"
+    new = NUMBERS + "```frame\nwindows.tier IN ('A','B','C')\npublished_expected 164693\n```\n"
+    hits = history_audit.declaration_bars(PATH, old, new)
+    assert hits == [
+        "tasks/TASK-6.md ```frame predicate \"windows.tier IN ('A','B')\" changed or deleted"
+    ]
+    assert history_audit.declaration_bars(PATH, old, old) == []
+
+
+def test_eval_line_change_and_block_deletion_are_bar_moves():
+    old = NUMBERS + "```eval\nset benchmarks/demo\n```\n"
+    new = NUMBERS + "```eval\nset benchmarks/easier\n```\n"
+    assert history_audit.declaration_bars(PATH, old, new) == [
+        "tasks/TASK-6.md ```eval 'set benchmarks/demo' changed or deleted"
+    ]
+    assert history_audit.declaration_bars(PATH, old, NUMBERS) == [
+        "tasks/TASK-6.md ```eval block deleted"
+    ]
+    assert history_audit.declaration_bars(PATH, NUMBERS, old) == []
+
+
+def _git(repo: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _gate_change_repo(tmp_path: Path) -> tuple[Path, str]:
+    repo = tmp_path / "repo"
+    (repo / "scripts").mkdir(parents=True)
+    _git(tmp_path, "init", "-q", str(repo))
+    (repo / "scripts" / "gate.py").write_text("def check():\n    raise Fail('x')\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "base")
+    base = _git(repo, "rev-parse", "HEAD")
+    (repo / "scripts" / "gate.py").write_text(
+        "def check():\n    raise Fail('x')\n    raise Fail('y')\n", encoding="utf-8"
+    )
+    _git(repo, "commit", "-q", "-am", "head")
+    return repo, base
+
+
+def _audit(repo: Path, base: str, body: str, monkeypatch, capsys) -> tuple[int, str]:
+    body_file = repo.parent / "body.txt"
+    body_file.write_text(body, encoding="utf-8")
+    monkeypatch.chdir(repo)
+    monkeypatch.setattr(
+        sys, "argv", ["history_audit.py", "--base", base, "--pr-body-file", str(body_file)]
+    )
+    code = history_audit.main()
+    return code, capsys.readouterr().out
+
+
+def test_gate_change_needs_a_gate_review_line(tmp_path, monkeypatch, capsys):
+    repo, base = _gate_change_repo(tmp_path)
+    code, out = _audit(
+        repo, base, "BAR-CHANGE: scripts/gate.py -- one more check\n", monkeypatch, capsys
+    )
+    assert code == 1, out
+    assert "a gate file changed (scripts/gate.py); the pull-request body needs 'Gate-review:" in out
+    assert "there is no such line" in out
+
+
+def test_gate_review_must_name_the_current_head(tmp_path, monkeypatch, capsys):
+    repo, base = _gate_change_repo(tmp_path)
+    head = _git(repo, "rev-parse", "HEAD")
+    code, out = _audit(
+        repo,
+        base,
+        f"BAR-CHANGE: scripts/gate.py -- one more check\nGate-review: {base[:12]} fresh session\n",
+        monkeypatch,
+        capsys,
+    )
+    assert code == 1, out
+    assert "no line names the current head commit" in out
+    code, out = _audit(
+        repo,
+        base,
+        f"BAR-CHANGE: scripts/gate.py -- one more check\nGate-review: {head[:12]} fresh Claude session, 2026-09-23\n",
+        monkeypatch,
+        capsys,
+    )
+    assert code == 0, out
+    assert f"gate review: Gate-review: {head[:12]} fresh Claude session, 2026-09-23" in out
+
+
+def test_renamed_gate_file_is_a_bar_and_needs_review(tmp_path, monkeypatch, capsys):
+    """A rename is a delete plus an add, so the old path cannot hide."""
+    repo, base = _gate_change_repo(tmp_path)
+    _git(repo, "mv", "scripts/gate.py", "scripts/gate2.py")
+    _git(repo, "commit", "-q", "-m", "rename")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 1, out
+    assert "scripts/gate.py" in out
+    assert "no 'BAR-CHANGE: <reason>' line" in out
+
+
+def test_added_file_that_could_shadow_a_module_needs_review(tmp_path, monkeypatch, capsys):
+    repo = tmp_path / "repo"
+    (repo / "scripts").mkdir(parents=True)
+    _git(tmp_path, "init", "-q", str(repo))
+    (repo / "README.md").write_text("x\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "base")
+    base = _git(repo, "rev-parse", "HEAD")
+    (repo / "scripts" / "json.py").write_text("loads = None\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "add")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 1, out
+    assert "a gate file changed (scripts/json.py)" in out

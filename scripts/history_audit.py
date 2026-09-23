@@ -18,6 +18,14 @@ Two rules, both mechanical:
    ``BAR-CHANGE:`` in its body, naming each bar path it moves. A vague token is
    not a name. The line does not make the change right; it makes it visible to
    the round audit, which is where judgement belongs.
+3. A pull request that adds, changes, renames or deletes a gate file
+   (anything under ``scripts/``, ``.github/`` or ``benchmarks/``, the gate
+   tests, their fixtures and mutation probes) also needs a line beginning
+   ``Gate-review:`` in its body that names the reviewed head commit (at least
+   seven hex digits of it). The owner adds it after a fresh review session
+   has read the diff; a later push makes the line stale until it is renewed.
+   CI re-runs when the body is edited. The owner cannot approve his own pull
+   request on GitHub, so this line is the recorded review.
 
 Counting rule for bars that are code: a NET REMOVAL is a bar change (fewer
 checks emitted, fewer fail sites, fewer counterexample patterns, fewer
@@ -32,7 +40,10 @@ Task briefs ``tasks/TASK-*.md`` declare bars in fenced ``numbers``, ``fixture``,
 ``frame``, ``n`` and ``identities`` blocks (plan §3.3). Widening a tolerance,
 deleting a name (for ``identities``: deleting or rewording a line, or widening
 its tolerance), or deleting a whole block is a bar move. Tightening a
-tolerance is not.
+tolerance is not. A ``frame`` predicate line defines the published set, so
+changing or deleting one is a bar move; so is changing or deleting a line of
+the ``eval`` block, which names the reference set a score route is judged
+against.
 
 The gate itself is a bar: any byte change to an existing file under
 ``scripts/`` or ``.github/``, or to a test file of a gate script
@@ -83,6 +94,8 @@ BAR_FILES: list[str] = [
     "tests/test_mutations*.py", "tests/test_assertions*.py",
     "tests/mutations/*", "tests/mutations/**",
     "tests/fixtures/*", "tests/fixtures/**",
+    # Reference sets a score route is judged against (owner-only).
+    "benchmarks/*", "benchmarks/**",
 ]
 BAR_COUNTED = {
     "scripts/*.py": (GATE_FAIL_SITE_RE, "fail sites"),
@@ -104,7 +117,9 @@ MUTATION_GLOB = "tests/mutations/*.patch"
 # a top-level sql/ path is still measured; absence of that directory is
 # zero-cost, not a reason to retire the glob.
 MEASURED = ["src/*", "src/**", "sql/*", "sql/**", "data/*", "data/**",
-            "scripts/*.py", "scripts/**/*.py", "tasks/**/*.sql"]
+            "scripts/*.py", "scripts/**/*.py", "tasks/**/*.sql",
+            # Prediction files a score route replays (fnmatch '*' crosses '/').
+            "tasks/*/pred/*", "tasks/*/mine_pred/*"]
 
 # RETIRED-BEGIN
 # Dead detector paths (plan §7 item 2 alternative). main() does not consult
@@ -154,6 +169,7 @@ LIVE_INVENTORY_STRS = frozenset({"MUTATION_GLOB"})
 # would also hit tasks/TASK-6/open_analysis.md.
 TASK_BRIEF_RE = re.compile(r"^tasks/TASK-[^/]+\.md$")
 DECL_KINDS = ("numbers", "fixture", "frame", "n", "identities")
+GATE_REVIEW = "Gate-review:"
 
 
 def retired_block(text: str) -> str:
@@ -279,7 +295,26 @@ def run(*args: str) -> str:
 
 
 def changed(base: str) -> list[str]:
-    return sorted(p for p in run("git", "diff", "--name-only", f"{base}...HEAD").splitlines() if p.strip())
+    # --no-renames: a rename is a delete plus an add, so the old path (a bar
+    # that existed in base) cannot disappear behind its new name.
+    return sorted(
+        p
+        for p in run("git", "diff", "--no-renames", "--name-only", f"{base}...HEAD").splitlines()
+        if p.strip()
+    )
+
+
+def reviewed_head() -> str:
+    """The pull request's head commit: HEAD^2 of the merge CI checks out, else HEAD."""
+    parents = run("git", "rev-list", "--parents", "-n", "1", "HEAD").split()
+    return parents[2] if len(parents) == 3 else parents[0]
+
+
+def names_head(line: str, head: str) -> bool:
+    """True when ``line`` carries at least seven hex digits that begin ``head``."""
+    return any(
+        head.startswith(tok) for tok in re.findall(r"\b[0-9a-f]{7,40}\b", line.lower())
+    )
 
 
 def match_any(path: str, globs: list[str]) -> bool:
@@ -402,11 +437,50 @@ def exempt_bars(path: str, old_text: str, new_text: str) -> list[str]:
     ]
 
 
+FRAME_FENCE = re.compile(r"^```frame\s*$(.*?)^```\s*$", re.M | re.S)
+EVAL_FENCE = re.compile(r"^```eval\s*$(.*?)^```\s*$", re.M | re.S)
+PREDICATE_LINE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*\s+\S")
+
+
+def _fence_lines(fence: re.Pattern[str], text: str) -> list[str] | None:
+    """Comment-stripped, whitespace-collapsed lines of the first fence; None without one."""
+    m = fence.search(text)
+    if not m:
+        return None
+    out: list[str] = []
+    for raw in m.group(1).splitlines():
+        line = " ".join(raw.split("#", 1)[0].split())
+        if line:
+            out.append(line)
+    return out
+
+
+def text_line_bars(path: str, old_text: str, new_text: str) -> list[str]:
+    """Frame predicates and eval lines: any change or removal is a bar move."""
+    hits: list[str] = []
+    old_frame = _fence_lines(FRAME_FENCE, old_text) or []
+    new_frame = _fence_lines(FRAME_FENCE, new_text) or []
+    for line in old_frame:
+        if PREDICATE_LINE.match(line) and line not in new_frame:
+            hits.append(f"{path} ```frame predicate {line!r} changed or deleted")
+    old_eval = _fence_lines(EVAL_FENCE, old_text)
+    new_eval = _fence_lines(EVAL_FENCE, new_text)
+    if old_eval:
+        if new_eval is None:
+            hits.append(f"{path} ```eval block deleted")
+        else:
+            for line in old_eval:
+                if line not in new_eval:
+                    hits.append(f"{path} ```eval {line!r} changed or deleted")
+    return hits
+
+
 def declaration_bars(path: str, old_text: str, new_text: str) -> list[str]:
     """Bar moves in fenced declaration blocks of a task brief (plan §3.3)."""
     old_blocks = parse_declaration_blocks(old_text)
     new_blocks = parse_declaration_blocks(new_text)
     hits: list[str] = exempt_bars(path, old_text, new_text)
+    hits.extend(text_line_bars(path, old_text, new_text))
     for kind in DECL_KINDS:
         was = old_blocks.get(kind)
         now = new_blocks.get(kind)
@@ -580,6 +654,29 @@ def main() -> int:
                     + ", ".join(unnamed)
                 )
                 failed = True
+
+    # Added, renamed and deleted gate files count too, not only bars that
+    # existed in base: a new scripts/json.py would shadow the standard
+    # library for every gate that runs from that directory.
+    gate_files = sorted(f for f in files if match_any(f, BAR_FILES))
+    if gate_files:
+        body = Path(args.body_FILE).read_text(encoding="utf-8") if args.body_FILE and Path(args.body_FILE).is_file() else ""
+        head = reviewed_head()
+        reviewed = [l for l in body.splitlines() if l.strip().startswith(GATE_REVIEW)]
+        current = [l for l in reviewed if names_head(l, head)]
+        if not current:
+            why = (
+                "no line names the current head commit" if reviewed else "there is no such line"
+            )
+            print(
+                f"history_audit: FAIL a gate file changed ({', '.join(gate_files)}); the "
+                f"pull-request body needs '{GATE_REVIEW} <head {head[:12]}> <who, when>' "
+                f"and {why}. Add it after a fresh review session has read this diff; CI "
+                f"re-runs when the body is edited."
+            )
+            failed = True
+        else:
+            print(f"  gate review: {current[0].strip()[:160]}")
 
     if failed:
         return 1

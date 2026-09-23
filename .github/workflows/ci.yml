@@ -5,13 +5,32 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    # "edited" re-runs the checks when the pull-request body changes, so the
+    # Gate-review line that history-audit asks for is seen once it is added.
+    # On a pull request every job runs on every event type: a job skipped by
+    # `if:` reports success and would replace an earlier failure of that check.
+    types: [opened, synchronize, reopened, edited]
 
+# Least privilege: the gates only read the repository. With no write scope,
+# nothing that runs here can push, comment, or post a passing status.
+permissions:
+  contents: read
+
+# A newer push to the same pull request cancels the older run; every push to
+# main keeps its own group (keyed by commit), so no main commit goes unchecked.
+concurrency:
+  group: analysis-ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Third-party actions are pinned to full commit hashes: a tag can be moved.
 jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
@@ -26,10 +45,11 @@ jobs:
   output-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - name: Take the gates from the base branch, not from this PR
@@ -37,58 +57,69 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          mkdir -p /tmp/gate
-          for f in output_check history_audit scope_check; do
-            git show "origin/$BASE_REF:scripts/$f.py" > /tmp/gate/$f.py
-          done
-          # The project facts the gates read travel with the gate copies, so a
-          # PR is judged by the base's config, not its own. A base without the
-          # file (before it landed) leaves the scripts to their fallback.
-          git show "origin/$BASE_REF:scripts/gate_config.json" > /tmp/gate/gate_config.json \
-            || rm -f /tmp/gate/gate_config.json
+          rm -rf /tmp/gate && mkdir -p /tmp/gate
+          # The whole scripts/ directory as the base branch has it: every gate,
+          # the config they read (gate_config.json) and the tables they load.
+          # The gate scripts a pull request is judged by are the base's, not its
+          # own. `python -I` keeps /tmp/gate off sys.path, so no file there can
+          # stand in for a standard-library module.
+          git archive "origin/$BASE_REF" scripts | tar -x -C /tmp/gate --strip-components=1
       - name: Replay every number, and make the two computations agree
         if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          python /tmp/gate/output_check.py \
+          python -I /tmp/gate/output_check.py \
             --base-ref "origin/$BASE_REF" \
             --head-ref HEAD
       - name: The same on main, where there is no branch point to check
         if: github.event_name != 'pull_request'
-        run: python scripts/output_check.py --head-ref HEAD
-      - name: Double and permute invariants from this checkout (HEAD, not /tmp/gate)
-        # After A1, the three gate scripts are copied from the base branch into
-        # /tmp/gate. This file (scripts/relations.py) is new: a base
-        # output_check.py cannot import or invoke it until this PR merges, so
-        # this job would stay green without ever running the new check.
-        # Run it from the pull-request workspace. Do not fold it into
-        # /tmp/gate/output_check.py. Temp corpora go to $RUNNER_TEMP, never data/.
-        run: python scripts/relations.py --head-ref HEAD
+        run: python -I scripts/output_check.py --head-ref HEAD
+      - name: Double, permute and exclude invariants, from the base branch's gates
+        # relations.py imports output_check.py from its own directory, so both
+        # come from /tmp/gate. Temp corpora go to $RUNNER_TEMP, never data/.
+        if: github.event_name == 'pull_request'
+        run: python -I /tmp/gate/relations.py --head-ref HEAD
+      - name: The same on main
+        if: github.event_name != 'pull_request'
+        run: python -I scripts/relations.py --head-ref HEAD
+      - name: A pull request that changes the gates also passes its own gates
+        # Can only add failures: the base's gates above still decide. It shows
+        # before merge whether the new gates would turn main red.
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if git diff --quiet "origin/$BASE_REF...HEAD" -- scripts; then
+            echo "scripts/ unchanged; the base's gates above are this pull request's gates"
+          else
+            python -I scripts/output_check.py --base-ref "origin/$BASE_REF" --head-ref HEAD
+            python -I scripts/relations.py --head-ref HEAD
+          fi
 
   scope-check:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - name: Take the gates from the base branch, not from this PR
+        if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          mkdir -p /tmp/gate
-          for f in output_check history_audit scope_check; do
-            git show "origin/$BASE_REF:scripts/$f.py" > /tmp/gate/$f.py
-          done
-          # The project facts the gates read travel with the gate copies, so a
-          # PR is judged by the base's config, not its own. A base without the
-          # file (before it landed) leaves the scripts to their fallback.
-          git show "origin/$BASE_REF:scripts/gate_config.json" > /tmp/gate/gate_config.json \
-            || rm -f /tmp/gate/gate_config.json
+          rm -rf /tmp/gate && mkdir -p /tmp/gate
+          # The whole scripts/ directory as the base branch has it: every gate,
+          # the config they read (gate_config.json) and the tables they load.
+          # The gate scripts a pull request is judged by are the base's, not its
+          # own. `python -I` keeps /tmp/gate off sys.path, so no file there can
+          # stand in for a standard-library module.
+          git archive "origin/$BASE_REF" scripts | tar -x -C /tmp/gate --strip-components=1
       - name: Every branch must belong to a known class
         # Everything GitHub-controlled goes through env, never into the script
         # text: a branch name is attacker-chosen and `${{ }}` inside run: is a
@@ -104,7 +135,7 @@ jobs:
           SCOPE_AUTHOR: ${{ github.event.pull_request.user.login }}
           SCOPE_OWNERS: ${{ github.repository_owner }}
         run: |
-          python /tmp/gate/scope_check.py \
+          python -I /tmp/gate/scope_check.py \
             --branch "$SCOPE_BRANCH" \
             --base "origin/$BASE_REF" \
             --actor "$SCOPE_ACTOR" \
@@ -114,25 +145,25 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - name: Take the gates from the base branch, not from this PR
+        if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          mkdir -p /tmp/gate
-          for f in output_check history_audit scope_check; do
-            git show "origin/$BASE_REF:scripts/$f.py" > /tmp/gate/$f.py
-          done
-          # The project facts the gates read travel with the gate copies, so a
-          # PR is judged by the base's config, not its own. A base without the
-          # file (before it landed) leaves the scripts to their fallback.
-          git show "origin/$BASE_REF:scripts/gate_config.json" > /tmp/gate/gate_config.json \
-            || rm -f /tmp/gate/gate_config.json
+          rm -rf /tmp/gate && mkdir -p /tmp/gate
+          # The whole scripts/ directory as the base branch has it: every gate,
+          # the config they read (gate_config.json) and the tables they load.
+          # The gate scripts a pull request is judged by are the base's, not its
+          # own. `python -I` keeps /tmp/gate off sys.path, so no file there can
+          # stand in for a standard-library module.
+          git archive "origin/$BASE_REF" scripts | tar -x -C /tmp/gate --strip-components=1
       - name: Capture the pull-request body without interpolating it into a shell
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
@@ -141,6 +172,6 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          python /tmp/gate/history_audit.py \
+          python -I /tmp/gate/history_audit.py \
             --base "origin/$BASE_REF" \
             --pr-body-file /tmp/pr_body.txt

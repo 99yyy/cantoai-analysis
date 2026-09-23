@@ -919,10 +919,44 @@ def test_parse_frame_skips_predicates_and_keeps_videos_expected(tmp_path):
             "windows.tier IN ('A','B')\n"
             "videos_expected 567\n"
             "videos_expected_tol 0\n"
+            "published_expected 164693\n"
         ),
     )
     brief = output_check.parse_brief(md)
-    assert brief.frame == {"videos_expected": 567.0, "videos_expected_tol": 0.0}
+    assert brief.frame == {
+        "videos_expected": 567.0,
+        "videos_expected_tol": 0.0,
+        "published_expected": 164693.0,
+    }
+
+
+def test_frame_predicate_without_published_expected_fails(tmp_path):
+    """A fence that defines the published set but never states its size would
+    leave exclude and anchor switched off without a word."""
+    md = _write_brief(
+        tmp_path, "7", frame_block="windows.tier IN ('A','B')\nvideos_expected 567\n"
+    )
+    with pytest.raises(
+        output_check.Fail,
+        match=r"frame defines the published set but declares no published_expected",
+    ):
+        output_check.parse_brief(md)
+
+
+@pytest.mark.parametrize(
+    "line",
+    ["published_expected: 164693", "published_expected = 164693", "published_expected 1 2"],
+)
+def test_frame_line_that_is_neither_number_nor_predicate_fails(tmp_path, line):
+    """``published_expected: 164693`` used to parse as a number named
+    ``published_expected:``, so exclude and anchor silently did not run."""
+    md = _write_brief(
+        tmp_path, "7", frame_block=f"windows.tier IN ('A','B')\n{line}\n"
+    )
+    with pytest.raises(
+        output_check.Fail, match=r"is neither '<name> <number>' nor '<table>.<column> <predicate>'"
+    ):
+        output_check.parse_brief(md)
 
 
 def test_without_n_block_matching_n_of_1_still_passes(conn, tmp_path):

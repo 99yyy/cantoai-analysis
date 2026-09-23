@@ -749,3 +749,134 @@ def test_families_and_prefix_columns_come_from_config():
             if token in l and not l.strip().startswith("#") and not l.strip().startswith(("*", "\"", "'"))
         ]
         assert code_lines == [], (token, code_lines)
+
+
+# --- anchor before any output, and score routes left to output-check ------
+
+
+def test_anchor_is_checked_before_any_output(tmp_path, capsys):
+    """A wrong published count fails on the brief's own pull request, before
+    any agent has been launched on it."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _pin_readme(repo, corpus)
+    _write_brief(
+        repo,
+        [("n_count", "0")],
+        extra="```frame\nwindows.tier IN ('A','B')\npublished_expected 99\n```\n",
+    )
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert (
+        "TASK-9: frame.published_expected is 99 but the pinned corpus holds 3 "
+        "published syllables rows (tol 0)"
+    ) in out
+    assert "no output yet" in out
+
+
+def test_anchor_before_any_output_green(tmp_path, capsys):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _pin_readme(repo, corpus)
+    _write_brief(repo, [("n_count", "0")], extra=FRAME_AB)
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "frame.published_expected 3 = published syllables rows" in out
+    assert "no output yet; double/permute not run" in out
+
+
+def _score_task_on_mini(repo: Path, corpus: Path, extra_rows: list[dict], names: list[tuple[str, str]]) -> None:
+    """n_count by SQL, rate_cer_m_pm scored from predictions, plus ``extra_rows``."""
+    _pin_readme(repo, corpus)
+    _write_brief(
+        repo,
+        [("n_count", "0"), ("rate_cer_m_pm", "0.5"), *names],
+        extra="```eval\nset benchmarks/demo\n```\n",
+    )
+    conn = sqlite3.connect(f"file:{corpus}?mode=ro", uri=True)
+    try:
+        n_count = conn.execute("SELECT COUNT(*) FROM videos").fetchone()[0]
+    finally:
+        conn.close()
+    _write_side(repo, [("n_count", float(n_count), "n_count.sql")])
+    manifest = repo / "benchmarks" / "demo" / "manifest.jsonl"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text('{"id": "a", "ref": "天氣好好"}\n', encoding="utf-8")
+    pred = repo / "tasks" / "TASK-9" / "pred" / "m.jsonl"
+    pred.parent.mkdir(parents=True, exist_ok=True)
+    pred.write_text('{"id": "a", "hyp": "天氣好"}\n', encoding="utf-8")
+    (pred.parent / "m.run.json").write_text(
+        json.dumps(
+            {
+                "script_commit": "a" * 40,
+                "model": "example/asr-small",
+                "model_revision": "b" * 40,
+                "decoding": {"language": "yue"},
+                "device": "cpu",
+                "dirty": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    out_path = repo / "tasks" / "TASK-9" / "results.json"
+    rows = json.loads(out_path.read_text(encoding="utf-8"))
+    rows.append(
+        {
+            "name": "rate_cer_m_pm",
+            "value": 250.0,
+            "n": 4,
+            "query": "score:cer:tasks/TASK-9/pred/m.jsonl",
+        }
+    )
+    rows.extend(extra_rows)
+    out_path.write_text(json.dumps(rows), encoding="utf-8")
+
+
+def test_score_routes_are_constant_on_every_copy(tmp_path, capsys):
+    """A number scored from predictions does not read the corpus: relations
+    replays it once and it passes double, permute and exclude as a constant."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _score_task_on_mini(repo, corpus, [], [])
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert (
+        "results.json 1 score route(s) replayed from predictions, constant on every "
+        "copy: rate_cer_m_pm"
+    ) in out
+    assert "double 2/2 permute 2/2" in out
+
+
+def test_derived_name_mixing_score_and_corpus_is_still_checked(tmp_path, capsys):
+    """``+ 0 * rate_cer_m_pm`` must not hide a hard-coded denominator."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    _mini_corpus(corpus)
+    _score_task_on_mini(
+        repo,
+        corpus,
+        [
+            {
+                "name": "rate_hit_pm",
+                "value": 1000.0,
+                "n": 1,
+                "query": "derived: 1000 * n_count / 2 + 0 * rate_cer_m_pm",
+            }
+        ],
+        [("rate_hit_pm", "0.5")],
+    )
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 1, out
+    assert "results.json:rate_hit_pm: double 2000, original 1000 (tol 0.5)" in out, out
+    assert "cannot be resolved" not in out, out
