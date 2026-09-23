@@ -7,6 +7,7 @@
 scripts/**          @99yyy
 tests/**            @99yyy
 data/**             @99yyy
+benchmarks/**       @99yyy
 LOOP.md             @99yyy
 README.md           @99yyy
 .cursor/**          @99yyy

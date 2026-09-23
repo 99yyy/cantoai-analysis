@@ -49,6 +49,15 @@ def test_mer_counts_latin_words_whole():
     ]
 
 
+def test_curly_apostrophes_and_accented_latin_stay_one_word():
+    assert output_check.score_tokens("don\u2019t café", "mer") == ["don't", "café"]
+
+
+def test_traditional_to_simplified_follows_chains():
+    # The table maps 薴 to 苧 and 苧 to 苎; one pass would leave 苧.
+    assert output_check.score_tokens("薴", "cer") == output_check.score_tokens("苎", "cer")
+
+
 def test_punctuation_only_difference_scores_zero():
     ref = output_check.score_tokens("今日天氣好好。", "cer")
     hyp = output_check.score_tokens("今日 天氣，好好！", "cer")
@@ -156,6 +165,21 @@ def test_score_pools_edits_over_the_whole_set(tmp_path):
     assert value == pytest.approx(100.0)
 
 
+def test_denominator_is_reference_tokens_not_hypothesis_tokens(tmp_path):
+    """One insertion in a, b exact: 1 edit over 10 reference characters is 100.
+    The hypotheses hold 11 characters, so dividing by them would give 90.9."""
+    _manifest(tmp_path)
+    pred = _pred(
+        tmp_path,
+        "tasks/TASK-12/pred/m.jsonl",
+        [("a", "我哋今日去咗街"), ("b", "天氣好好")],
+        _card(),
+    )
+    value, tokens = output_check.ScoreSet(tmp_path, SET, None).score("r", "cer", pred)
+    assert tokens == 10
+    assert value == pytest.approx(100.0)
+
+
 @pytest.mark.parametrize(
     "hyps, message",
     [
@@ -222,7 +246,8 @@ def test_script_commit_must_be_in_the_head_history(tmp_path):
     "name, query, message",
     [
         ("rate_cer_m_pm", "score:wer:tasks/TASK-12/pred/m.jsonl", r"must be score:<cer\|mer>"),
-        ("rate_cer_m", "score:cer:tasks/TASK-12/pred/m.jsonl", r"must end in _pm"),
+        ("rate_cer_m", "score:cer:tasks/TASK-12/pred/m.jsonl", r"must be rate_<\.\.\.>_pm"),
+        ("cer_m_pm", "score:cer:tasks/TASK-12/pred/m.jsonl", r"must be rate_<\.\.\.>_pm"),
         ("rate_cer_m_pm", "score:cer:tasks/TASK-13/pred/m.jsonl", r"must be tasks/TASK-12/"),
         ("rate_cer_m_pm", "score:cer:tasks/TASK-12/pred/none.jsonl", r"names no file"),
     ],
@@ -260,7 +285,7 @@ def _score_task(
     md.write_text(body, encoding="utf-8")
     _manifest(root)
     _pred(root, "tasks/TASK-12/pred/m.jsonl", GOOD_HYPS, _card())
-    _pred(root, "tasks/TASK-12/mine_pred/m.jsonl", GOOD_HYPS, _card())
+    _pred(root, "tasks/TASK-12/mine_pred/m.jsonl", list(reversed(GOOD_HYPS)), _card())
     for side, rel, value, n in (
         ("results.json", "tasks/TASK-12/pred/m.jsonl", w_value, w_n),
         ("mine.json", verifier_rel, 100.0, 10),
@@ -314,3 +339,38 @@ def test_both_sides_scoring_one_file_fails(tmp_path):
     md = _score_task(tmp_path, verifier_rel="tasks/TASK-12/pred/m.jsonl")
     fail = _check(tmp_path, md)
     assert any("the second run must be its own" in f for f in fail), fail
+
+
+def test_byte_identical_copy_of_the_other_side_fails(tmp_path):
+    md = _score_task(tmp_path)
+    src = tmp_path / "tasks/TASK-12/pred/m.jsonl"
+    (tmp_path / "tasks/TASK-12/mine_pred/m.jsonl").write_bytes(src.read_bytes())
+    fail = _check(tmp_path, md)
+    assert any("are byte-identical; the second run must be its own" in f for f in fail), fail
+
+
+def test_reference_set_is_checked_when_the_brief_lands(tmp_path, capsys):
+    md = tmp_path / "tasks" / "TASK-12.md"
+    md.parent.mkdir(parents=True)
+    md.write_text(
+        "status: open\n```numbers\nrate_cer_m_pm  0.5\n```\n```eval\nset benchmarks/demo\n```\n",
+        encoding="utf-8",
+    )
+    fail = _check(tmp_path, md)
+    assert any("benchmarks/demo/manifest.jsonl does not exist" in f for f in fail), fail
+    _manifest(tmp_path)
+    assert _check(tmp_path, md) == []
+    assert "eval set benchmarks/demo holds 2 item(s)" in capsys.readouterr().out
+
+
+def test_changing_a_reference_set_touches_every_task_that_names_it(tmp_path):
+    md = _score_task(tmp_path)
+    other = tmp_path / "tasks" / "TASK-13.md"
+    other.write_text("status: open\n```numbers\nn_x  0\n```\n", encoding="utf-8")
+    briefs = [md, other]
+    assert output_check.tasks_naming_changed_sets(
+        briefs, ["benchmarks/demo/manifest.jsonl"]
+    ) == frozenset({"12"})
+    assert output_check.tasks_naming_changed_sets(
+        briefs, ["benchmarks/demo2/manifest.jsonl", "README.md"]
+    ) == frozenset()

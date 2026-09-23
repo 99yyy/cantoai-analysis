@@ -98,9 +98,10 @@ What this enforces, in order:
                Traditional->Simplified characters (``opencc_TSCharacters.txt``),
                punctuation, symbols and spaces dropped -- and pools edits over
                the whole set: ``cer`` counts characters, ``mer`` counts CJK
-               characters and Latin words. The value is per mille (the name
-               ends in ``_pm``) and ``n`` must equal the number of reference
-               tokens. The agent's own scorer is never used, and an empty
+               characters and Latin words. The value is per mille (the name is
+               ``rate_<...>_pm``) and ``n`` must equal the number of reference
+               tokens. Worker and verifier each run their own script: the two
+               prediction files may be neither one path nor byte-identical. The agent's own scorer is never used, and an empty
                reference fails.
   replay       every number equals what its own route produces, within tol.
                A SQL route whose plan never SCAN/SEARCHes a corpus table
@@ -824,6 +825,24 @@ def task_ids_from_paths(paths: Iterable[str]) -> frozenset[str]:
         m = TASK_PATH_RE.match(raw.replace("\\", "/"))
         if m:
             out.add(m.group(1))
+    return frozenset(out)
+
+
+def tasks_naming_changed_sets(briefs: list[Path], paths: Iterable[str]) -> frozenset[str]:
+    """Task ids whose ``eval`` set has a file in ``paths``.
+
+    Editing a reference set re-scores every task judged against it, so the
+    pull request that edits it must check those tasks, not freeze them.
+    """
+    paths = [p.replace("\\", "/") for p in paths]
+    out: set[str] = set()
+    for md in briefs:
+        try:
+            s = parse_eval_block(md.name, md.read_text(encoding="utf-8"))
+        except (Fail, OSError):
+            continue
+        if s is not None and any(p.startswith(s + "/") for p in paths):
+            out.add(brief_task_id(md))
     return frozenset(out)
 
 
@@ -2024,9 +2043,10 @@ def route(label: str, n: str, name: str, q: str, root: Path) -> tuple[str, objec
                 f"{label}:{name}: score route {q!r} must be "
                 f"score:<{'|'.join(SCORE_METRICS)}>:tasks/TASK-{n}/<file>.jsonl"
             )
-        if not name.endswith("_pm"):
+        if not (name.startswith("rate_") and name.endswith("_pm")):
             raise Fail(
-                f"{label}:{name}: a score route is per mille, so the name must end in _pm"
+                f"{label}:{name}: a score route is a per-mille rate, so the name must be "
+                f"rate_<...>_pm"
             )
         prefix = f"tasks/TASK-{n}/"
         if not rel.startswith(prefix) or not rel.endswith(".jsonl"):
@@ -2220,23 +2240,45 @@ def _kept(ch: str) -> bool:
     return unicodedata.category(ch)[0] in ("L", "M", "N")
 
 
+_APOSTROPHES = str.maketrans({"\u2019": "'", "\u2018": "'", "\u02bc": "'"})
+
+
+def _fold(t2s: dict[str, str], ch: str) -> str:
+    """Traditional->Simplified until the character stops changing (the table
+    has chains such as 薴 -> 苧 -> 苎)."""
+    for _ in range(4):
+        nxt = t2s.get(ch, ch)
+        if nxt == ch:
+            break
+        ch = nxt
+    return ch
+
+
+def _word_char(ch: str) -> bool:
+    """Part of a ``mer`` word: a Latin letter in any form, an ASCII digit, an apostrophe."""
+    if ch == "'" or (ch.isascii() and ch.isdigit()):
+        return True
+    return ch.isalpha() and unicodedata.name(ch, "").startswith("LATIN")
+
+
 def score_tokens(text: str, metric: str) -> list[str]:
     """Normalize ``text``, then split it into the units ``metric`` counts.
 
-    ``cer``: every kept character. ``mer``: each non-ASCII kept character on
-    its own, and each run of ASCII letters, digits and inner apostrophes as
-    one word, so code-switched English counts by word.
+    ``cer``: every kept character. ``mer``: each kept character on its own,
+    except runs of Latin letters, ASCII digits and inner apostrophes, which
+    count as one word, so code-switched English counts by word.
     """
     t2s = t2s_table()
     norm = "".join(
-        t2s.get(ch, ch) for ch in unicodedata.normalize("NFKC", text).lower()
+        _fold(t2s, ch)
+        for ch in unicodedata.normalize("NFKC", text).lower().translate(_APOSTROPHES)
     )
     if metric == "cer":
         return [ch for ch in norm if _kept(ch)]
     out: list[str] = []
     word: list[str] = []
     for ch in norm:
-        if ch.isascii() and (ch.isalnum() or ch == "'"):
+        if _word_char(ch):
             word.append(ch)
             continue
         w = "".join(word).strip("'")
@@ -2297,6 +2339,7 @@ class ScoreSet:
         self.set_path = set_path
         self.head = head
         self._refs: list[tuple[str, str]] | None = None
+        self._memo: dict[tuple[str, Path], tuple[float, int]] = {}
 
     def refs(self) -> list[tuple[str, str]]:
         if self._refs is None:
@@ -2304,6 +2347,10 @@ class ScoreSet:
             path = self.root / self.set_path / MANIFEST
             if not path.is_file():
                 raise Fail(f"{label} does not exist; the eval block names a set with no manifest")
+            try:
+                path.resolve().relative_to((self.root / BENCHMARKS).resolve())
+            except ValueError:
+                raise Fail(f"{label} resolves outside {BENCHMARKS}/")
             out: list[tuple[str, str]] = []
             seen: set[str] = set()
             for row in read_jsonl(path, label, ("id", "ref")):
@@ -2320,6 +2367,10 @@ class ScoreSet:
         card = pred.with_name(pred.name[: -len(".jsonl")] + RUN_CARD_SUFFIX)
         if not card.is_file():
             raise Fail(f"{label}: {card.name} is missing; every prediction file needs its run card")
+        try:
+            card.resolve().relative_to(pred.parent.resolve())
+        except ValueError:
+            raise Fail(f"{label}: {card.name} resolves outside the prediction file's directory")
         try:
             data = json.loads(card.read_text(encoding="utf-8"))
         except json.JSONDecodeError as e:
@@ -2361,6 +2412,9 @@ class ScoreSet:
 
     def score(self, label: str, metric: str, pred: Path) -> tuple[float, int]:
         """Per-mille error rate of ``pred`` against the set, and its token count."""
+        key = (metric, pred)
+        if key in self._memo:
+            return self._memo[key]
         refs = self.refs()
         self.check_run_card(label, pred)
         rows = read_jsonl(pred, f"{label} {pred.name}", ("id", "hyp"))
@@ -2386,7 +2440,8 @@ class ScoreSet:
                 raise Fail(f"{self.set_path}/{MANIFEST}: id {i!r} has no {metric} tokens")
             edits += edit_distance(r_tok, score_tokens(hyps[i], metric))
             total += len(r_tok)
-        return 1000.0 * edits / total, total
+        self._memo[key] = (1000.0 * edits / total, total)
+        return self._memo[key]
 
 
 # ---------------------------------------------------------------- RESULT.json
@@ -3231,6 +3286,14 @@ def check_task(
         )
         return
 
+    if scores is not None and status == "open":
+        # The reference set must exist before anyone is launched on the brief.
+        try:
+            refs = scores.refs()
+            print(f"  TASK-{n} [{status}]: eval set {eval_set} holds {len(refs)} item(s)")
+        except Fail as e:
+            fail.append(f"TASK-{n}: {e}")
+
     if stale_closed(status, stamp, corpus_sha):
         print(stale_closed_line(n, stamp, corpus_sha))
         return
@@ -3327,6 +3390,14 @@ def check_task(
                 f"TASK-{n}: {p.relative_to(root.resolve())} is scored for {wp[p]} in "
                 f"{WORKER} and {vp[p]} in {VERIFIER}; the second run must be its own"
             )
+        for a in sorted(set(wp) - set(vp)):
+            for b in sorted(set(vp) - set(wp)):
+                if a.read_bytes() == b.read_bytes():
+                    fail.append(
+                        f"TASK-{n}: {a.relative_to(root.resolve())} and "
+                        f"{b.relative_to(root.resolve())} are byte-identical; the second "
+                        f"run must be its own"
+                    )
 
     paired = 0
     if WORKER in rows and VERIFIER in rows:
@@ -3473,7 +3544,7 @@ def main() -> int:
         except Fail as e:
             print(f"output_check: FAIL\n  {e}")
             return 1
-        touched = task_ids_from_paths(changed)
+        touched = task_ids_from_paths(changed) | tasks_naming_changed_sets(briefs, changed)
         shown = (
             ", ".join(
                 f"TASK-{t}"

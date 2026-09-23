@@ -56,11 +56,13 @@ a smaller published set. The anchor is checked as soon as the brief exists,
 before either output does, so a wrong count fails on the brief's own pull
 request instead of after two agents have been launched on it.
 
-Score routes (``score:<metric>:<file>.jsonl``) are replayed by output-check
-from prediction files, not from the corpus. They, and any ``derived:`` name
-that reaches one, are left out here and printed as such. A side whose
-corpus-bound routes exist but of which no number was compared under double
-fails: a relation that checks nothing must not read as a pass.
+Score routes (``score:<metric>:<file>.jsonl``) do not read the corpus: they
+are scored from prediction files, so their value is the same on every copy.
+They are replayed here too, once, with output-check's scorer, and enter every
+relation as that constant. A ``derived:`` name that mixes a score route with a
+corpus number is therefore still checked -- ``1000 * n_count / 2 + 0 * rate_cer_pm``
+cannot hide a hard-coded denominator. A side of which no number was compared
+under double fails: a relation that checks nothing must not read as a pass.
 
 An unclassified name is a failure. Suspended and STALE tasks are skipped, as
 in output-check. Relations does not freeze on PR diff: a hardcoded denominator
@@ -419,14 +421,26 @@ def replay_values(
     conn: sqlite3.Connection,
     seconds: float,
     fail: list[str],
+    scores: "output_check.ScoreSet | None" = None,
 ) -> dict[str, float]:
-    """Replay SQL and derived names. Does not look at written values."""
+    """Replay SQL, score and derived names. Does not look at written values."""
     got: dict[str, float] = {}
     pending: dict[str, str] = {}
     for name in sorted(routes):
         kind, target = routes[name]
         if kind == "derived":
             pending[name] = str(target)
+            continue
+        if kind == "score":
+            # Corpus-independent: the same value on every copy of the corpus.
+            if scores is None:
+                fail.append(f"{label}:{name}: a score route needs an ```eval block")
+                continue
+            metric, pred = target  # type: ignore[misc]
+            try:
+                got[name] = scores.score(f"{label}:{name}", metric, pred)[0]
+            except Fail as e:
+                fail.append(str(e))
             continue
         try:
             got[name] = output_check.run_sql(
@@ -577,9 +591,13 @@ def check_task(
         text = md.read_text(encoding="utf-8")
         outside_frame = parse_outside_frame_block(md.name, text, tol)
         predicates = output_check.parse_frame_predicates(md.name, text)
+        eval_set = output_check.parse_eval_block(md.name, text)
     except Fail as e:
         fail.append(str(e))
         return
+    scores = (
+        output_check.ScoreSet(root, eval_set, None) if eval_set is not None else None
+    )
 
     if status in output_check.SUSPEND_STATUS:
         print(
@@ -634,27 +652,23 @@ def check_task(
                     family(name)
                 except Fail as e:
                     fail.append(str(e))
-            scored = frozenset(nm for nm, (kind, _t) in routes.items() if kind == "score")
+            scored = sorted(nm for nm, (kind, _t) in routes.items() if kind == "score")
             if scored:
-                off = outside_frame_closure(scored, routes)
                 print(
-                    f"  TASK-{n} [{status}]: {k} {len(off)} name(s) scored from "
-                    f"predictions, not corpus-bound: {', '.join(sorted(off))}"
+                    f"  TASK-{n} [{status}]: {k} {len(scored)} score route(s) replayed "
+                    f"from predictions, constant on every copy: {', '.join(scored)}"
                 )
-                routes = {nm: r for nm, r in routes.items() if nm not in off}
-                if not routes:
-                    continue
-            orig = replay_values(f"{k}", routes, orig_conn, seconds, fail)
+            orig = replay_values(f"{k}", routes, orig_conn, seconds, fail, scores)
             doubled_v = replay_values(
-                f"{k}:double", routes, dup_conn, seconds, fail
+                f"{k}:double", routes, dup_conn, seconds, fail, scores
             )
             perm_v = replay_values(
-                f"{k}:permute", routes, perm_conn, seconds, fail
+                f"{k}:permute", routes, perm_conn, seconds, fail, scores
             )
             exc_v: dict[str, float] = {}
             if exc_conn is not None:
                 exc_v = replay_values(
-                    f"{k}:exclude", routes, exc_conn, seconds, fail
+                    f"{k}:exclude", routes, exc_conn, seconds, fail, scores
                 )
             exempt = outside_frame_closure(outside_frame, routes) if run_exclude else frozenset()
             d_ok = 0
@@ -680,7 +694,7 @@ def check_task(
                     e_ok += 1
             if not any(name in orig and name in doubled_v for name in routes):
                 fail.append(
-                    f"TASK-{n}: {k}: double compared none of {len(routes)} corpus-bound "
+                    f"TASK-{n}: {k}: double compared none of {len(routes)} "
                     f"number(s); a relation that checks nothing is not a pass"
                 )
             if run_exclude:

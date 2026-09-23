@@ -16,8 +16,10 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same pull request cancels the older run; every push to
+# main keeps its own group (keyed by commit), so no main commit goes unchecked.
 concurrency:
-  group: analysis-ci-${{ github.event.pull_request.number || github.ref }}
+  group: analysis-ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Third-party actions are pinned to full commit hashes: a tag can be moved.
@@ -58,27 +60,42 @@ jobs:
           rm -rf /tmp/gate && mkdir -p /tmp/gate
           # The whole scripts/ directory as the base branch has it: every gate,
           # the config they read (gate_config.json) and the tables they load.
-          # A pull request is judged by the base's gates, never by its own.
+          # The gate scripts a pull request is judged by are the base's, not its
+          # own. `python -I` keeps /tmp/gate off sys.path, so no file there can
+          # stand in for a standard-library module.
           git archive "origin/$BASE_REF" scripts | tar -x -C /tmp/gate --strip-components=1
       - name: Replay every number, and make the two computations agree
         if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          python /tmp/gate/output_check.py \
+          python -I /tmp/gate/output_check.py \
             --base-ref "origin/$BASE_REF" \
             --head-ref HEAD
       - name: The same on main, where there is no branch point to check
         if: github.event_name != 'pull_request'
-        run: python scripts/output_check.py --head-ref HEAD
+        run: python -I scripts/output_check.py --head-ref HEAD
       - name: Double, permute and exclude invariants, from the base branch's gates
         # relations.py imports output_check.py from its own directory, so both
         # come from /tmp/gate. Temp corpora go to $RUNNER_TEMP, never data/.
         if: github.event_name == 'pull_request'
-        run: python /tmp/gate/relations.py --head-ref HEAD
+        run: python -I /tmp/gate/relations.py --head-ref HEAD
       - name: The same on main
         if: github.event_name != 'pull_request'
-        run: python scripts/relations.py --head-ref HEAD
+        run: python -I scripts/relations.py --head-ref HEAD
+      - name: A pull request that changes the gates also passes its own gates
+        # Can only add failures: the base's gates above still decide. It shows
+        # before merge whether the new gates would turn main red.
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if git diff --quiet "origin/$BASE_REF...HEAD" -- scripts; then
+            echo "scripts/ unchanged; the base's gates above are this pull request's gates"
+          else
+            python -I scripts/output_check.py --base-ref "origin/$BASE_REF" --head-ref HEAD
+            python -I scripts/relations.py --head-ref HEAD
+          fi
 
   scope-check:
     if: github.event_name == 'pull_request'
@@ -99,7 +116,9 @@ jobs:
           rm -rf /tmp/gate && mkdir -p /tmp/gate
           # The whole scripts/ directory as the base branch has it: every gate,
           # the config they read (gate_config.json) and the tables they load.
-          # A pull request is judged by the base's gates, never by its own.
+          # The gate scripts a pull request is judged by are the base's, not its
+          # own. `python -I` keeps /tmp/gate off sys.path, so no file there can
+          # stand in for a standard-library module.
           git archive "origin/$BASE_REF" scripts | tar -x -C /tmp/gate --strip-components=1
       - name: Every branch must belong to a known class
         # Everything GitHub-controlled goes through env, never into the script
@@ -116,7 +135,7 @@ jobs:
           SCOPE_AUTHOR: ${{ github.event.pull_request.user.login }}
           SCOPE_OWNERS: ${{ github.repository_owner }}
         run: |
-          python /tmp/gate/scope_check.py \
+          python -I /tmp/gate/scope_check.py \
             --branch "$SCOPE_BRANCH" \
             --base "origin/$BASE_REF" \
             --actor "$SCOPE_ACTOR" \
@@ -141,7 +160,9 @@ jobs:
           rm -rf /tmp/gate && mkdir -p /tmp/gate
           # The whole scripts/ directory as the base branch has it: every gate,
           # the config they read (gate_config.json) and the tables they load.
-          # A pull request is judged by the base's gates, never by its own.
+          # The gate scripts a pull request is judged by are the base's, not its
+          # own. `python -I` keeps /tmp/gate off sys.path, so no file there can
+          # stand in for a standard-library module.
           git archive "origin/$BASE_REF" scripts | tar -x -C /tmp/gate --strip-components=1
       - name: Capture the pull-request body without interpolating it into a shell
         env:
@@ -151,6 +172,6 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          python /tmp/gate/history_audit.py \
+          python -I /tmp/gate/history_audit.py \
             --base "origin/$BASE_REF" \
             --pr-body-file /tmp/pr_body.txt

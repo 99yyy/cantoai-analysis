@@ -18,12 +18,14 @@ Two rules, both mechanical:
    ``BAR-CHANGE:`` in its body, naming each bar path it moves. A vague token is
    not a name. The line does not make the change right; it makes it visible to
    the round audit, which is where judgement belongs.
-3. A pull request that moves a gate file (anything under ``scripts/`` or
-   ``.github/``, the gate tests, their fixtures and mutation probes) also needs
-   a line beginning ``Gate-review:`` in its body. The owner adds it after a
-   fresh review session, from a different model family than the author, has
-   read the diff. CI re-runs when the body is edited. The owner cannot approve
-   his own pull request on GitHub, so this line is the recorded review.
+3. A pull request that adds, changes, renames or deletes a gate file
+   (anything under ``scripts/``, ``.github/`` or ``benchmarks/``, the gate
+   tests, their fixtures and mutation probes) also needs a line beginning
+   ``Gate-review:`` in its body that names the reviewed head commit (at least
+   seven hex digits of it). The owner adds it after a fresh review session
+   has read the diff; a later push makes the line stale until it is renewed.
+   CI re-runs when the body is edited. The owner cannot approve his own pull
+   request on GitHub, so this line is the recorded review.
 
 Counting rule for bars that are code: a NET REMOVAL is a bar change (fewer
 checks emitted, fewer fail sites, fewer counterexample patterns, fewer
@@ -92,6 +94,8 @@ BAR_FILES: list[str] = [
     "tests/test_mutations*.py", "tests/test_assertions*.py",
     "tests/mutations/*", "tests/mutations/**",
     "tests/fixtures/*", "tests/fixtures/**",
+    # Reference sets a score route is judged against (owner-only).
+    "benchmarks/*", "benchmarks/**",
 ]
 BAR_COUNTED = {
     "scripts/*.py": (GATE_FAIL_SITE_RE, "fail sites"),
@@ -113,7 +117,9 @@ MUTATION_GLOB = "tests/mutations/*.patch"
 # a top-level sql/ path is still measured; absence of that directory is
 # zero-cost, not a reason to retire the glob.
 MEASURED = ["src/*", "src/**", "sql/*", "sql/**", "data/*", "data/**",
-            "scripts/*.py", "scripts/**/*.py", "tasks/**/*.sql"]
+            "scripts/*.py", "scripts/**/*.py", "tasks/**/*.sql",
+            # Prediction files a score route replays (fnmatch '*' crosses '/').
+            "tasks/*/pred/*", "tasks/*/mine_pred/*"]
 
 # RETIRED-BEGIN
 # Dead detector paths (plan §7 item 2 alternative). main() does not consult
@@ -289,7 +295,26 @@ def run(*args: str) -> str:
 
 
 def changed(base: str) -> list[str]:
-    return sorted(p for p in run("git", "diff", "--name-only", f"{base}...HEAD").splitlines() if p.strip())
+    # --no-renames: a rename is a delete plus an add, so the old path (a bar
+    # that existed in base) cannot disappear behind its new name.
+    return sorted(
+        p
+        for p in run("git", "diff", "--no-renames", "--name-only", f"{base}...HEAD").splitlines()
+        if p.strip()
+    )
+
+
+def reviewed_head() -> str:
+    """The pull request's head commit: HEAD^2 of the merge CI checks out, else HEAD."""
+    parents = run("git", "rev-list", "--parents", "-n", "1", "HEAD").split()
+    return parents[2] if len(parents) == 3 else parents[0]
+
+
+def names_head(line: str, head: str) -> bool:
+    """True when ``line`` carries at least seven hex digits that begin ``head``."""
+    return any(
+        head.startswith(tok) for tok in re.findall(r"\b[0-9a-f]{7,40}\b", line.lower())
+    )
 
 
 def match_any(path: str, globs: list[str]) -> bool:
@@ -630,19 +655,28 @@ def main() -> int:
                 )
                 failed = True
 
-    gate_bars = sorted({bar_path(b) for b in bars if match_any(bar_path(b), BAR_FILES)})
-    if gate_bars:
+    # Added, renamed and deleted gate files count too, not only bars that
+    # existed in base: a new scripts/json.py would shadow the standard
+    # library for every gate that runs from that directory.
+    gate_files = sorted(f for f in files if match_any(f, BAR_FILES))
+    if gate_files:
         body = Path(args.body_FILE).read_text(encoding="utf-8") if args.body_FILE and Path(args.body_FILE).is_file() else ""
+        head = reviewed_head()
         reviewed = [l for l in body.splitlines() if l.strip().startswith(GATE_REVIEW)]
-        if not reviewed:
+        current = [l for l in reviewed if names_head(l, head)]
+        if not current:
+            why = (
+                "no line names the current head commit" if reviewed else "there is no such line"
+            )
             print(
-                f"history_audit: FAIL a gate file changed ({', '.join(gate_bars)}) with no "
-                f"'{GATE_REVIEW} <who, when>' line in the pull-request body. Add it after a "
-                f"fresh review session has read the diff; CI re-runs when the body is edited."
+                f"history_audit: FAIL a gate file changed ({', '.join(gate_files)}); the "
+                f"pull-request body needs '{GATE_REVIEW} <head {head[:12]}> <who, when>' "
+                f"and {why}. Add it after a fresh review session has read this diff; CI "
+                f"re-runs when the body is edited."
             )
             failed = True
         else:
-            print(f"  gate review: {reviewed[0].strip()[:160]}")
+            print(f"  gate review: {current[0].strip()[:160]}")
 
     if failed:
         return 1
