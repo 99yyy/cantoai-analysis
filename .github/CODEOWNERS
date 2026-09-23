@@ -1,6 +1,8 @@
 # Owner-reviewed paths. GitHub requests a review from the owner on any pull
-# request that touches these, and with "Require review from Code Owners" on
-# the main branch rule, no such PR merges without it. The list mirrors the
+# request that touches these. "Require review from Code Owners" is off: the
+# repository has one person, who cannot approve his own pull requests (see
+# LOOP.md). The four required checks and history-audit guard merges; this
+# file notifies. The list mirrors the
 # protected paths in scripts/gate_config.json (scope) plus the tests that
 # guard the gates and the loop contract.
 .github/**          @99yyy

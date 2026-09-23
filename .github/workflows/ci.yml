@@ -84,18 +84,37 @@ jobs:
         if: github.event_name != 'pull_request'
         run: python -I scripts/relations.py --head-ref HEAD
       - name: A pull request that changes the gates also passes its own gates
-        # Can only add failures: the base's gates above still decide. It shows
-        # before merge whether the new gates would turn main red.
+        # Can only add failures: the base's gates above still decide. The
+        # pull-request run judges the tasks this change touches. The main-mode
+        # run judges every task, closed ones included, the way main will after
+        # the merge; it fails only where the base's gates, run the same way on
+        # the same tree, pass. So a gate change that would turn main red shows
+        # here, before the merge.
         if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
           if git diff --quiet "origin/$BASE_REF...HEAD" -- scripts; then
             echo "scripts/ unchanged; the base's gates above are this pull request's gates"
-          else
-            python -I scripts/output_check.py --base-ref "origin/$BASE_REF" --head-ref HEAD
-            python -I scripts/relations.py --head-ref HEAD
+            exit 0
           fi
+          python -I scripts/output_check.py --base-ref "origin/$BASE_REF" --head-ref HEAD
+          own=0
+          python -I scripts/output_check.py --head-ref HEAD || own=1
+          python -I scripts/relations.py --head-ref HEAD || own=1
+          if [ "$own" = 0 ]; then
+            echo "the new gates pass every task in main mode"
+            exit 0
+          fi
+          base=0
+          python -I /tmp/gate/output_check.py --head-ref HEAD > /tmp/base_main_mode.log 2>&1 || base=1
+          python -I /tmp/gate/relations.py --head-ref HEAD >> /tmp/base_main_mode.log 2>&1 || base=1
+          if [ "$base" = 0 ]; then
+            echo "::error::the new gates fail in main mode where the base's gates pass; merging this would turn main red"
+            exit 1
+          fi
+          echo "the base's gates fail in main mode on this tree as well (log below); the pull-request runs above decide"
+          cat /tmp/base_main_mode.log
 
   scope-check:
     if: github.event_name == 'pull_request'
