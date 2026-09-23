@@ -18,6 +18,12 @@ Two rules, both mechanical:
    ``BAR-CHANGE:`` in its body, naming each bar path it moves. A vague token is
    not a name. The line does not make the change right; it makes it visible to
    the round audit, which is where judgement belongs.
+3. A pull request that moves a gate file (anything under ``scripts/`` or
+   ``.github/``, the gate tests, their fixtures and mutation probes) also needs
+   a line beginning ``Gate-review:`` in its body. The owner adds it after a
+   fresh review session, from a different model family than the author, has
+   read the diff. CI re-runs when the body is edited. The owner cannot approve
+   his own pull request on GitHub, so this line is the recorded review.
 
 Counting rule for bars that are code: a NET REMOVAL is a bar change (fewer
 checks emitted, fewer fail sites, fewer counterexample patterns, fewer
@@ -32,7 +38,10 @@ Task briefs ``tasks/TASK-*.md`` declare bars in fenced ``numbers``, ``fixture``,
 ``frame``, ``n`` and ``identities`` blocks (plan §3.3). Widening a tolerance,
 deleting a name (for ``identities``: deleting or rewording a line, or widening
 its tolerance), or deleting a whole block is a bar move. Tightening a
-tolerance is not.
+tolerance is not. A ``frame`` predicate line defines the published set, so
+changing or deleting one is a bar move; so is changing or deleting a line of
+the ``eval`` block, which names the reference set a score route is judged
+against.
 
 The gate itself is a bar: any byte change to an existing file under
 ``scripts/`` or ``.github/``, or to a test file of a gate script
@@ -154,6 +163,7 @@ LIVE_INVENTORY_STRS = frozenset({"MUTATION_GLOB"})
 # would also hit tasks/TASK-6/open_analysis.md.
 TASK_BRIEF_RE = re.compile(r"^tasks/TASK-[^/]+\.md$")
 DECL_KINDS = ("numbers", "fixture", "frame", "n", "identities")
+GATE_REVIEW = "Gate-review:"
 
 
 def retired_block(text: str) -> str:
@@ -402,11 +412,50 @@ def exempt_bars(path: str, old_text: str, new_text: str) -> list[str]:
     ]
 
 
+FRAME_FENCE = re.compile(r"^```frame\s*$(.*?)^```\s*$", re.M | re.S)
+EVAL_FENCE = re.compile(r"^```eval\s*$(.*?)^```\s*$", re.M | re.S)
+PREDICATE_LINE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*\s+\S")
+
+
+def _fence_lines(fence: re.Pattern[str], text: str) -> list[str] | None:
+    """Comment-stripped, whitespace-collapsed lines of the first fence; None without one."""
+    m = fence.search(text)
+    if not m:
+        return None
+    out: list[str] = []
+    for raw in m.group(1).splitlines():
+        line = " ".join(raw.split("#", 1)[0].split())
+        if line:
+            out.append(line)
+    return out
+
+
+def text_line_bars(path: str, old_text: str, new_text: str) -> list[str]:
+    """Frame predicates and eval lines: any change or removal is a bar move."""
+    hits: list[str] = []
+    old_frame = _fence_lines(FRAME_FENCE, old_text) or []
+    new_frame = _fence_lines(FRAME_FENCE, new_text) or []
+    for line in old_frame:
+        if PREDICATE_LINE.match(line) and line not in new_frame:
+            hits.append(f"{path} ```frame predicate {line!r} changed or deleted")
+    old_eval = _fence_lines(EVAL_FENCE, old_text)
+    new_eval = _fence_lines(EVAL_FENCE, new_text)
+    if old_eval:
+        if new_eval is None:
+            hits.append(f"{path} ```eval block deleted")
+        else:
+            for line in old_eval:
+                if line not in new_eval:
+                    hits.append(f"{path} ```eval {line!r} changed or deleted")
+    return hits
+
+
 def declaration_bars(path: str, old_text: str, new_text: str) -> list[str]:
     """Bar moves in fenced declaration blocks of a task brief (plan §3.3)."""
     old_blocks = parse_declaration_blocks(old_text)
     new_blocks = parse_declaration_blocks(new_text)
     hits: list[str] = exempt_bars(path, old_text, new_text)
+    hits.extend(text_line_bars(path, old_text, new_text))
     for kind in DECL_KINDS:
         was = old_blocks.get(kind)
         now = new_blocks.get(kind)
@@ -580,6 +629,20 @@ def main() -> int:
                     + ", ".join(unnamed)
                 )
                 failed = True
+
+    gate_bars = sorted({bar_path(b) for b in bars if match_any(bar_path(b), BAR_FILES)})
+    if gate_bars:
+        body = Path(args.body_FILE).read_text(encoding="utf-8") if args.body_FILE and Path(args.body_FILE).is_file() else ""
+        reviewed = [l for l in body.splitlines() if l.strip().startswith(GATE_REVIEW)]
+        if not reviewed:
+            print(
+                f"history_audit: FAIL a gate file changed ({', '.join(gate_bars)}) with no "
+                f"'{GATE_REVIEW} <who, when>' line in the pull-request body. Add it after a "
+                f"fresh review session has read the diff; CI re-runs when the body is edited."
+            )
+            failed = True
+        else:
+            print(f"  gate review: {reviewed[0].strip()[:160]}")
 
     if failed:
         return 1
