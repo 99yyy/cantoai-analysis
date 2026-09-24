@@ -1,5 +1,6 @@
 ---
 name: open-code-review-delegate
+disable-model-invocation: true
 description: >
   Delegation mode for open-code-review (OCR). Instead of OCR calling an LLM
   endpoint, this skill instructs the host agent to perform the code review

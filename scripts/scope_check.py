@@ -141,10 +141,13 @@ def run(*args: str) -> str:
 
 def changed(base: str) -> list[str]:
     # --no-renames: a moved file is a delete plus an add, and both are judged.
+    # -z: names come out as they are, NUL-terminated. Without it git quotes a
+    # name holding a non-ASCII byte ("docs/\350\257\264.md"), and the quoted
+    # form matches no glob.
     return sorted(
         p
-        for p in run("git", "diff", "--name-only", "--no-renames", f"{base}...HEAD").splitlines()
-        if p.strip()
+        for p in run("git", "diff", "--name-only", "--no-renames", "-z", f"{base}...HEAD").split("\0")
+        if p
     )
 
 

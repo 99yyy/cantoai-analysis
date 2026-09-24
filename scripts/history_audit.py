@@ -20,9 +20,12 @@ Two rules, both mechanical:
    the round audit, which is where judgement belongs.
 3. A pull request that adds, changes, renames or deletes a gate file
    (anything under ``scripts/``, ``.github/`` or ``benchmarks/``; the gate
-   tests listed in the gate config, their fixtures and mutation probes; and the
+   tests listed in the gate config, their fixtures and mutation probes; the
    files that decide what pytest collects and imports: ``conftest.py``,
-   ``tests/__init__.py``, the pytest configuration and the requirements) also
+   ``tests/__init__.py``, the pytest configuration and the requirements; and
+   the agent instructions Cursor loads into every Cloud Agent: anything under
+   a ``.cursor/``, ``.agents/``, ``.claude/`` or ``.codex/`` directory at any
+   depth, and every ``AGENTS.md``, ``CLAUDE.md`` or ``.cursorrules``) also
    needs a line beginning
    ``Gate-review:`` in its body that names the reviewed head commit (at least
    seven hex digits of it). The owner adds it after a fresh review session
@@ -117,6 +120,17 @@ BAR_FILES: list[str] = [
     "requirements*.txt",
     # Reference sets a score route is judged against (owner-only).
     "benchmarks/*", "benchmarks/**",
+    # Agent instructions. Cursor loads rules, skills and the environment
+    # set-up from these into every Cloud Agent, nested directories included,
+    # so a change here changes what every agent is told to do. fnmatch '*'
+    # crosses '/', so "*/AGENTS.md" matches at any depth below the root. The
+    # bare directory names catch a symlink standing in for the directory.
+    ".cursor", ".cursor/*", ".cursor/**", "*/.cursor", "*/.cursor/*",
+    ".agents", ".agents/*", ".agents/**", "*/.agents", "*/.agents/*",
+    ".claude", ".claude/*", ".claude/**", "*/.claude", "*/.claude/*",
+    ".codex", ".codex/*", ".codex/**", "*/.codex", "*/.codex/*",
+    "AGENTS.md", "*/AGENTS.md", "CLAUDE.md", "*/CLAUDE.md",
+    ".cursorrules", "*/.cursorrules",
 ]
 BAR_COUNTED = {
     "scripts/*.py": (GATE_FAIL_SITE_RE, "fail sites"),
@@ -323,11 +337,30 @@ def run(*args: str) -> str:
 def changed(base: str) -> list[str]:
     # --no-renames: a rename is a delete plus an add, so the old path (a bar
     # that existed in base) cannot disappear behind its new name.
+    # -z (here and in tree_paths): names come out as they are. Without it git
+    # quotes a name holding a non-ASCII byte, and the quoted form matches no
+    # glob, so ".cursor/rules/<non-ASCII>.mdc" would not be a gate file.
     return sorted(
         p
-        for p in run("git", "diff", "--no-renames", "--name-only", f"{base}...HEAD").splitlines()
-        if p.strip()
+        for p in run("git", "diff", "--no-renames", "--name-only", "-z", f"{base}...HEAD").split("\0")
+        if p
     )
+
+
+def tree_paths(ref: str) -> list[str]:
+    return [p for p in run("git", "ls-tree", "-r", "--name-only", "-z", ref).split("\0") if p]
+
+
+def symlinks_at(ref: str) -> set[str]:
+    """Paths whose mode at ``ref`` is 120000. ``-z`` leaves the name unquoted."""
+    found: set[str] = set()
+    for rec in run("git", "ls-tree", "-r", "-z", ref).split("\0"):
+        if not rec:
+            continue
+        meta, sep, path = rec.partition("\t")
+        if sep and meta.startswith("120000 "):
+            found.add(path)
+    return found
 
 
 def reviewed_head() -> str:
@@ -619,14 +652,13 @@ def main() -> int:
         return 0
 
     bars: list[str] = []
-    base_tree = run("git", "ls-tree", "-r", "--name-only", args.base).splitlines()
+    base_tree = tree_paths(args.base)
     for f in files:
         # A file under expected/ counts only if it existed before this change.
         if f in base_tree and is_gate_file(f):
             bars.append(f)
     b_pat = [p for p in base_tree if fnmatch.fnmatch(p, MUTATION_GLOB)]
-    h_pat = [p for p in run("git", "ls-tree", "-r", "--name-only", "HEAD").splitlines()
-             if fnmatch.fnmatch(p, MUTATION_GLOB)]
+    h_pat = [p for p in tree_paths("HEAD") if fnmatch.fnmatch(p, MUTATION_GLOB)]
     if len(h_pat) < len(b_pat):
         bars.append(f"tests/mutations/ ({len(b_pat)} -> {len(h_pat)} patches)")
 
@@ -692,6 +724,15 @@ def main() -> int:
     # existed in base: a new scripts/json.py would shadow the standard
     # library for every gate that runs from that directory.
     gate_files = sorted(f for f in files if is_gate_file(f))
+    linked = [f for f in gate_files if f in symlinks_at("HEAD")]
+    if linked:
+        print(
+            "history_audit: FAIL a gate file is a symlink ("
+            + ", ".join(linked)
+            + "); agent instructions and gate files must be regular files, "
+            "or an edit to the target would bypass review."
+        )
+        failed = True
     if gate_files:
         body = Path(args.body_FILE).read_text(encoding="utf-8") if args.body_FILE and Path(args.body_FILE).is_file() else ""
         head = reviewed_head()

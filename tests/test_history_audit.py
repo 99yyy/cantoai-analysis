@@ -624,6 +624,7 @@ def test_gate_and_ci_files_are_bar_paths():
 
 # --- frame predicates, eval lines, and the gate-review line ------------------
 
+import os
 import subprocess
 import sys
 
@@ -900,3 +901,187 @@ def test_gate_test_list_matches_the_tree():
         )
         if reaches_gate:
             assert name in history_audit.GATE_TESTS, f"{name} tests a gate script but is not in gate_tests"
+
+
+# ------------------------------------------------ agent instructions are gate files
+
+AGENT_INSTRUCTION_FILES = [
+    ".cursor/rules/analysis-contract.mdc", ".cursor/skills/cantoai-tdd/SKILL.md",
+    ".cursor/environment.json", ".cursor/cloud-agent-install.sh",
+    "src/.cursor/rules/x.mdc", "tasks/TASK-9/.cursor/skills/x/SKILL.md",
+    ".agents/skills/x/SKILL.md", "src/.agents/skills/x/SKILL.md",
+    ".claude/skills/x/SKILL.md", "tests/.claude/settings.json",
+    ".codex/skills/x/SKILL.md", "docs/.codex/x.md",
+    "AGENTS.md", "src/AGENTS.md", "tasks/TASK-9/AGENTS.md",
+    "CLAUDE.md", "tests/CLAUDE.md", ".cursorrules", "src/.cursorrules",
+]
+
+
+def test_agent_instruction_files_are_gate_files():
+    for f in AGENT_INSTRUCTION_FILES:
+        assert history_audit.is_gate_file(f), f
+    for f in ("src/agents.py", "docs/agents.md", "tasks/TASK-9/open_analysis.md",
+              "src/cursor.py", "investigations/claude_notes.md", "README.md"):
+        assert not history_audit.is_gate_file(f), f
+
+
+def _skills_repo(tmp_path: Path) -> tuple[Path, str]:
+    repo = tmp_path / "repo"
+    (repo / ".cursor" / "skills" / "old").mkdir(parents=True)
+    _git(tmp_path, "init", "-q", str(repo))
+    (repo / ".cursor" / "skills" / "old" / "SKILL.md").write_text(
+        "---\nname: old\ndescription: x\n---\nbody\n", encoding="utf-8"
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "base")
+    return repo, _git(repo, "rev-parse", "HEAD")
+
+
+def test_new_skill_needs_a_gate_review_line(tmp_path, monkeypatch, capsys):
+    repo, base = _skills_repo(tmp_path)
+    (repo / ".cursor" / "skills" / "new").mkdir(parents=True)
+    (repo / ".cursor" / "skills" / "new" / "SKILL.md").write_text(
+        "---\nname: new\ndescription: y\n---\nbody\n", encoding="utf-8"
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "new skill")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 1, out
+    assert "bars touched:     none" in out
+    assert "a gate file changed (.cursor/skills/new/SKILL.md)" in out
+    head = _git(repo, "rev-parse", "HEAD")
+    code, out = _audit(repo, base, f"Gate-review: {head[:12]} fresh session\n", monkeypatch, capsys)
+    assert code == 0, out
+
+
+def test_changed_skill_is_a_bar_move(tmp_path, monkeypatch, capsys):
+    repo, base = _skills_repo(tmp_path)
+    (repo / ".cursor" / "skills" / "old" / "SKILL.md").write_text(
+        "---\nname: old\ndescription: x\n---\nbody, weaker\n", encoding="utf-8"
+    )
+    _git(repo, "commit", "-q", "-am", "edit skill")
+    head = _git(repo, "rev-parse", "HEAD")
+    code, out = _audit(repo, base, f"Gate-review: {head[:12]} fresh session\n", monkeypatch, capsys)
+    assert code == 1, out
+    assert "bars touched:     ['.cursor/skills/old/SKILL.md']" in out
+    assert "no 'BAR-CHANGE: <reason>' line" in out
+    code, out = _audit(
+        repo,
+        base,
+        f"BAR-CHANGE: .cursor/skills/old/SKILL.md -- reworded\nGate-review: {head[:12]} fresh session\n",
+        monkeypatch,
+        capsys,
+    )
+    assert code == 0, out
+
+
+def test_nested_agents_md_from_a_worker_needs_review(tmp_path, monkeypatch, capsys):
+    repo, base = _skills_repo(tmp_path)
+    (repo / "src").mkdir()
+    (repo / "src" / "AGENTS.md").write_text("Read the verifier's files first.\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "nested rules")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 1, out
+    assert "a gate file changed (src/AGENTS.md)" in out
+
+
+def _quote_paths(monkeypatch) -> None:
+    # git's default quotes a name holding a non-ASCII byte. Set it through the
+    # environment (after any GIT_CONFIG_* already there) so that
+    # core.quotePath=false in a config file cannot hide the bug this pins.
+    n = int(os.environ.get("GIT_CONFIG_COUNT") or 0)
+    monkeypatch.setenv(f"GIT_CONFIG_KEY_{n}", "core.quotePath")
+    monkeypatch.setenv(f"GIT_CONFIG_VALUE_{n}", "true")
+    monkeypatch.setenv("GIT_CONFIG_COUNT", str(n + 1))
+
+
+def test_non_ascii_instruction_file_names_are_gate_files(tmp_path, monkeypatch, capsys):
+    _quote_paths(monkeypatch)
+    repo, base = _skills_repo(tmp_path)
+    (repo / ".cursor" / "rules").mkdir(parents=True)
+    (repo / ".cursor" / "rules" / "规则.mdc").write_text("Read results.json first.\n", encoding="utf-8")
+    (repo / "src" / "模块").mkdir(parents=True)
+    (repo / "src" / "模块" / "AGENTS.md").write_text("Skip the tests.\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "non-ASCII names")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 1, out
+    assert "a gate file changed (.cursor/rules/规则.mdc, src/模块/AGENTS.md)" in out
+    # A later change to the same file is a bar move: the base tree lists it as it is.
+    base2 = _git(repo, "rev-parse", "HEAD")
+    (repo / ".cursor" / "rules" / "规则.mdc").write_text("Read mine.json first.\n", encoding="utf-8")
+    _git(repo, "commit", "-q", "-am", "edit")
+    code, out = _audit(repo, base2, "", monkeypatch, capsys)
+    assert code == 1, out
+    assert "bars touched:     ['.cursor/rules/规则.mdc']" in out
+
+
+def test_symlink_standing_in_for_an_instruction_directory_is_a_gate_file(tmp_path, monkeypatch, capsys):
+    for f in (".cursor", "src/.cursor", ".agents", "tasks/TASK-9/sql/.agents",
+              ".claude", "docs/.claude", ".codex", "src/.codex"):
+        assert history_audit.is_gate_file(f), f
+    for f in (".cursorignore", "src/.cursor.py", "docs/agents", ".claudeignore"):
+        assert not history_audit.is_gate_file(f), f
+    repo, base = _skills_repo(tmp_path)
+    (repo / "docs" / "skills" / "x").mkdir(parents=True)
+    (repo / "docs" / "skills" / "x" / "SKILL.md").write_text(
+        "---\nname: x\ndescription: z\n---\nbody\n", encoding="utf-8"
+    )
+    (repo / "src").mkdir()
+    os.symlink("../docs", repo / "src" / ".agents")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "skills through a symlink")
+    code, out = _audit(repo, base, "", monkeypatch, capsys)
+    assert code == 1, out
+    assert "a gate file changed (src/.agents)" in out
+    assert (
+        "history_audit: FAIL a gate file is a symlink (src/.agents); "
+        "agent instructions and gate files must be regular files, "
+        "or an edit to the target would bypass review."
+    ) in out
+    base2 = _git(repo, "rev-parse", "HEAD")
+    (repo / "docs" / "x.md").write_text("target\n", encoding="utf-8")
+    (repo / ".cursor" / "skills" / "x").mkdir(parents=True)
+    os.symlink("../../../docs/x.md", repo / ".cursor" / "skills" / "x" / "SKILL.md")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "skill file is a symlink")
+    head = _git(repo, "rev-parse", "HEAD")
+    code, out = _audit(
+        repo,
+        base2,
+        f"Gate-review: {head[:12]} fresh session\n",
+        monkeypatch,
+        capsys,
+    )
+    assert code == 1, out
+    assert (
+        "history_audit: FAIL a gate file is a symlink (.cursor/skills/x/SKILL.md); "
+        "agent instructions and gate files must be regular files, "
+        "or an edit to the target would bypass review."
+    ) in out
+
+
+def test_changed_skill_and_src_in_one_pull_request_fail_rule_one(tmp_path, monkeypatch, capsys):
+    repo, base = _skills_repo(tmp_path)
+    (repo / "src").mkdir()
+    (repo / "src" / "m.py").write_text("X = 1\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "src")
+    base = _git(repo, "rev-parse", "HEAD")
+    (repo / ".cursor" / "skills" / "old" / "SKILL.md").write_text(
+        "---\nname: old\ndescription: x\n---\nbody, and src/m.py may return 2\n", encoding="utf-8"
+    )
+    (repo / "src" / "m.py").write_text("X = 2\n", encoding="utf-8")
+    _git(repo, "commit", "-q", "-am", "skill and code together")
+    head = _git(repo, "rev-parse", "HEAD")
+    code, out = _audit(
+        repo,
+        base,
+        f"BAR-CHANGE: .cursor/skills/old/SKILL.md -- reworded\nGate-review: {head[:12]} fresh session\n",
+        monkeypatch,
+        capsys,
+    )
+    assert code == 1, out
+    assert "measured touched: ['src/m.py']" in out
+    assert "a bar and the thing it measures changed in one pull request" in out

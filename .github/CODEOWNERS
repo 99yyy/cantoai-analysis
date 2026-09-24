@@ -12,5 +12,14 @@ data/**             @99yyy
 benchmarks/**       @99yyy
 LOOP.md             @99yyy
 README.md           @99yyy
-.cursor/**          @99yyy
 tasks/TASK-*.md     @99yyy
+# Agent instructions Cursor loads into every Cloud Agent. A pattern with no
+# inner slash matches at any depth; with no trailing slash it matches the
+# directory and everything in it, and also a file (a symlink) of that name.
+.cursor             @99yyy
+.agents             @99yyy
+.claude             @99yyy
+.codex              @99yyy
+AGENTS.md           @99yyy
+CLAUDE.md           @99yyy
+.cursorrules        @99yyy
