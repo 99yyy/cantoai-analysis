@@ -1,0 +1,62 @@
+{
+  "task": "TASK-10",
+  "subtype": "success",
+  "verdict": "inconclusive",
+  "hypothesis": "On published A+B windows of this channel's videos, chars_per_sec is faster for upload years 2025 and later than for 2024 and earlier (gap_cps_pm > 0).",
+  "why": "Machine completion is 12/12 agree on #123. The window-weighted cluster interval for gap_cps_pm excludes 0, but Q2 signs disagree across gap_cps_pm, gap_cps_vidmed_pm, and gap_cps_trim10_pm, so the brief forbids an overall-faster conclusion.",
+  "numbers": {
+    "n_videos_pre": {
+      "value": 391,
+      "within_tol": true
+    },
+    "n_videos_post": {
+      "value": 176,
+      "within_tol": true
+    },
+    "n_unassigned_period": {
+      "value": 0,
+      "within_tol": true
+    },
+    "n_windows_pre": {
+      "value": 3286,
+      "within_tol": true
+    },
+    "n_windows_post": {
+      "value": 1153,
+      "within_tol": true
+    },
+    "rate_cps_pre_pm": {
+      "value": 2651.004260499087,
+      "within_tol": true
+    },
+    "rate_cps_post_pm": {
+      "value": 2799.0980052038162,
+      "within_tol": true
+    },
+    "gap_cps_pm": {
+      "value": 148.09374470472903,
+      "within_tol": true
+    },
+    "rate_cps_median_pre_pm": {
+      "value": 2560.0,
+      "within_tol": true
+    },
+    "rate_cps_median_post_pm": {
+      "value": 2560.0,
+      "within_tol": true
+    },
+    "gap_cps_vidmed_pm": {
+      "value": -34.9999999999997,
+      "within_tol": true
+    },
+    "gap_cps_trim10_pm": {
+      "value": 74.95079558930229,
+      "within_tol": true
+    }
+  },
+  "turns_used": 5,
+  "turn_cap": 3,
+  "corpus_sha": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+  "forked_from": null,
+  "fork_depth": 0
+}

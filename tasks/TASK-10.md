@@ -1,6 +1,7 @@
 # TASK-10：发布窗 chars_per_sec 是否在 2025 及之后比之前更快
 
-status: open
+status: closed
+corpus_sha: 2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f
 rung: Autopilot
 
 ## 目标
