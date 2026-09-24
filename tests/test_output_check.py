@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import sqlite3
 import subprocess
@@ -2048,3 +2049,27 @@ def test_parse_brief_fails_on_an_ambiguous_layout(tmp_path):
     md.write_text("status: open\n\n```fixture\n```numbers\nn_a 5\n```\n\n```numbers\nn_a 0\n```\n", encoding="utf-8")
     with pytest.raises(output_check.Fail, match="opens inside the fence"):
         output_check.parse_brief(md)
+
+
+def _quote_paths(monkeypatch) -> None:
+    # git's default quotes a name holding a non-ASCII byte. Set it through the
+    # environment (after any GIT_CONFIG_* already there) so that
+    # core.quotePath=false in a config file cannot hide the bug this pins.
+    n = int(os.environ.get("GIT_CONFIG_COUNT") or 0)
+    monkeypatch.setenv(f"GIT_CONFIG_KEY_{n}", "core.quotePath")
+    monkeypatch.setenv(f"GIT_CONFIG_VALUE_{n}", "true")
+    monkeypatch.setenv("GIT_CONFIG_COUNT", str(n + 1))
+
+
+def test_pr_diff_names_lists_non_ascii_names_as_they_are(tmp_path, monkeypatch):
+    # Without -z the name came out quoted, did not start with tasks/TASK-3/,
+    # and the task looked untouched.
+    _quote_paths(monkeypatch)
+    repo = tmp_path / "repo"
+    (repo / "tasks" / "TASK-3").mkdir(parents=True)
+    _init_git(repo)
+    (repo / "tasks" / "TASK-3" / "notes.md").write_text("x\n", encoding="utf-8")
+    base = _commit(repo, "base")
+    (repo / "tasks" / "TASK-3" / "说明.md").write_text("y\n", encoding="utf-8")
+    head = _commit(repo, "non-ASCII name")
+    assert output_check.pr_diff_names(repo, base, head) == ["tasks/TASK-3/说明.md"]

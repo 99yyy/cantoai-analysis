@@ -862,8 +862,8 @@ def tasks_naming_changed_sets(briefs: list[Path], paths: Iterable[str]) -> froze
 
 def pr_diff_names(root: Path, base: str, head: str) -> list[str]:
     """Repo-relative paths in ``base...head`` (the pull-request triple-dot)."""
-    out = git(root, "diff", "--name-only", "--no-renames", f"{base}...{head}")
-    return [l.strip() for l in out.splitlines() if l.strip()]
+    out = git(root, "diff", "--name-only", "--no-renames", "-z", f"{base}...{head}")
+    return [p for p in out.split("\0") if p]
 
 
 def discover_briefs(root: Path) -> list[Path]:
