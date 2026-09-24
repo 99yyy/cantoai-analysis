@@ -351,6 +351,18 @@ def tree_paths(ref: str) -> list[str]:
     return [p for p in run("git", "ls-tree", "-r", "--name-only", "-z", ref).split("\0") if p]
 
 
+def symlinks_at(ref: str) -> set[str]:
+    """Paths whose mode at ``ref`` is 120000. ``-z`` leaves the name unquoted."""
+    found: set[str] = set()
+    for rec in run("git", "ls-tree", "-r", "-z", ref).split("\0"):
+        if not rec:
+            continue
+        meta, sep, path = rec.partition("\t")
+        if sep and meta.startswith("120000 "):
+            found.add(path)
+    return found
+
+
 def reviewed_head() -> str:
     """The pull request's head commit: HEAD^2 of the merge CI checks out, else HEAD."""
     parents = run("git", "rev-list", "--parents", "-n", "1", "HEAD").split()
@@ -712,6 +724,15 @@ def main() -> int:
     # existed in base: a new scripts/json.py would shadow the standard
     # library for every gate that runs from that directory.
     gate_files = sorted(f for f in files if is_gate_file(f))
+    linked = [f for f in gate_files if f in symlinks_at("HEAD")]
+    if linked:
+        print(
+            "history_audit: FAIL a gate file is a symlink ("
+            + ", ".join(linked)
+            + "); agent instructions and gate files must be regular files, "
+            "or an edit to the target would bypass review."
+        )
+        failed = True
     if gate_files:
         body = Path(args.body_FILE).read_text(encoding="utf-8") if args.body_FILE and Path(args.body_FILE).is_file() else ""
         head = reviewed_head()

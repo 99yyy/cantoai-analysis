@@ -37,12 +37,12 @@ Use the closest executable check instead: a targeted script, a reproduction comm
 ## In this repository
 
 - Put a new test in `tests/test_<module>.py` for the module you changed. If that name is a gate file (next item), pick another.
-- Gate files are listed in full by `BAR_FILES` in `scripts/history_audit.py` and `gate_tests` in `scripts/gate_config.json`. In `tests/` they include every `tests/test_assertions*.py` and `tests/test_mutations*.py`, the tests of the gate scripts, `tests/fixtures/`, `tests/mutations/`, any `conftest.py` and `tests/__init__.py`; the pytest configuration and `requirements*.txt` are gate files too. A pull request that changes one fails history-audit until Tom adds a `Gate-review:` line after a fresh review. Do not change them unless your launch prompt says so.
+- Gate files are listed in full by `BAR_FILES` in `scripts/history_audit.py` and `gate_tests` in `scripts/gate_config.json`. In `tests/` they include every `tests/test_assertions*.py` and `tests/test_mutations*.py`, the tests of the gate scripts, `tests/fixtures/`, `tests/mutations/`, any `conftest.py` and `tests/__init__.py`; the pytest configuration and `requirements*.txt` are gate files too. A pull request that changes one fails history-audit until Tom adds a `Gate-review:` line after a fresh review. Never change them; if a fix needs one changed, stop and say so in your final message.
 - A new assertion in `src/` needs its test, `pytest.raises(<type>, match=r"^<message>")`, whose body calls the function imported from `src/`, unmocked (analysis contract, clause 7). It goes in that module's test file, not in `tests/test_assertions.py`.
 - New code of a defect class that clause 8 lists needs a mutation patch in `tests/mutations/`. Adding one for new code is not moving a bar, but the patch is a new gate file: say in your final message that the pull request needs a `Gate-review:` line.
 - Changing or deleting an existing gate file, or removing a `match=` pattern from any test, moves a bar. That may not share a pull request with a change to `src/` or any `.sql` file (clause 6). Stop and report it instead.
 - A test you add or change also follows the `cantoai-test-behavior` skill.
-- Run the focused test with `python -m pytest -q tests/<file>.py`, then `./verify` before you open the pull request.
+- Run the focused test with `python3 -m pytest -q tests/<file>.py`, then `./verify` before you open the pull request.
 
 ## Final response
 

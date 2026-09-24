@@ -2,6 +2,8 @@ Skills for Cloud Agents on this repository.
 
 Cursor loads the skills in this directory into every Cloud Agent started on the repository, whether from the web, the desktop app, GitHub, Slack or the API, including the agents fyp launches from Grok Bot. A skill without `disable-model-invocation: true` is in the agent's catalog from the start, and the agent uses it when its description matches the task or the launch prompt names it. A skill with `paths` is offered only while the agent works on matching files. The Cloud Agents API has no field for skills, so a launch prompt names a skill in plain words, for example "Use the cantoai-interrogate skill".
 
+In a run on 2026-09-24 an agent started on a branch got the skills of main, not of its branch, so a change to a skill takes effect once it is merged.
+
 | Skill | Used by | When |
 |---|---|---|
 | `cantoai-tdd` | any agent changing `src/` or `tests/` | fixing a bug that a cheap local test can show |

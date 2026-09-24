@@ -1035,6 +1035,31 @@ def test_symlink_standing_in_for_an_instruction_directory_is_a_gate_file(tmp_pat
     code, out = _audit(repo, base, "", monkeypatch, capsys)
     assert code == 1, out
     assert "a gate file changed (src/.agents)" in out
+    assert (
+        "history_audit: FAIL a gate file is a symlink (src/.agents); "
+        "agent instructions and gate files must be regular files, "
+        "or an edit to the target would bypass review."
+    ) in out
+    base2 = _git(repo, "rev-parse", "HEAD")
+    (repo / "docs" / "x.md").write_text("target\n", encoding="utf-8")
+    (repo / ".cursor" / "skills" / "x").mkdir(parents=True)
+    os.symlink("../../../docs/x.md", repo / ".cursor" / "skills" / "x" / "SKILL.md")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "skill file is a symlink")
+    head = _git(repo, "rev-parse", "HEAD")
+    code, out = _audit(
+        repo,
+        base2,
+        f"Gate-review: {head[:12]} fresh session\n",
+        monkeypatch,
+        capsys,
+    )
+    assert code == 1, out
+    assert (
+        "history_audit: FAIL a gate file is a symlink (.cursor/skills/x/SKILL.md); "
+        "agent instructions and gate files must be regular files, "
+        "or an edit to the target would bypass review."
+    ) in out
 
 
 def test_changed_skill_and_src_in_one_pull_request_fail_rule_one(tmp_path, monkeypatch, capsys):
