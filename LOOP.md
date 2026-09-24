@@ -92,6 +92,8 @@ backlog  auditor 的结论只进 backlog.md，不自动变成下一题。
 
 前三个是 main 的必需检查；`tests` 也是。四个都过，没有 owner 审阅也能合——见下一节为什么。
 
+另有一道 `claude-review`（`.github/workflows/claude-review.yml`，说明在 `.github/claude-review.md`）：Cursor agent 开的 PR（分支 `cursor/` `box/` `repair/tooling-`）由 Claude（Opus 5.5，effort medium）审代码逻辑——SQL 是否算的是任务书定义的量、`src/` 的边界情况和调用方、契约、测试能不能失败——逐行留评论，有 important 发现就红，其余 PR 直接绿。流程和说明都从 base 分支读（`pull_request_target`），被审的 PR 改不了；PR 的文件只读，不运行。任务分支上只读这一边的文件，评论和总结里不写任何算出来的数。红了，fyp 按 ITERATE 把行内评论转给同一个 agent 修。它用 Tom 的 Claude 订阅（secret `CLAUDE_CODE_OAUTH_TOKEN`），结论只是审查意见；设不设为 main 的必需检查由 Tom 在仓库设置里定。
+
 ## 仓库设置（不在脚本里，在 GitHub Settings 里）
 
 闸门脚本管的是 PR 的内容；下面三样只能靠仓库设置，改了要在这里同步记一笔：
