@@ -1,0 +1,45 @@
+{
+  "B": 2000,
+  "master_seed": 20260924,
+  "seed_rule": "int(sha256(f'{master_seed}:{h}').hexdigest()[:8], 16)",
+  "stratum_seeds": {
+    "pre": 2614385437,
+    "post": 1919133284
+  },
+  "seeds_pairwise_distinct": 1,
+  "G_h": {
+    "pre": 391,
+    "post": 176
+  },
+  "ci_unreliable": 0,
+  "ci_unreliable_stratum": {
+    "pre": 0,
+    "post": 0
+  },
+  "m": 1,
+  "resample": "whole video_id within period; window-weighted mean is sum(chars_per_sec)/sum(n_windows) on the drawn videos",
+  "n_videos_with_published_windows": {
+    "pre": 389,
+    "post": 176
+  },
+  "gaps": {
+    "gap_cps_pm": {
+      "observed_pm": 148.09374470472926,
+      "rate_cps_pre_pm": 2651.004260499087,
+      "rate_cps_post_pm": 2799.0980052038162,
+      "ci95": [
+        47.350824592651456,
+        243.37247685283123
+      ],
+      "includes_0": 0,
+      "p_raw": 0.003,
+      "p_BH": 0.003,
+      "share_pos": 0.9985,
+      "share_neg": 0.0015,
+      "descriptive": 0,
+      "ci_unreliable": 0,
+      "conclusion": "inconclusive",
+      "weighting": "window"
+    }
+  }
+}
