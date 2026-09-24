@@ -11,7 +11,7 @@ rung: Autopilot
 
 上一轮是 TASK-10（`tasks/TASK-10.md`，已 `closed`）。本任务是 campaign `investigations/g2p-real-speech` 方向一的首个 gated 任务，不是 TASK-6–10 的分叉：测量对象是词典侧「上下文读音相对默认读音发生变化」的子集上的一致率对比，不重报期际一致率或语速差距。
 
-提案经 Tom「采纳」（含两处修改：主集改为 `jp_ctx ≠ jp_default`；恢复比较并交 Q4 差值区间）；质询员对修订版打回 Q5（缺 = 侧规模名），已并入 `n_same_judgeable`；其余放行意见并入下文。
+提案经 Tom「采纳」（含两处修改：主集改为 `jp_ctx ≠ jp_default`；恢复比较并交 Q4 差值区间）；质询员对修订版打回 Q5（缺 = 侧规模名），已并入 `n_same_judgeable`；其余放行意见并入下文。草稿 PR #126 四道绿后质询①「放行（附修）」两点已并入定义：Q4 整簇 bootstrap 公式对齐契约；描述性「呢」写死用列 `next_char`。
 
 ## 假说
 
@@ -43,10 +43,10 @@ rung: Autopilot
 - **`agree_ctx_pm`**：`1000 * n_ctx_match / n_diff_judgeable`。分母为 0 则退出非零。
 - **`agree_default_pm`**：`1000 * n_default_match / n_diff_judgeable`。
 - **`gap_agree_pm`**：`agree_ctx_pm - agree_default_pm`（定义恒等；配对在同一批 `n_diff_judgeable` 行上）。
-- **Q4 差值区间（不进 numbers）**：名字 `gap_agree_ci`。方法：按 `video_id` 整簇 bootstrap，`B >= 1000`；层种子 `int(sha256(f"{master_seed}:{h}").hexdigest()[:8], 16)`，与契约第 20 条及 TASK-9/10 对齐；每一簇内用该视频主评测集行按与声明相同的定义重算 `gap_agree_pm`，再对簇重采样得区间。报 `G`（有主评测集行的视频数）；`G < 10` 发 `ci_unreliable=1`。开放分析必须写一句：把差值换成相对幅度（例如相对 `agree_default_pm`）后，符号/结论是否翻转。区间端点不进 `numbers`。
+- **Q4 差值区间（不进 numbers）**：名字 `gap_agree_ci`。方法：对 `video_id` **有放回重采样**整簇，`B >= 1000`；层种子 `int(sha256(f"{master_seed}:{h}").hexdigest()[:8], 16)`，与契约第 20 条及 TASK-9/10 对齐。每一次 bootstrap 样本：取被抽中簇在主评测集上的**行并集**，在该并集上按与声明相同的定义**重算全局** `gap_agree_pm`，再由 B 次重算得区间。报 `G`（有主评测集行的视频数）；`G < 10` 发 `ci_unreliable=1`。**禁止**先在每一簇内各自算 `gap_agree_pm` 再对簇级差值做均值或分位（那不是契约第 20 条的整簇 bootstrap）。开放分析必须写一句：把差值换成相对幅度（例如相对 `agree_default_pm`）后，符号/结论是否翻转。区间端点不进 `numbers`。
 - **Q5 错分方向（写死）**：漏掉「本应不同却被标成相同」的行 → 主集偏「更容易见差」的子集，`|gap_agree_pm|` 可能偏大；把噪声差纳入 ≠ 侧 → `gap_agree_pm` 被稀释。两侧规模名 `n_diff_judgeable` / `n_same_judgeable` 均进 `numbers`。
 - **描述性（不进 numbers，标 `descriptive=1`）**：
-  1. **非句末「呢」**：`char = '呢'`，且文本侧不是句末：`next_char` 不属于句末标点集合，且 `next_char` 非空（即不是 `text_clean` 末字的常见情形）。句末标点集合写死为：`。！？!?．…`（记入 `manifest.json` 的 `sent_final_punct`）。再 ∩ 发布集 ∩ 可判定。只报与 `jp_ctx` 的一致率描述，不宣称已知答案或金标读音。
+  1. **非句末「呢」**：`char = '呢'`，且文本侧不是句末。`next_char` **是语料列** `syllables.next_char`（列名；**不**在运行时从 `text_clean` / `pos` / 音节序现构）。判定写死：`trim(coalesce(next_char,''))` 长度 > 0，且该值不属于句末标点集合。句末标点集合写死为：`。！？!?．…`（记入 `manifest.json` 的 `sent_final_punct`）。再 ∩ 发布集 ∩ 可判定。只报与 `jp_ctx` 的一致率描述，不宣称已知答案或金标读音。
   2. **`n_cand ≥ 2` 集合**：发布集 ∩ 可判定 ∩ `n_cand >= 2` 上的 `jp_ctx` 一致率描述（覆盖面广，不作 headline）。
 - **总体**：这个频道的 567 条视频。聚类停在 `video_id`。不写「粤语」或「Cantonese」。
 - **用词**：agreement / 一致率；禁止 accuracy / 错误率。两边都不是真值。
@@ -114,7 +114,7 @@ windows_expected 4911
 windows_expected_tol 0
 syllables_expected 171867
 syllables_expected_tol 0
-published_expected 164693
+published_expected {PUBLISHED_EXPECTED}
 published_expected_tol 0
 ```
 
@@ -135,7 +135,7 @@ agree_default_pm = 1000 * n_default_match / n_diff_judgeable  0.5
 **质询 Q7 框内取值分布**（必交，开放分析 + `manifest.json`，不进 `numbers`）：
 1. 发布集可判定上，规范化后 `jp_ctx ≠ jp_default` 与 `=` 的行数（与两个 `n_*` 对照）。
 2. 主评测集内 `char` 的顶频描述（descriptive）；`n_cand` 在发布集可判定上的取值分布摘要。
-3. 描述性「呢」子集：句末判定结果分布（非句末进子集 / 句末排除）计数。
+3. 描述性「呢」子集：句末判定结果分布（非句末进子集 / 句末排除）计数；判定仅用列 `next_char`。
 
 若某一依赖列在框内 distinct=1，必须显式写出并标 `q7_constant=1`。
 
@@ -165,6 +165,6 @@ agree_default_pm = 1000 * n_default_match / n_diff_judgeable  0.5
 Q1 分组边界: 不适用 + 理由（主结果不是按序数切分的组间差；主集由词典列相等性定义）
 Q2 加权单位: 不适用 + 理由（主结果是同一子集上的一致率与配对差，不是两组行加权组间差）
 Q3 是否恒等式: 不适用 + 理由（不是份额分解；gap 是定义差，不写「解释了」）
-Q4 差值区间: 触发；交 gap_agree_ci（video_id 整簇 bootstrap B>=1000）；结论可比较 ctx 与 default；须写相对幅度是否翻转；区间不进 numbers
+Q4 差值区间: 触发；交 gap_agree_ci（对 video_id 有放回重采样，在并集主评测集上重算全局 gap；B>=1000）；结论可比较 ctx 与 default；须写相对幅度是否翻转；区间不进 numbers
 Q5 代理错分方向: 触发；两侧规模 n_diff_judgeable / n_same_judgeable 进 numbers；错分方向见定义
-Q7 框内取值: 交 jp_ctx≠jp_default 判定覆盖、n_cand 摘要、呢子集句末判定分布（见「还要交的东西」）
+Q7 框内取值: 交 jp_ctx≠jp_default 判定覆盖、n_cand 摘要、呢子集句末判定分布（见「还要交的东西」；呢判定用列 next_char）
