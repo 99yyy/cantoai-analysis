@@ -1,0 +1,74 @@
+[
+  {
+    "name": "n_videos_pre",
+    "value": 391,
+    "n": 567,
+    "query": "tasks/TASK-10/sql/n_videos_pre.sql"
+  },
+  {
+    "name": "n_videos_post",
+    "value": 176,
+    "n": 567,
+    "query": "tasks/TASK-10/sql/n_videos_post.sql"
+  },
+  {
+    "name": "n_unassigned_period",
+    "value": 0,
+    "n": 567,
+    "query": "tasks/TASK-10/sql/n_unassigned_period.sql"
+  },
+  {
+    "name": "n_windows_pre",
+    "value": 3286,
+    "n": 3286,
+    "query": "tasks/TASK-10/sql/n_windows_pre.sql"
+  },
+  {
+    "name": "n_windows_post",
+    "value": 1153,
+    "n": 1153,
+    "query": "tasks/TASK-10/sql/n_windows_post.sql"
+  },
+  {
+    "name": "rate_cps_pre_pm",
+    "value": 2651.004260499087,
+    "n": 3286,
+    "query": "tasks/TASK-10/sql/rate_cps_pre_pm.sql"
+  },
+  {
+    "name": "rate_cps_post_pm",
+    "value": 2799.0980052038162,
+    "n": 1153,
+    "query": "tasks/TASK-10/sql/rate_cps_post_pm.sql"
+  },
+  {
+    "name": "gap_cps_pm",
+    "value": 148.09374470472903,
+    "n": 4439,
+    "query": "tasks/TASK-10/sql/gap_cps_pm.sql"
+  },
+  {
+    "name": "rate_cps_median_pre_pm",
+    "value": 2560.0,
+    "n": 3286,
+    "query": "tasks/TASK-10/sql/rate_cps_median_pre_pm.sql"
+  },
+  {
+    "name": "rate_cps_median_post_pm",
+    "value": 2560.0,
+    "n": 1153,
+    "query": "tasks/TASK-10/sql/rate_cps_median_post_pm.sql"
+  },
+  {
+    "name": "gap_cps_vidmed_pm",
+    "value": -34.9999999999997,
+    "n": 567,
+    "query": "tasks/TASK-10/sql/gap_cps_vidmed_pm.sql"
+  },
+  {
+    "name": "gap_cps_trim10_pm",
+    "value": 74.95079558930229,
+    "n": 4439,
+    "query": "tasks/TASK-10/sql/gap_cps_trim10_pm.sql"
+  }
+]

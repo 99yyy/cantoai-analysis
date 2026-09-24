@@ -1,0 +1,37 @@
+{
+  "B": 2000,
+  "master_seed": 20260920,
+  "stratum_seeds": {
+    "pre": 2992308033,
+    "post": 3818394395
+  },
+  "G_h": {
+    "pre": 391,
+    "post": 176
+  },
+  "ci_unreliable": 0,
+  "ci_unreliable_stratum": {
+    "pre": 0,
+    "post": 0
+  },
+  "m": 1,
+  "comparison": "gap_cps_pm",
+  "observed_pm": 148.09374470472903,
+  "rate_cps_pre_pm": 2651.004260499087,
+  "rate_cps_post_pm": 2799.0980052038162,
+  "baseline": "pre",
+  "ci95": [
+    48.77662563233467,
+    241.9449209110202
+  ],
+  "includes_0": false,
+  "p_raw": 0.006,
+  "p_BH": 0.006,
+  "conclusion": "inconclusive",
+  "descriptive_companions": [
+    "rate_cps_median_pre_pm",
+    "rate_cps_median_post_pm",
+    "gap_cps_vidmed_pm",
+    "gap_cps_trim10_pm"
+  ]
+}

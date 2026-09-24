@@ -1,0 +1,346 @@
+{
+  "git_sha": "f883c2e894b50898f2a2f41b47f543d6ec95d17d",
+  "population": "这个频道的视频",
+  "inputs": {
+    "data/corpus_v2.sqlite": {
+      "sha256": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+      "git_sha": "f883c2e894b50898f2a2f41b47f543d6ec95d17d",
+      "tables": {
+        "videos": {
+          "rows": 567,
+          "columns": [
+            "video_id",
+            "title",
+            "upload_date",
+            "n_windows",
+            "speech_s"
+          ]
+        },
+        "windows": {
+          "rows": 4911,
+          "columns": [
+            "uid",
+            "video_id",
+            "idx",
+            "start",
+            "end",
+            "dur",
+            "start_sample",
+            "end_sample",
+            "boundary_start",
+            "boundary_end",
+            "lang",
+            "text_raw",
+            "text_norm",
+            "text_clean",
+            "flag_hai",
+            "flag_simp",
+            "flag_sing",
+            "flag_boiler",
+            "chars_per_sec",
+            "aligned",
+            "coverage",
+            "first_s",
+            "in_range",
+            "max_zero_run",
+            "tone_shift_suspect",
+            "n_syllables",
+            "tier",
+            "text_human"
+          ]
+        },
+        "syllables": {
+          "rows": 171867,
+          "columns": [
+            "syl_id",
+            "uid",
+            "video_id",
+            "pos",
+            "c0",
+            "char",
+            "start",
+            "end",
+            "dur",
+            "win_start",
+            "jp_default",
+            "jp_ctx",
+            "jp_candidates",
+            "n_cand",
+            "prev_char",
+            "next_char",
+            "ctx",
+            "tier",
+            "jp_realized",
+            "jp_match",
+            "review_prior",
+            "verification_status",
+            "verification_note"
+          ]
+        },
+        "runs": {
+          "rows": 1,
+          "columns": [
+            "ts",
+            "git_sha",
+            "asr_model",
+            "aligner_model",
+            "jyutping_model",
+            "tojyutping_version",
+            "n_limit",
+            "n_videos",
+            "n_windows",
+            "n_syllables"
+          ]
+        }
+      }
+    }
+  },
+  "frame_load": {
+    "videos": {
+      "expected": 567,
+      "actual": 567
+    },
+    "windows": {
+      "expected": 4911,
+      "actual": 4911
+    },
+    "syllables": {
+      "expected": 171867,
+      "actual": 171867
+    },
+    "published_syllables": {
+      "expected": 164693,
+      "actual": 164693
+    }
+  },
+  "steps": [
+    {
+      "step": "drop_non_published_windows",
+      "rule": "windows.tier IN ('A','B')",
+      "group": "published",
+      "rows_before": 4911,
+      "rows_after": 4439
+    },
+    {
+      "step": "unassigned_period_videos",
+      "rule": "upload year is not four digits, or is neither <=2024 nor >=2025",
+      "group": "unassigned",
+      "rows_before": 567,
+      "rows_after": 0
+    },
+    {
+      "step": "published_windows_pre",
+      "rule": "tier A+B and four-digit year <= 2024",
+      "group": "pre",
+      "rows_before": 4439,
+      "rows_after": 3286
+    },
+    {
+      "step": "published_windows_post",
+      "rule": "tier A+B and four-digit year >= 2025",
+      "group": "post",
+      "rows_before": 4439,
+      "rows_after": 1153
+    },
+    {
+      "step": "trim10_drop_videos",
+      "rule": "drop k lowest and k highest pool videos by mean chars_per_sec, title, video_id",
+      "group": "trim10",
+      "rows_before": 565,
+      "rows_after": 509
+    }
+  ],
+  "year_table": [
+    {
+      "year": "2021",
+      "n_videos": 9,
+      "n_windows": 157,
+      "rate_cps_pm": 2414.8407643312103,
+      "descriptive": 1,
+      "small_cell": 1
+    },
+    {
+      "year": "2022",
+      "n_videos": 193,
+      "n_windows": 2008,
+      "rate_cps_pm": 2651.429282868526,
+      "descriptive": 1,
+      "small_cell": 0
+    },
+    {
+      "year": "2023",
+      "n_videos": 36,
+      "n_windows": 233,
+      "rate_cps_pm": 2646.6094420600857,
+      "descriptive": 1,
+      "small_cell": 0
+    },
+    {
+      "year": "2024",
+      "n_videos": 153,
+      "n_windows": 888,
+      "rate_cps_pm": 2692.9504504504503,
+      "descriptive": 1,
+      "small_cell": 0
+    },
+    {
+      "year": "2025",
+      "n_videos": 138,
+      "n_windows": 904,
+      "rate_cps_pm": 2843.2300884955753,
+      "descriptive": 1,
+      "small_cell": 0
+    },
+    {
+      "year": "2026",
+      "n_videos": 38,
+      "n_windows": 249,
+      "rate_cps_pm": 2638.875502008032,
+      "descriptive": 1,
+      "small_cell": 0
+    }
+  ],
+  "q7_upload_year": {
+    "pre": [
+      {
+        "year": "2021",
+        "n_videos": 9,
+        "n_windows": 157,
+        "rate_cps_pm": 2414.8407643312103,
+        "descriptive": 1,
+        "small_cell": 1
+      },
+      {
+        "year": "2022",
+        "n_videos": 193,
+        "n_windows": 2008,
+        "rate_cps_pm": 2651.429282868526,
+        "descriptive": 1,
+        "small_cell": 0
+      },
+      {
+        "year": "2023",
+        "n_videos": 36,
+        "n_windows": 233,
+        "rate_cps_pm": 2646.6094420600857,
+        "descriptive": 1,
+        "small_cell": 0
+      },
+      {
+        "year": "2024",
+        "n_videos": 153,
+        "n_windows": 888,
+        "rate_cps_pm": 2692.9504504504503,
+        "descriptive": 1,
+        "small_cell": 0
+      }
+    ],
+    "post": [
+      {
+        "year": "2025",
+        "n_videos": 138,
+        "n_windows": 904,
+        "rate_cps_pm": 2843.2300884955753,
+        "descriptive": 1,
+        "small_cell": 0
+      },
+      {
+        "year": "2026",
+        "n_videos": 38,
+        "n_windows": 249,
+        "rate_cps_pm": 2638.875502008032,
+        "descriptive": 1,
+        "small_cell": 0
+      }
+    ],
+    "unassigned": []
+  },
+  "q7_chars_per_sec": {
+    "pre": {
+      "n_nonnull": 3286,
+      "n_distinct": 327,
+      "min": 0.79,
+      "p25": 2.2,
+      "median": 2.56,
+      "p75": 3.13,
+      "max": 5.33,
+      "q7_constant": 0,
+      "descriptive": 1,
+      "percentile": "position p*(n+1) on (chars_per_sec ASC, uid ASC), linear between adjacent order statistics; median matches the brief"
+    },
+    "post": {
+      "n_nonnull": 1153,
+      "n_distinct": 307,
+      "min": 0.67,
+      "p25": 2.255,
+      "median": 2.56,
+      "p75": 3.39,
+      "max": 5.69,
+      "q7_constant": 0,
+      "descriptive": 1,
+      "percentile": "position p*(n+1) on (chars_per_sec ASC, uid ASC), linear between adjacent order statistics; median matches the brief"
+    }
+  },
+  "vidmed": {
+    "pre": {
+      "n_videos": 389,
+      "rate_cps_vidmed_pm": 2590.0
+    },
+    "post": {
+      "n_videos": 176,
+      "rate_cps_vidmed_pm": 2555.0
+    }
+  },
+  "trim10": {
+    "G": 565,
+    "k": 28,
+    "trim10_skipped": 0,
+    "n_videos_dropped": 56,
+    "rule": "k=0 and trim10_skipped=1 if G<2; k=1 if 2<=G<20; else k=floor(0.05*G); drop lowest k and highest k",
+    "remaining_windows": {
+      "pre": 3054,
+      "post": 962
+    },
+    "rate_cps_pre_trim10_pm": 2656.535690897184,
+    "rate_cps_post_trim10_pm": 2731.4864864864867
+  },
+  "period_rates_window": {
+    "rate_cps_pre_pm": 2651.004260499087,
+    "rate_cps_post_pm": 2799.0980052038162,
+    "gap_cps_pm": 148.09374470472903,
+    "baseline": "pre"
+  },
+  "q2": {
+    "gaps": {
+      "gap_cps_pm": 148.09374470472903,
+      "gap_cps_vidmed_pm": -34.9999999999997,
+      "gap_cps_trim10_pm": 74.95079558930229
+    },
+    "pairs": {
+      "window_vidmed": {
+        "sign_mismatch": 1,
+        "zero_vs_nonzero": 0,
+        "abs_ratio": 4.23124984870658,
+        "ratio_gt_2": 1,
+        "triggered": 1
+      },
+      "window_trim10": {
+        "sign_mismatch": 0,
+        "zero_vs_nonzero": 0,
+        "abs_ratio": 1.975879555918502,
+        "ratio_gt_2": 0,
+        "triggered": 0
+      },
+      "vidmed_trim10": {
+        "sign_mismatch": 1,
+        "zero_vs_nonzero": 0,
+        "abs_ratio": 2.1414513025515123,
+        "ratio_gt_2": 1,
+        "triggered": 1
+      }
+    },
+    "triggered": 1,
+    "conclusion": "inconclusive"
+  },
+  "null_chars_per_sec_published": 0
+}
