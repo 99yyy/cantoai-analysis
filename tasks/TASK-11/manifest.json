@@ -1,0 +1,311 @@
+{
+  "git_sha": "5a8059892a3cfebf7c313665d85b1bacfcc8d068",
+  "population": "这个频道的 567 条视频",
+  "inputs": {
+    "data/corpus_v2.sqlite": {
+      "sha256": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+      "git_sha": "5a8059892a3cfebf7c313665d85b1bacfcc8d068",
+      "readme_sha256": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+      "sha256_match": true,
+      "tables": {
+        "videos": {
+          "rows": 567,
+          "columns": [
+            "video_id",
+            "title",
+            "upload_date",
+            "n_windows",
+            "speech_s"
+          ]
+        },
+        "windows": {
+          "rows": 4911,
+          "columns": [
+            "uid",
+            "video_id",
+            "idx",
+            "start",
+            "end",
+            "dur",
+            "start_sample",
+            "end_sample",
+            "boundary_start",
+            "boundary_end",
+            "lang",
+            "text_raw",
+            "text_norm",
+            "text_clean",
+            "flag_hai",
+            "flag_simp",
+            "flag_sing",
+            "flag_boiler",
+            "chars_per_sec",
+            "aligned",
+            "coverage",
+            "first_s",
+            "in_range",
+            "max_zero_run",
+            "tone_shift_suspect",
+            "n_syllables",
+            "tier",
+            "text_human"
+          ]
+        },
+        "syllables": {
+          "rows": 171867,
+          "columns": [
+            "syl_id",
+            "uid",
+            "video_id",
+            "pos",
+            "c0",
+            "char",
+            "start",
+            "end",
+            "dur",
+            "win_start",
+            "jp_default",
+            "jp_ctx",
+            "jp_candidates",
+            "n_cand",
+            "prev_char",
+            "next_char",
+            "ctx",
+            "tier",
+            "jp_realized",
+            "jp_match",
+            "review_prior",
+            "verification_status",
+            "verification_note"
+          ]
+        },
+        "runs": {
+          "rows": 1,
+          "columns": [
+            "ts",
+            "git_sha",
+            "asr_model",
+            "aligner_model",
+            "jyutping_model",
+            "tojyutping_version",
+            "n_limit",
+            "n_videos",
+            "n_windows",
+            "n_syllables"
+          ]
+        }
+      }
+    }
+  },
+  "normalization": {
+    "rule": "trim, then Unicode casefold",
+    "sql": "lower(trim(column))",
+    "casefold_equals_lower_on_published_jp_columns": true,
+    "non_ascii_published_jp_rows": 0
+  },
+  "sent_final_punct": [
+    "。",
+    "！",
+    "？",
+    "!",
+    "?",
+    "．",
+    "…"
+  ],
+  "frame": {
+    "predicate": "windows.tier IN ('A','B') AND syllables.tier = windows.tier",
+    "videos_expected": 567,
+    "videos_actual": 567,
+    "windows_expected": 4911,
+    "windows_actual": 4911,
+    "syllables_expected": 171867,
+    "syllables_actual": 171867,
+    "published_expected": 164693,
+    "published_actual": 164693
+  },
+  "steps": [
+    {
+      "step": "published_windows",
+      "rule": "windows.tier IN ('A','B')",
+      "group": "published",
+      "rows_before": 4911,
+      "rows_after": 4439
+    },
+    {
+      "step": "published_syllables",
+      "rule": "windows.tier IN ('A','B') AND syllables.tier = windows.tier",
+      "group": "published",
+      "rows_before": 171867,
+      "rows_after": 164693
+    },
+    {
+      "step": "judgeable",
+      "rule": "trim(jp_realized) non-empty AND dur > 0",
+      "group": "published",
+      "rows_before": 164693,
+      "rows_after": 139362
+    },
+    {
+      "step": "dict_columns_nonempty",
+      "rule": "trim(jp_ctx) and trim(jp_default) non-empty on judgeable rows",
+      "group": "judgeable",
+      "rows_before": 139362,
+      "rows_after": 139362
+    },
+    {
+      "step": "main_diff",
+      "rule": "casefold(trim(jp_ctx)) != casefold(trim(jp_default))",
+      "group": "diff",
+      "rows_before": 139362,
+      "rows_after": 6022
+    },
+    {
+      "step": "same_side",
+      "rule": "casefold(trim(jp_ctx)) = casefold(trim(jp_default))",
+      "group": "same",
+      "rows_before": 139362,
+      "rows_after": 133340
+    }
+  ],
+  "groups": {
+    "diff": {
+      "predicate": "published AND judgeable AND casefold(trim(jp_ctx)) != casefold(trim(jp_default))",
+      "rows": 6022
+    },
+    "same": {
+      "predicate": "published AND judgeable AND casefold(trim(jp_ctx)) = casefold(trim(jp_default))",
+      "rows": 133340
+    },
+    "unassigned_judgeable": 0,
+    "matched_both": 0,
+    "unassigned_published_not_judgeable": 25331
+  },
+  "contract_24_published": {
+    "n_total": 164693,
+    "n_empty_realized": 2183,
+    "n_dur_le_0": 23860,
+    "n_empty_and_dur_le_0": 712,
+    "n_judgeable": 139362,
+    "n_match_ctx": 112519,
+    "n_match_default": 109750,
+    "null_jp_match_on_judgeable": 0
+  },
+  "contract_24_main": {
+    "n_total": 6022,
+    "n_empty_realized": 0,
+    "n_dur_le_0": 0,
+    "n_empty_and_dur_le_0": 0,
+    "n_judgeable": 6022,
+    "n_match": 3734,
+    "n_match_predicate": "casefold(trim(jp_ctx)) = casefold(trim(jp_realized))",
+    "n_match_default": 965
+  },
+  "contract_24_diff_before_judgeable": {
+    "predicate": "published AND casefold(trim(jp_ctx)) != casefold(trim(jp_default)) AND both dictionary columns non-empty",
+    "n_total": 7099,
+    "n_empty_realized": 101,
+    "n_dur_le_0": 1010,
+    "n_empty_and_dur_le_0": 34,
+    "n_judgeable": 6022,
+    "n_match_ctx": 3734,
+    "n_match_default": 965
+  },
+  "q7": {
+    "judgeable_ctx_ne_default": 6022,
+    "judgeable_ctx_eq_default": 133340,
+    "q7_constant": 0,
+    "main_char_top": [
+      {
+        "char": "話",
+        "n": 545
+      },
+      {
+        "char": "呢",
+        "n": 475
+      },
+      {
+        "char": "生",
+        "n": 423
+      },
+      {
+        "char": "為",
+        "n": 240
+      },
+      {
+        "char": "上",
+        "n": 175
+      },
+      {
+        "char": "會",
+        "n": 149
+      },
+      {
+        "char": "到",
+        "n": 146
+      },
+      {
+        "char": "行",
+        "n": 132
+      },
+      {
+        "char": "重",
+        "n": 130
+      },
+      {
+        "char": "咁",
+        "n": 120
+      },
+      {
+        "char": "下",
+        "n": 118
+      },
+      {
+        "char": "名",
+        "n": 111
+      }
+    ],
+    "main_char_distinct": 383,
+    "n_cand_on_judgeable": {
+      "1": 39303,
+      "2": 44856,
+      "3": 24947,
+      "4": 19362,
+      "5": 3653,
+      "6": 1909,
+      "7": 2782,
+      "8": 602,
+      "9": 234,
+      "10": 3,
+      "11": 1023,
+      "12": 620,
+      "13": 10,
+      "15": 58
+    },
+    "n_cand_distinct": 14,
+    "ne_next_char": {
+      "judgeable_ne": 750,
+      "nonfinal_in_subset": 722,
+      "excluded_sentence_final_or_empty": 28,
+      "excluded_next_char_empty": 28,
+      "excluded_next_char_punct": 0
+    }
+  },
+  "descriptive": [
+    {
+      "name": "ne_nonfinal_ctx",
+      "descriptive": 1,
+      "rule": "char = 呢 AND length(trim(coalesce(next_char,''))) > 0 AND trim(next_char) not in sent_final_punct AND published AND judgeable",
+      "n": 722,
+      "n_ctx_match": 262,
+      "agree_ctx_pm": 362.8808864265928
+    },
+    {
+      "name": "n_cand_ge_2_ctx",
+      "descriptive": 1,
+      "rule": "published AND judgeable AND n_cand >= 2",
+      "n": 100059,
+      "n_ctx_match": 79573,
+      "agree_ctx_pm": 795.2607961302831
+    }
+  ]
+}
