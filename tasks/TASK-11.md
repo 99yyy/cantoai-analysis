@@ -114,7 +114,7 @@ windows_expected 4911
 windows_expected_tol 0
 syllables_expected 171867
 syllables_expected_tol 0
-published_expected {PUBLISHED_EXPECTED}
+published_expected 164693
 published_expected_tol 0
 ```
 
