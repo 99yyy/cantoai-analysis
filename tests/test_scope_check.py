@@ -409,3 +409,39 @@ def test_changed_lists_non_ascii_names_as_they_are(tmp_path, monkeypatch):
     chore = scope_check.classify("chore/notes", actor="99yyy", owners=OWNERS)
     assert scope_check.path_blocked("docs/说明.md", chore) is None
     assert scope_check.path_blocked("docs/模块/AGENTS.md", chore) == "DENY"
+
+
+# --------------------------------------------------------------------------- commit identities
+
+
+def test_commit_identities_outside_the_list_fail(tmp_path, monkeypatch):
+    owners = scope_check.parse_owners("99yyy")
+    assert scope_check.identity_allowed("cursoragent@cursor.com", owners)
+    assert scope_check.identity_allowed("123+99yyy@users.noreply.github.com", owners)
+    assert not scope_check.identity_allowed("tom@users.noreply.github.com", owners)
+    assert not scope_check.identity_allowed("cantoai-bot@users.noreply.github.com", owners)
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*args: str, email: str = "yan325128@gmail.com", name: str = "Tomy") -> str:
+        return subprocess.run(
+            ["git", "-C", str(repo), "-c", f"user.name={name}", "-c", f"user.email={email}", *args],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+
+    git("init", "-q")
+    (repo / "a.md").write_text("a\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "base")
+    base = git("rev-parse", "HEAD")
+    (repo / "b.md").write_text("b\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "agent", email="cursoragent@cursor.com", name="Cursor Agent")
+    monkeypatch.chdir(repo)
+    assert scope_check.stranger_identities(base, owners) == []
+    (repo / "c.md").write_text("c\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "made-up author", "--author", "Tom <tom@users.noreply.github.com>")
+    bad = scope_check.stranger_identities(base, owners)
+    assert len(bad) == 1 and bad[0].endswith("author Tom <tom@users.noreply.github.com>"), bad

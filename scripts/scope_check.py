@@ -53,6 +53,10 @@ What each class may touch comes from the ``scope`` section of
     chore   only its allow list, and never a protected path
     repair  anything, once the PR author is a repository owner
 
+Every commit in the pull request must also carry an author and a committer
+email from ``scope.identities`` (or an owner's GitHub noreply address): GitHub
+credits a commit to whichever account owns its email.
+
 The diff is taken with ``--no-renames``: a rename shows as a delete plus an
 add, so moving a protected file cannot hide the delete behind the new name.
 
@@ -153,6 +157,39 @@ def changed(base: str) -> list[str]:
 
 def match_any(path: str, globs: list[str]) -> bool:
     return any(fnmatch.fnmatch(path, g) for g in globs)
+
+
+# Commit identities a pull request may carry (scope.identities). A config
+# without the section (an older base copy) checks nothing.
+IDENTITY_EMAILS: frozenset[str] | None = (
+    frozenset(e.casefold() for e in SCOPE["identities"]["emails"])
+    if "identities" in SCOPE
+    else None
+)
+OWNER_NOREPLY_RE = re.compile(r"(?:\d+\+)?([A-Za-z0-9-]+)@users\.noreply\.github\.com")
+
+
+def identity_allowed(email: str, owners: frozenset[str]) -> bool:
+    e = email.strip().casefold()
+    if IDENTITY_EMAILS is None or e in IDENTITY_EMAILS:
+        return True
+    m = OWNER_NOREPLY_RE.fullmatch(e)
+    return bool(m) and m.group(1) in owners
+
+
+def stranger_identities(base: str, owners: frozenset[str]) -> list[str]:
+    """Author or committer identities in ``base..HEAD`` outside scope.identities."""
+    out = run("git", "log", "-z", "--format=%H%x1f%an%x1f%ae%x1f%cn%x1f%ce", f"{base}..HEAD")
+    bad: list[str] = []
+    for rec in out.split("\0"):
+        fields = rec.strip("\n").split("\x1f")
+        if len(fields) != 5:
+            continue
+        sha, an, ae, cn, ce = fields
+        for role, name, email in (("author", an, ae), ("committer", cn, ce)):
+            if not identity_allowed(email, owners):
+                bad.append(f"{sha[:7]} {role} {name} <{email}>")
+    return bad
 
 
 def parse_owners(raw: str | None) -> frozenset[str]:
@@ -300,6 +337,10 @@ def main() -> int:
         else:
             print(f"  ok      {f}")
 
+    strangers = stranger_identities(args.base, owners)
+    for s in strangers:
+        print(f"  IDENTITY {s}")
+
     if bad:
         print(f"scope_check: FAIL {len(bad)} file(s) this branch class may not touch")
         if cls.allow is not None:
@@ -307,6 +348,13 @@ def main() -> int:
         print(f"  no class but repair may touch: {DENY}")
         if cls.no_brief:
             print("  a task brief tasks/<name>.md is the owner's; an agent writes only under tasks/TASK-N/")
+    if strangers:
+        print(
+            f"scope_check: FAIL {len(strangers)} commit identit{'y' if len(strangers) == 1 else 'ies'} "
+            "outside scope.identities in gate_config.json; GitHub credits a commit to the "
+            "account that owns its email. Recommit with an allowed identity."
+        )
+    if bad or strangers:
         return 1
 
     print("scope_check: PASS")

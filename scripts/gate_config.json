@@ -96,6 +96,24 @@
       "bare name too, which catches a symlink standing in for the directory),",
       "and every AGENTS.md, CLAUDE.md and .cursorrules."
     ],
+    "identities": {
+      "_about": [
+        "Every commit in a pull request must have an author and a committer",
+        "email from this list, or the GitHub noreply address of a repository",
+        "owner ((<id>+)<owner>@users.noreply.github.com). GitHub credits a",
+        "commit to whichever account owns its email, so a made-up identity such",
+        "as Tom <tom@users.noreply.github.com> lists a stranger as a",
+        "contributor. noreply@github.com covers commits GitHub itself makes",
+        "(merges, Update branch, web edits)."
+      ],
+      "emails": [
+        "yan325128@gmail.com",
+        "cursoragent@cursor.com",
+        "noreply@anthropic.com",
+        "cantoai-bot@cantoai.invalid",
+        "noreply@github.com"
+      ]
+    },
     "protected": [
       ".cursor",
       ".cursor/*",
