@@ -8,9 +8,12 @@ name: claude-review
 # branch has them, so a pull request cannot change how it is reviewed. The
 # pull request's files are checked out into pr-head/ and only read: nothing
 # from the pull request runs here.
+#
+# Drafts are reviewed too: agents open draft pull requests, and a review that
+# starts only at ready_for_review races the merge that follows it.
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened]
 
 permissions: {}
 
@@ -26,7 +29,6 @@ jobs:
       contents: read
       pull-requests: write
       issues: read
-      id-token: write
     steps:
       - name: Decide whether this pull request is reviewed
         id: scope
@@ -35,10 +37,9 @@ jobs:
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          IS_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           review=false
-          if [ "$HEAD_REPO" = "$GITHUB_REPOSITORY" ] && [ "$IS_DRAFT" != "true" ]; then
+          if [ "$HEAD_REPO" = "$GITHUB_REPOSITORY" ]; then
             case "$HEAD_REF" in
               cursor/*|box/*|repair/tooling-*) review=true ;;
             esac
@@ -67,6 +68,11 @@ jobs:
         uses: anthropics/claude-code-action@8cf3482550831fb35a4fc3fbf7ca139cf8028b4c # v1.0.233
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # The workflow's own token (pull-requests: write) posts the inline
+          # comments. Without it the action exchanges an OIDC token for a
+          # Claude GitHub App token, and that exchange rejects
+          # pull_request_target runs (401 Invalid OIDC token).
+          github_token: ${{ github.token }}
           allowed_bots: "cursor,cursor[bot]"
           prompt: |
             Review pull request #${{ github.event.pull_request.number }} of ${{ github.repository }}.
