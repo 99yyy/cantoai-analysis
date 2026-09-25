@@ -7,6 +7,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -2073,3 +2074,235 @@ def test_pr_diff_names_lists_non_ascii_names_as_they_are(tmp_path, monkeypatch):
     (repo / "tasks" / "TASK-3" / "说明.md").write_text("y\n", encoding="utf-8")
     head = _commit(repo, "non-ASCII name")
     assert output_check.pr_diff_names(repo, base, head) == ["tasks/TASK-3/说明.md"]
+
+
+# ---------------------------------------------------------------- pred tables
+
+
+_PRED_CARD = {
+    "script_commit": "a" * 40,
+    "model": "example/g2p",
+    "model_revision": "b" * 40,
+    "decoding": {"language": "yue", "beam": 1},
+    "device": "cpu",
+    "dirty": False,
+}
+
+
+def _syl_db(path: Path, ids: tuple[str, ...] = ("s1", "s2")) -> None:
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE syllables (syl_id TEXT PRIMARY KEY, video_id TEXT)")
+    for i in ids:
+        conn.execute("INSERT INTO syllables (syl_id, video_id) VALUES (?, 'v1')", (i,))
+    conn.commit()
+    conn.close()
+
+
+def _jsonl(path: Path, rows: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8"
+    )
+    path.with_name(path.name[: -len(".jsonl")] + ".run.json").write_text(
+        json.dumps(_PRED_CARD), encoding="utf-8"
+    )
+
+
+def _load_pred(src: Path, dest: Path, rows: list[dict], *, mode: str = "plain", known: set[str] | None = None):
+    pred = dest.parent / "g.jsonl"
+    _jsonl(pred, rows)
+    conn = sqlite3.connect(f"file:{src}?mode=ro", uri=True)
+    try:
+        ids = output_check.syllable_ids(conn) if known is None else known
+    finally:
+        conn.close()
+    return output_check.open_pred_corpus(
+        src,
+        dest,
+        data_dir=src.parent,
+        pairs=[("g", pred)],
+        known_ids=ids,
+        label="probe",
+        mode=mode,
+    )
+
+
+def _corpus(tmp_path: Path) -> Path:
+    src = tmp_path / "data" / "c.sqlite"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    return src
+
+
+def test_pred_duplicate_id_fails(tmp_path):
+    src = _corpus(tmp_path)
+    _syl_db(src)
+    with pytest.raises(output_check.Fail, match=r"probe: g\.jsonl: repeats id 's1'"):
+        _load_pred(src, tmp_path / "out.sqlite", [{"id": "s1", "hyp": "aa1"}, {"id": "s1", "hyp": "aa2"}])
+
+
+def test_pred_empty_hyp_fails(tmp_path):
+    src = _corpus(tmp_path)
+    _syl_db(src)
+    with pytest.raises(output_check.Fail, match=r"probe: g\.jsonl: id 's1' has an empty hyp"):
+        _load_pred(src, tmp_path / "out.sqlite", [{"id": "s1", "hyp": "  "}])
+
+
+def test_pred_unknown_id_fails(tmp_path):
+    src = _corpus(tmp_path)
+    _syl_db(src)
+    with pytest.raises(output_check.Fail, match=r"probe: g\.jsonl: id 'nope' is not in syllables\.syl_id"):
+        _load_pred(src, tmp_path / "out.sqlite", [{"id": "nope", "hyp": "aa1"}])
+
+
+def test_pred_plain_join_and_double_prefix(tmp_path):
+    src = _corpus(tmp_path)
+    _syl_db(src, ("s1", "dup:s1"))
+    loaded = _load_pred(
+        src, tmp_path / "out.sqlite", [{"id": "s1", "hyp": "aa1"}], mode="double"
+    )
+    try:
+        n, hyp, prefixed = loaded.execute(
+            "SELECT COUNT(*), MIN(hyp), SUM(id = 'dup:s1') FROM pred_g"
+        ).fetchone()
+        assert (n, hyp, prefixed) == (2, "aa1", 1)
+        joined = loaded.execute(
+            "SELECT COUNT(*) FROM syllables s JOIN pred_g p ON p.id = s.syl_id"
+        ).fetchone()[0]
+        assert joined == 2
+    finally:
+        loaded.close()
+
+
+def test_pred_exclude_drops_syllable_that_was_removed(tmp_path):
+    src = _corpus(tmp_path)
+    _syl_db(src, ("s1",))
+    loaded = _load_pred(
+        src,
+        tmp_path / "out.sqlite",
+        [{"id": "s1", "hyp": "aa1"}, {"id": "s2", "hyp": "bb1"}],
+        mode="exclude",
+        known={"s1", "s2"},
+    )
+    try:
+        assert loaded.execute("SELECT id FROM pred_g").fetchall() == [("s1",)]
+    finally:
+        loaded.close()
+
+
+def test_pred_refuses_to_write_under_the_corpus_directory(tmp_path):
+    src = _corpus(tmp_path)
+    _syl_db(src)
+    with pytest.raises(output_check.Fail, match=r"refusing to write a temp corpus under"):
+        _load_pred(src, src.parent / "nested.sqlite", [{"id": "s1", "hyp": "aa1"}])
+
+
+def test_parse_pred_block_and_missing_declared_file(tmp_path):
+    assert output_check.parse_pred_block("b", "status: open\n") is None
+    assert output_check.parse_pred_block("b", "```pred\ng2p\n# note\n```\n") == ("g2p",)
+    with pytest.raises(output_check.Fail, match=r"the pred block is empty"):
+        output_check.parse_pred_block("b", "```pred\n```\n")
+    task = tmp_path / "TASK-1"
+    _jsonl(task / "pred" / "extra.jsonl", [{"id": "s1", "hyp": "aa1"}])
+    assert output_check.side_pred_pairs(task, "results.json", None, "TASK-1: results.json") is None
+    with pytest.raises(output_check.Fail, match=r"missing g2p under pred/"):
+        output_check.side_pred_pairs(task, "results.json", ("g2p",), "TASK-1: results.json")
+
+
+def _mutant(tmp_path: Path, patch_name: str):
+    dest = tmp_path / "mutant"
+    script_dir = dest / "scripts"
+    script_dir.mkdir(parents=True)
+    shutil.copy(ROOT / "scripts" / "output_check.py", script_dir / "output_check.py")
+    shutil.copy(ROOT / "scripts" / "gate_config.json", script_dir / "gate_config.json")
+    proc = subprocess.run(
+        ["patch", "-p1", "--forward", "--batch", "-i", str(ROOT / "tests" / "mutations" / patch_name)],
+        cwd=dest,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    spec = importlib.util.spec_from_file_location(
+        "output_check_" + patch_name.replace(".", "_"), script_dir / "output_check.py"
+    )
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_pred_duplicate_check_removed_killed(tmp_path):
+    mod = _mutant(tmp_path, "pred_duplicate_id_check_removed.patch")
+    src = _corpus(tmp_path)
+    _syl_db(src)
+    pred = tmp_path / "g.jsonl"
+    _jsonl(pred, [{"id": "s1", "hyp": "aa1"}, {"id": "s1", "hyp": "aa2"}])
+    with pytest.raises(mod.Fail, match=r"probe: g\.jsonl: prediction row violated id, hyp, or syllable constraint"):
+        mod.open_pred_corpus(
+            src, tmp_path / "out.sqlite", data_dir=src.parent, pairs=[("g", pred)],
+            known_ids={"s1"}, label="probe", mode="plain",
+        )
+
+
+def test_pred_empty_hyp_check_removed_killed(tmp_path):
+    mod = _mutant(tmp_path, "pred_empty_hyp_check_removed.patch")
+    src = _corpus(tmp_path)
+    _syl_db(src)
+    pred = tmp_path / "g.jsonl"
+    _jsonl(pred, [{"id": "s1", "hyp": ""}])
+    with pytest.raises(mod.Fail, match=r"probe: g\.jsonl: prediction row violated id, hyp, or syllable constraint"):
+        mod.open_pred_corpus(
+            src, tmp_path / "out.sqlite", data_dir=src.parent, pairs=[("g", pred)],
+            known_ids={"s1"}, label="probe", mode="plain",
+        )
+
+
+def test_pred_unknown_id_check_removed_killed(tmp_path):
+    mod = _mutant(tmp_path, "pred_unknown_id_check_removed.patch")
+    src = _corpus(tmp_path)
+    _syl_db(src)
+    pred = tmp_path / "g.jsonl"
+    _jsonl(pred, [{"id": "nope", "hyp": "aa1"}])
+    with pytest.raises(mod.Fail, match=r"probe: g\.jsonl: prediction row violated id, hyp, or syllable constraint"):
+        mod.open_pred_corpus(
+            src, tmp_path / "out.sqlite", data_dir=src.parent, pairs=[("g", pred)],
+            known_ids={"s1"}, label="probe", mode="plain",
+        )
+
+
+def test_pred_dup_prefix_insert_removed_killed(tmp_path):
+    mod = _mutant(tmp_path, "pred_dup_prefix_insert_removed.patch")
+    src = _corpus(tmp_path)
+    _syl_db(src, ("s1", "dup:s1"))
+    pred = tmp_path / "g.jsonl"
+    _jsonl(pred, [{"id": "s1", "hyp": "aa1"}])
+    with pytest.raises(mod.Fail, match=r"probe: g\.jsonl: pred_g has 1 rows after double; want 2 \* 1"):
+        mod.open_pred_corpus(
+            src, tmp_path / "out.sqlite", data_dir=src.parent, pairs=[("g", pred)],
+            known_ids={"s1", "dup:s1"}, label="probe", mode="double",
+        )
+
+
+def test_check_task_replays_sql_joined_to_this_sides_pred_table(tmp_path):
+    src = _corpus(tmp_path)
+    _syl_db(src, ("s1", "s2"))
+    repo = tmp_path / "repo"
+    md = _write_brief(repo, "1", name="n_hit")
+    md.write_text(md.read_text(encoding="utf-8") + "```pred\ng\n```\n", encoding="utf-8")
+    _jsonl(
+        repo / "tasks" / "TASK-1" / "pred" / "g.jsonl",
+        [{"id": "s1", "hyp": "aa1"}, {"id": "s2", "hyp": "bb2"}],
+    )
+    sql_path = repo / "tasks" / "TASK-1" / "sql" / "n_hit.sql"
+    sql_path.parent.mkdir(parents=True, exist_ok=True)
+    sql_path.write_text(
+        "SELECT COUNT(*) FROM syllables s JOIN pred_g p ON p.id = s.syl_id WHERE p.hyp = 'aa1'\n",
+        encoding="utf-8",
+    )
+    _write_rows(repo / "tasks" / "TASK-1" / "results.json", "n_hit", 1.0, "tasks/TASK-1/sql/n_hit.sql")
+    conn = sqlite3.connect(f"file:{src}?mode=ro", uri=True)
+    fail: list[str] = []
+    try:
+        output_check.check_task(repo, md, conn, 60.0, None, None, fail, "a" * 64)
+    finally:
+        conn.close()
+    assert fail == []

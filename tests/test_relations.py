@@ -880,3 +880,90 @@ def test_derived_name_mixing_score_and_corpus_is_still_checked(tmp_path, capsys)
     assert code == 1, out
     assert "results.json:rate_hit_pm: double 2000, original 1000 (tol 0.5)" in out, out
     assert "cannot be resolved" not in out, out
+
+
+def test_pred_tables_follow_double_permute_and_exclude(tmp_path, capsys):
+    """A count joined to pred_<stem> doubles, survives permute, and ignores excluded rows."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    corpus = repo / "mini.sqlite"
+    conn = sqlite3.connect(corpus)
+    conn.executescript(
+        """
+        CREATE TABLE videos(video_id TEXT PRIMARY KEY, title TEXT, upload_date TEXT);
+        CREATE TABLE windows(uid TEXT PRIMARY KEY, video_id TEXT, tier TEXT);
+        CREATE TABLE syllables(
+            syl_id TEXT PRIMARY KEY, uid TEXT, video_id TEXT,
+            char TEXT, jp_match TEXT, jp_realized TEXT, dur REAL
+        );
+        CREATE TABLE runs(git_sha TEXT);
+        INSERT INTO videos VALUES ('v1', 't', '20240101');
+        INSERT INTO windows VALUES ('w1', 'v1', 'A');
+        INSERT INTO windows VALUES ('w2', 'v1', 'C');
+        INSERT INTO syllables VALUES ('s1', 'w1', 'v1', '甲', 'exact_default', 'aa1', 0.1);
+        INSERT INTO syllables VALUES ('s2', 'w2', 'v1', '乙', 'tone', 'bb1', 0.1);
+        INSERT INTO runs VALUES ('probe');
+        """
+    )
+    conn.commit()
+    conn.close()
+    _pin_readme(repo, corpus)
+    _write_brief(
+        repo,
+        [("n_pred_a", "0")],
+        extra=(
+            "```frame\n"
+            "windows.tier = 'A'\n"
+            "published_expected 1\n"
+            "```\n"
+            "```pred\n"
+            "g2p\n"
+            "```\n"
+        ),
+    )
+    sql = (
+        "SELECT COUNT(*) FROM syllables s\n"
+        "JOIN windows w ON s.uid = w.uid\n"
+        "JOIN pred_g2p p ON p.id = s.syl_id\n"
+        "WHERE w.tier = 'A'\n"
+    )
+    card = {
+        "script_commit": "a" * 40,
+        "model": "example/g2p",
+        "model_revision": "b" * 40,
+        "decoding": {"language": "yue"},
+        "device": "cpu",
+        "dirty": False,
+    }
+    for side, sub, out_name, hyp2 in (
+        ("worker", "sql", "results.json", "zz9"),
+        ("verifier", "mine_sql", "mine.json", "yy9"),
+    ):
+        pred_dir = repo / "tasks" / "TASK-9" / ("pred" if side == "worker" else "mine_pred")
+        pred_dir.mkdir(parents=True)
+        (pred_dir / "g2p.jsonl").write_text(
+            '{"id": "s1", "hyp": "aa1"}\n{"id": "s2", "hyp": "' + hyp2 + '"}\n',
+            encoding="utf-8",
+        )
+        (pred_dir / "g2p.run.json").write_text(json.dumps(card), encoding="utf-8")
+        sql_dir = repo / "tasks" / "TASK-9" / sub
+        sql_dir.mkdir(parents=True, exist_ok=True)
+        (sql_dir / "n_pred_a.sql").write_text(sql, encoding="utf-8")
+        payload = [
+            {
+                "name": "n_pred_a",
+                "value": 1,
+                "n": 1,
+                "query": f"tasks/TASK-9/{sub}/n_pred_a.sql",
+            }
+        ]
+        (repo / "tasks" / "TASK-9" / out_name).write_text(
+            json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+        )
+    code = _run_main(repo, corpus)
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "double 1/1" in out
+    assert "permute 1/1" in out
+    assert "exclude 1/1" in out
+    assert "loaded pred_g2p" in out

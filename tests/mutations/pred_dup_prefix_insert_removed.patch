@@ -1,0 +1,11 @@
+# kills: pred_g has 1 rows after double; want 2 * 1
+--- a/scripts/output_check.py
++++ b/scripts/output_check.py
+@@ -2663,7 +2663,6 @@
+                 _on_pred_integrity(f"{label}: {path.name}", e)
+             if mode == "double":
+                 n_before = len(rows)
+-                _insert_prefixed_copy(conn, qtable, qid, qhyp, prefix)
+                 _assert_pred_doubled(f"{label}: {path.name}", conn, qtable, n_before)
+             elif mode == "permute":
+                 _permute_pred_table(conn, qtable, qid, qhyp)

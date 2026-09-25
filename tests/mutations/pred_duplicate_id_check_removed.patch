@@ -1,0 +1,12 @@
+# kills: prediction row violated id, hyp, or syllable constraint
+--- a/scripts/output_check.py
++++ b/scripts/output_check.py
+@@ -2531,8 +2531,6 @@
+     out: list[tuple[str, str]] = []
+     for row in rows:
+         i, hyp = row["id"], row["hyp"]
+-        if i in seen:
+-            raise Fail(f"{label}: repeats id {i!r}")
+         seen.add(i)
+         if hyp.strip() == "":
+             raise Fail(f"{label}: id {i!r} has an empty hyp")

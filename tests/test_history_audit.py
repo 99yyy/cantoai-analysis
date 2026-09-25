@@ -651,6 +651,20 @@ def test_eval_line_change_and_block_deletion_are_bar_moves():
     assert history_audit.declaration_bars(PATH, NUMBERS, old) == []
 
 
+def test_pred_line_change_and_block_deletion_are_bar_moves():
+    old = NUMBERS + "```pred\ng2p\n```\n"
+    changed = NUMBERS + "```pred\nother\n```\n"
+    added = NUMBERS + "```pred\ng2p\nextra\n```\n"
+    assert history_audit.declaration_bars(PATH, old, changed) == [
+        "tasks/TASK-6.md ```pred 'g2p' changed or deleted"
+    ]
+    assert history_audit.declaration_bars(PATH, old, NUMBERS) == [
+        "tasks/TASK-6.md ```pred block deleted"
+    ]
+    assert history_audit.declaration_bars(PATH, old, added) == []
+    assert history_audit.declaration_bars(PATH, NUMBERS, old) == []
+
+
 def _git(repo: Path, *args: str) -> str:
     return subprocess.run(
         ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *args],

@@ -1,0 +1,17 @@
+# kills: prediction row violated id, hyp, or syllable constraint
+--- a/scripts/output_check.py
++++ b/scripts/output_check.py
+@@ -2631,13 +2631,6 @@
+         for stem, path in pairs:
+             qtable = pred_table_name(stem)
+             rows = read_pred_rows(path, f"{label}: {path.name}")
+-            _reject_unknown_pred_ids(
+-                f"{label}: {path.name}",
+-                [i for i, _h in rows],
+-                known_ids,
+-                qjoin,
+-                qkey,
+-            )
+             qid, qhyp = sql_ident("id"), sql_ident("hyp")
+             # exclude has already dropped syllables, so a foreign key would
+             # reject a prediction of an unpublished syllable before we can
