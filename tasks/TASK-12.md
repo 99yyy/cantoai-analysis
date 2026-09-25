@@ -10,7 +10,7 @@ rung: Autopilot
 
 ## Prior Attempts
 
-上一轮是 TASK-11（`tasks/TASK-11.md`，已 `closed`）：词典侧 `jp_ctx≠jp_default` 子集上 ctx vs default。本任务是 campaign `investigations/g2p-real-speech` 方向一的下一步：引入 PyCantonese / g2pW 预测表（闸门 #130），主集改为「至少两工具文字侧不同」。提案经 Tom「采纳」（修订版：质询员打回 Q4/Q7 已并入——Q4 公式写死且不跨工具比 gap；Q7 主集与对照侧各一份）。
+上一轮是 TASK-11（`tasks/TASK-11.md`，已 `closed`）：词典侧 `jp_ctx≠jp_default` 子集上 ctx vs default。本任务是 campaign `investigations/g2p-real-speech` 方向一的下一步：引入 PyCantonese / g2pW 预测表（闸门 #130），主集改为「至少两工具文字侧不同」。提案经 Tom「采纳」（修订版：质询员打回 Q4/Q7 已并入——Q4 公式写死且不跨工具比 gap；Q7 主集与对照侧各一份）。草稿 PR #131 四道绿后质询①「放行（附修）」两点已并入定义：Q4 有放回按抽中次数计入；相对幅度每轮用该轮重算的 gap 与 agree_default（分母 0 标不可比）。
 
 ## 假说
 
@@ -44,7 +44,7 @@ rung: Autopilot
 - **`agree_*_pm`**：`1000 * n_*_match / n_multi_disagree`。分母为 0 则退出非零。
 - **`gap_X_default_pm`**：`agree_X_pm - agree_default_pm`（X∈{tj,py,g2pw}；定义恒等；配对在同一批主集行上）。
 - **结论口径（Q4）**：只声称每个 `gap_X_default_pm` 相对 0，以及相对幅度是否翻转。**禁止**跨工具比较 gap 大小；不交两两工具差的区间名。
-- **Q4 差值区间（不进 numbers）**：名字 `gap_tj_default_ci` / `gap_py_default_ci` / `gap_g2pw_default_ci`。方法：对 `video_id` **有放回重采样**整簇，`B >= 1000`；层种子 `int(sha256(f"{master_seed}:{h}").hexdigest()[:8], 16)`，与契约第 20 条及 TASK-9/10/11 对齐。第 h 次：按有放回抽得的簇多重集，取这些簇在主评测集上的**行并集**（同一簇抽中 k 次仍只计该簇行一次进并集），在该并集上按与声明相同的定义**重算全局**对应的 `gap_X_default_pm`，再由 B 次重算得区间。相对幅度 = `gap_X_default_pm / agree_default_pm`（分母 0 则标不可比）；开放分析必须写一句：符号/结论是否翻转。报 `G`（有主评测集行的视频数）；`G < 10` 发 `ci_unreliable=1`。**禁止**先在每一簇内各自算 gap 再对簇级差值做均值或分位。区间端点不进 `numbers`。
+- **Q4 差值区间（不进 numbers）**：名字 `gap_tj_default_ci` / `gap_py_default_ci` / `gap_g2pw_default_ci`。方法：对 `video_id` **有放回重采样**整簇，`B >= 1000`；层种子 `int(sha256(f"{master_seed}:{h}").hexdigest()[:8], 16)`，与契约第 20 条及 TASK-9/10/11 对齐。第 h 次：按有放回抽得的簇多重集，将该多重集中每个簇在主评测集上的行**按抽中次数计入**（同一簇抽中 k 次则该簇主集行计入 k 次；不是去重并集），在该加权行集上按与声明相同的定义**重算全局**对应的 `gap_X_default_pm` 与 `agree_default_pm`，再由 B 次重算得区间。相对幅度在**每一轮**用该轮重算的 `gap_X_default_pm / agree_default_pm`（分母为 0 则该轮标不可比）；点估计也用同样定义；开放分析必须写一句：符号/结论是否翻转。报 `G`（有主评测集行的视频数）；`G < 10` 发 `ci_unreliable=1`。**禁止**先在每一簇内各自算 gap 再对簇级差值做均值或分位。区间端点不进 `numbers`。
 - **Q5 错分方向（写死）**：漏掉「本应不同却被标成相同」的行 → 主集偏「更容易见差」的子集，`|gap_*|` 可能偏大；把噪声差纳入主集 → gap 被稀释。两侧规模名 `n_multi_disagree` / `n_tools_agree` 均进 `numbers`。
 - **描述性（不进 numbers，标 `descriptive=1`）**：
   1. **TASK-11 子集**：发布集 ∩ 可判定 ∩（规范化后 `jp_ctx ≠ jp_default`）上各工具 / default 的一致率描述（不作 headline）。
@@ -156,7 +156,7 @@ agree_default_pm = 1000 * n_default_match / n_multi_disagree  0.5
 
 ## 还要交的东西（这部分不进 numbers 块）
 
-**质询 Q4**：开放分析交三个 `gap_*_default_ci`（方法与公式见定义）；列出四个 `agree_*_pm` 与三个 `gap_*_default_pm`；写相对幅度是否翻转；写明不跨工具比 gap。区间端点不进 `numbers`。
+**质询 Q4**：开放分析交三个 `gap_*_default_ci`（方法与公式见定义；抽中 k 次计入 k 次）；列出四个 `agree_*_pm` 与三个 `gap_*_default_pm`；写相对幅度是否翻转（每轮用该轮重算的 `gap_*_default_pm` 与 `agree_default_pm`，分母 0 标不可比）；写明不跨工具比 gap。区间端点不进 `numbers`。
 
 **质询 Q5**：开放分析写错分方向句（见定义）；两侧规模即 `n_multi_disagree` / `n_tools_agree`。
 
@@ -196,6 +196,6 @@ agree_default_pm = 1000 * n_default_match / n_multi_disagree  0.5
 Q1 分组边界: 不适用 + 理由（主结果不是按序数切分的组间差；主集由文字工具两两相等性定义）
 Q2 加权单位: 不适用 + 理由（主结果是同一子集上的一致率与配对差，不是两组行加权组间差）
 Q3 是否恒等式: 不适用 + 理由（不是份额分解；gap 是定义差，不写「解释了」）
-Q4 差值区间: 触发；交 gap_tj_default_ci / gap_py_default_ci / gap_g2pw_default_ci（公式见定义）；只声称各 gap 相对 0，不跨工具比大小；须写相对幅度是否翻转；区间不进 numbers
+Q4 差值区间: 触发；交 gap_tj_default_ci / gap_py_default_ci / gap_g2pw_default_ci（公式见定义；抽中 k 次计入 k 次）；只声称各 gap 相对 0，不跨工具比大小；相对幅度每轮用该轮重算 gap 与 agree_default（分母 0 标不可比）；区间不进 numbers
 Q5 代理错分方向: 触发；两侧规模 n_multi_disagree / n_tools_agree 进 numbers；错分方向见定义
 Q7 框内取值: 触发；三工具两两分歧模式与 char 顶频在主集与对照侧各一份；呢子集与 pred 覆盖见「还要交的东西」
