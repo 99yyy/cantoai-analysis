@@ -1,0 +1,5340 @@
+{
+  "git_sha": "42def177795d988c05313992dc3ca73c206746e3",
+  "corpus_sha256": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+  "sent_final_punct": [
+    "。",
+    "！",
+    "？",
+    "!",
+    "?",
+    "．",
+    "…"
+  ],
+  "normalization": "trim then Unicode casefold; SQL replay uses lower(trim()) because these readings are ASCII jyutping",
+  "packages": {
+    "pycantonese": {
+      "version": "5.0.0",
+      "model_revision": "3d729c01e53f6056cb1c6c527953837e9a106147"
+    },
+    "g2pw": {
+      "model": "Naozumi0512/g2pW-canto-20241206-bert-base",
+      "model_revision": "2f435334357487f85d05429e2da1d6da93aafd2f",
+      "code_revision": "99f2d29cfd9cdd69c4fba9d8150060d596d3ca0d",
+      "bert_revision": "1d59d6ca8a09a96715f338d10d55bb180f223420"
+    }
+  },
+  "inputs": {
+    "corpus": {
+      "path": "data/corpus_v2.sqlite",
+      "sha256": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+      "rows": {
+        "videos": 567,
+        "windows": 4911,
+        "syllables": 171867,
+        "published": 164693
+      },
+      "columns": {
+        "videos": [
+          "video_id",
+          "title",
+          "upload_date",
+          "n_windows",
+          "speech_s"
+        ],
+        "windows": [
+          "uid",
+          "video_id",
+          "idx",
+          "start",
+          "end",
+          "dur",
+          "start_sample",
+          "end_sample",
+          "boundary_start",
+          "boundary_end",
+          "lang",
+          "text_raw",
+          "text_norm",
+          "text_clean",
+          "flag_hai",
+          "flag_simp",
+          "flag_sing",
+          "flag_boiler",
+          "chars_per_sec",
+          "aligned",
+          "coverage",
+          "first_s",
+          "in_range",
+          "max_zero_run",
+          "tone_shift_suspect",
+          "n_syllables",
+          "tier",
+          "text_human"
+        ],
+        "syllables": [
+          "syl_id",
+          "uid",
+          "video_id",
+          "pos",
+          "c0",
+          "char",
+          "start",
+          "end",
+          "dur",
+          "win_start",
+          "jp_default",
+          "jp_ctx",
+          "jp_candidates",
+          "n_cand",
+          "prev_char",
+          "next_char",
+          "ctx",
+          "tier",
+          "jp_realized",
+          "jp_match",
+          "review_prior",
+          "verification_status",
+          "verification_note"
+        ],
+        "runs": [
+          "ts",
+          "git_sha",
+          "asr_model",
+          "aligner_model",
+          "jyutping_model",
+          "tojyutping_version",
+          "n_limit",
+          "n_videos",
+          "n_windows",
+          "n_syllables"
+        ]
+      },
+      "git_sha": "42def177795d988c05313992dc3ca73c206746e3"
+    },
+    "pred_pycantonese": {
+      "path": "tasks/TASK-12/pred/pycantonese.jsonl",
+      "sha256": "c7c167d12eda6b03a3712ccc867e7d51f9d0c8b24c27510857f00ed6c07503d7",
+      "rows": 164693,
+      "columns": [
+        "id",
+        "hyp"
+      ],
+      "git_sha": "42def177795d988c05313992dc3ca73c206746e3"
+    },
+    "pred_g2pw": {
+      "path": "tasks/TASK-12/pred/g2pw.jsonl",
+      "sha256": "e0511ec8ab1f2101461537f47d7cc389a8969a8761b7d300f138aba2b784aca2",
+      "rows": 164693,
+      "columns": [
+        "id",
+        "hyp"
+      ],
+      "git_sha": "42def177795d988c05313992dc3ca73c206746e3"
+    }
+  },
+  "steps": [
+    {
+      "step": "tier_filter",
+      "rule": "windows.tier IN ('A','B')",
+      "group": "published",
+      "rows_before": 171867,
+      "rows_after": 164693
+    },
+    {
+      "step": "judgeable",
+      "rule": "trim(jp_realized) non-empty AND dur > 0",
+      "group": "judgeable",
+      "rows_before": 164693,
+      "rows_after": 139362
+    },
+    {
+      "step": "main_set",
+      "rule": "at least one normalised tool pair differs",
+      "group": "main",
+      "rows_before": 139362,
+      "rows_after": 8967
+    },
+    {
+      "step": "control_set",
+      "rule": "three normalised tool readings equal",
+      "group": "control",
+      "rows_before": 139362,
+      "rows_after": 130395
+    }
+  ],
+  "unassigned_judgeable": 0,
+  "both_main_and_control": 0,
+  "clause24": {
+    "published": {
+      "n_total": 164693,
+      "n_empty_realized": 2183,
+      "n_dur_le_0": 23860,
+      "n_empty_and_dur_le_0": 712,
+      "n_judgeable": 139362,
+      "n_match_tj": 112519,
+      "n_match_py": 110598,
+      "n_match_g2pw": 110960,
+      "n_match_default": 109750
+    },
+    "main": {
+      "n_total": 8967,
+      "n_empty_realized": 0,
+      "n_dur_le_0": 0,
+      "n_empty_and_dur_le_0": 0,
+      "n_judgeable": 8967,
+      "n_match_tj": 4885,
+      "n_match_py": 2964,
+      "n_match_g2pw": 3326,
+      "n_match_default": 3793
+    }
+  },
+  "q7_patterns_main": [
+    {
+      "pattern": "tj_ne_py=0,tj_ne_g2pw=1,py_ne_g2pw=1",
+      "n": 3135
+    },
+    {
+      "pattern": "tj_ne_py=1,tj_ne_g2pw=0,py_ne_g2pw=1",
+      "n": 3464
+    },
+    {
+      "pattern": "tj_ne_py=1,tj_ne_g2pw=1,py_ne_g2pw=0",
+      "n": 1725
+    },
+    {
+      "pattern": "tj_ne_py=1,tj_ne_g2pw=1,py_ne_g2pw=1",
+      "n": 643
+    }
+  ],
+  "q7_patterns_control": [
+    {
+      "pattern": "tj_ne_py=0,tj_ne_g2pw=0,py_ne_g2pw=0",
+      "n": 130395
+    }
+  ],
+  "q7_top_char_main": [
+    {
+      "char": "呢",
+      "n": 749
+    },
+    {
+      "char": "會",
+      "n": 525
+    },
+    {
+      "char": "話",
+      "n": 348
+    },
+    {
+      "char": "到",
+      "n": 301
+    },
+    {
+      "char": "下",
+      "n": 216
+    },
+    {
+      "char": "為",
+      "n": 201
+    },
+    {
+      "char": "上",
+      "n": 184
+    },
+    {
+      "char": "噶",
+      "n": 183
+    },
+    {
+      "char": "名",
+      "n": 173
+    },
+    {
+      "char": "咪",
+      "n": 168
+    },
+    {
+      "char": "啦",
+      "n": 154
+    },
+    {
+      "char": "嚟",
+      "n": 138
+    },
+    {
+      "char": "聽",
+      "n": 136
+    },
+    {
+      "char": "長",
+      "n": 127
+    },
+    {
+      "char": "揾",
+      "n": 125
+    }
+  ],
+  "q7_top_char_control": [
+    {
+      "char": "嘅",
+      "n": 2509
+    },
+    {
+      "char": "係",
+      "n": 2199
+    },
+    {
+      "char": "人",
+      "n": 1707
+    },
+    {
+      "char": "有",
+      "n": 1536
+    },
+    {
+      "char": "一",
+      "n": 1530
+    },
+    {
+      "char": "個",
+      "n": 1348
+    },
+    {
+      "char": "唔",
+      "n": 1289
+    },
+    {
+      "char": "你",
+      "n": 1287
+    },
+    {
+      "char": "我",
+      "n": 1200
+    },
+    {
+      "char": "就",
+      "n": 1119
+    },
+    {
+      "char": "佢",
+      "n": 976
+    },
+    {
+      "char": "得",
+      "n": 974
+    },
+    {
+      "char": "都",
+      "n": 956
+    },
+    {
+      "char": "同",
+      "n": 951
+    },
+    {
+      "char": "好",
+      "n": 908
+    }
+  ],
+  "q7_distinct": {
+    "char": {
+      "distinct": 3282,
+      "q7_constant": 0
+    },
+    "tj": {
+      "distinct": 1537,
+      "q7_constant": 0
+    },
+    "py": {
+      "distinct": 1487,
+      "q7_constant": 0
+    },
+    "g2pw": {
+      "distinct": 1460,
+      "q7_constant": 0
+    },
+    "default": {
+      "distinct": 1373,
+      "q7_constant": 0
+    },
+    "realized": {
+      "distinct": 3033,
+      "q7_constant": 0
+    }
+  },
+  "q7_nei": {
+    "n_ne_judgeable_published": 750,
+    "n_next_empty": 28,
+    "n_sent_final": 0,
+    "n_nonfinal": 722,
+    "next_char_counts": [
+      {
+        "next_char": "個",
+        "n": 256
+      },
+      {
+        "next_char": "兩",
+        "n": 37
+      },
+      {
+        "next_char": "啲",
+        "n": 33
+      },
+      {
+        "next_char": "度",
+        "n": 31
+      },
+      {
+        "next_char": "",
+        "n": 28
+      },
+      {
+        "next_char": "幾",
+        "n": 25
+      },
+      {
+        "next_char": "一",
+        "n": 20
+      },
+      {
+        "next_char": "句",
+        "n": 20
+      },
+      {
+        "next_char": "單",
+        "n": 17
+      },
+      {
+        "next_char": "只",
+        "n": 16
+      },
+      {
+        "next_char": "種",
+        "n": 16
+      },
+      {
+        "next_char": "部",
+        "n": 16
+      },
+      {
+        "next_char": "段",
+        "n": 15
+      },
+      {
+        "next_char": "首",
+        "n": 12
+      },
+      {
+        "next_char": "條",
+        "n": 10
+      },
+      {
+        "next_char": "類",
+        "n": 10
+      },
+      {
+        "next_char": "家",
+        "n": 7
+      },
+      {
+        "next_char": "位",
+        "n": 6
+      },
+      {
+        "next_char": "次",
+        "n": 6
+      },
+      {
+        "next_char": "鑊",
+        "n": 6
+      },
+      {
+        "next_char": "三",
+        "n": 5
+      },
+      {
+        "next_char": "壇",
+        "n": 5
+      },
+      {
+        "next_char": "就",
+        "n": 5
+      },
+      {
+        "next_char": "幅",
+        "n": 5
+      },
+      {
+        "next_char": "I",
+        "n": 4
+      },
+      {
+        "next_char": "我",
+        "n": 4
+      },
+      {
+        "next_char": "款",
+        "n": 4
+      },
+      {
+        "next_char": "番",
+        "n": 4
+      },
+      {
+        "next_char": "輯",
+        "n": 4
+      },
+      {
+        "next_char": "間",
+        "n": 4
+      },
+      {
+        "next_char": "件",
+        "n": 3
+      },
+      {
+        "next_char": "份",
+        "n": 3
+      },
+      {
+        "next_char": "你",
+        "n": 3
+      },
+      {
+        "next_char": "副",
+        "n": 3
+      },
+      {
+        "next_char": "原",
+        "n": 3
+      },
+      {
+        "next_char": "四",
+        "n": 3
+      },
+      {
+        "next_char": "張",
+        "n": 3
+      },
+      {
+        "next_char": "隻",
+        "n": 3
+      },
+      {
+        "next_char": "頭",
+        "n": 3
+      },
+      {
+        "next_char": "世",
+        "n": 2
+      },
+      {
+        "next_char": "代",
+        "n": 2
+      },
+      {
+        "next_char": "六",
+        "n": 2
+      },
+      {
+        "next_char": "十",
+        "n": 2
+      },
+      {
+        "next_char": "可",
+        "n": 2
+      },
+      {
+        "next_char": "咁",
+        "n": 2
+      },
+      {
+        "next_char": "場",
+        "n": 2
+      },
+      {
+        "next_char": "招",
+        "n": 2
+      },
+      {
+        "next_char": "據",
+        "n": 2
+      },
+      {
+        "next_char": "日",
+        "n": 2
+      },
+      {
+        "next_char": "時",
+        "n": 2
+      },
+      {
+        "next_char": "本",
+        "n": 2
+      },
+      {
+        "next_char": "樣",
+        "n": 2
+      },
+      {
+        "next_char": "等",
+        "n": 2
+      },
+      {
+        "next_char": "鋪",
+        "n": 2
+      },
+      {
+        "next_char": "A",
+        "n": 1
+      },
+      {
+        "next_char": "F",
+        "n": 1
+      },
+      {
+        "next_char": "也",
+        "n": 1
+      },
+      {
+        "next_char": "五",
+        "n": 1
+      },
+      {
+        "next_char": "以",
+        "n": 1
+      },
+      {
+        "next_char": "佢",
+        "n": 1
+      },
+      {
+        "next_char": "係",
+        "n": 1
+      },
+      {
+        "next_char": "借",
+        "n": 1
+      },
+      {
+        "next_char": "八",
+        "n": 1
+      },
+      {
+        "next_char": "出",
+        "n": 1
+      },
+      {
+        "next_char": "又",
+        "n": 1
+      },
+      {
+        "next_char": "受",
+        "n": 1
+      },
+      {
+        "next_char": "呃",
+        "n": 1
+      },
+      {
+        "next_char": "呢",
+        "n": 1
+      },
+      {
+        "next_char": "哇",
+        "n": 1
+      },
+      {
+        "next_char": "唔",
+        "n": 1
+      },
+      {
+        "next_char": "嗯",
+        "n": 1
+      },
+      {
+        "next_char": "因",
+        "n": 1
+      },
+      {
+        "next_char": "好",
+        "n": 1
+      },
+      {
+        "next_char": "富",
+        "n": 1
+      },
+      {
+        "next_char": "封",
+        "n": 1
+      },
+      {
+        "next_char": "對",
+        "n": 1
+      },
+      {
+        "next_char": "小",
+        "n": 1
+      },
+      {
+        "next_char": "希",
+        "n": 1
+      },
+      {
+        "next_char": "廣",
+        "n": 1
+      },
+      {
+        "next_char": "情",
+        "n": 1
+      },
+      {
+        "next_char": "或",
+        "n": 1
+      },
+      {
+        "next_char": "所",
+        "n": 1
+      },
+      {
+        "next_char": "支",
+        "n": 1
+      },
+      {
+        "next_char": "救",
+        "n": 1
+      },
+      {
+        "next_char": "教",
+        "n": 1
+      },
+      {
+        "next_char": "會",
+        "n": 1
+      },
+      {
+        "next_char": "有",
+        "n": 1
+      },
+      {
+        "next_char": "期",
+        "n": 1
+      },
+      {
+        "next_char": "林",
+        "n": 1
+      },
+      {
+        "next_char": "梗",
+        "n": 1
+      },
+      {
+        "next_char": "棵",
+        "n": 1
+      },
+      {
+        "next_char": "歌",
+        "n": 1
+      },
+      {
+        "next_char": "正",
+        "n": 1
+      },
+      {
+        "next_char": "消",
+        "n": 1
+      },
+      {
+        "next_char": "照",
+        "n": 1
+      },
+      {
+        "next_char": "牛",
+        "n": 1
+      },
+      {
+        "next_char": "生",
+        "n": 1
+      },
+      {
+        "next_char": "當",
+        "n": 1
+      },
+      {
+        "next_char": "百",
+        "n": 1
+      },
+      {
+        "next_char": "真",
+        "n": 1
+      },
+      {
+        "next_char": "筆",
+        "n": 1
+      },
+      {
+        "next_char": "範",
+        "n": 1
+      },
+      {
+        "next_char": "篇",
+        "n": 1
+      },
+      {
+        "next_char": "舊",
+        "n": 1
+      },
+      {
+        "next_char": "舞",
+        "n": 1
+      },
+      {
+        "next_char": "處",
+        "n": 1
+      },
+      {
+        "next_char": "話",
+        "n": 1
+      },
+      {
+        "next_char": "講",
+        "n": 1
+      },
+      {
+        "next_char": "邊",
+        "n": 1
+      },
+      {
+        "next_char": "都",
+        "n": 1
+      },
+      {
+        "next_char": "鍋",
+        "n": 1
+      },
+      {
+        "next_char": "阿",
+        "n": 1
+      },
+      {
+        "next_char": "陣",
+        "n": 1
+      },
+      {
+        "next_char": "集",
+        "n": 1
+      },
+      {
+        "next_char": "飯",
+        "n": 1
+      },
+      {
+        "next_char": "餐",
+        "n": 1
+      }
+    ],
+    "agree_tj_pm": 362.8808864265928,
+    "agree_py_pm": 432.13296398891964,
+    "agree_g2pw_pm": 87.25761772853186,
+    "agree_default_pm": 441.82825484764544,
+    "descriptive": 1
+  },
+  "q7_pred_coverage": {
+    "main": {
+      "pycantonese": {
+        "rows": 8967,
+        "ids": 8967,
+        "missing": 0
+      },
+      "g2pw": {
+        "rows": 8967,
+        "ids": 8967,
+        "missing": 0
+      },
+      "missing": 0
+    },
+    "control": {
+      "pycantonese": {
+        "rows": 130395,
+        "ids": 130395,
+        "missing": 0
+      },
+      "g2pw": {
+        "rows": 130395,
+        "ids": 130395,
+        "missing": 0
+      },
+      "missing": 0
+    }
+  },
+  "task11_subset": {
+    "descriptive": 1,
+    "n": 6022,
+    "agree_tj_pm": 620.0597808037197,
+    "agree_py_pm": 519.7608767851212,
+    "agree_g2pw_pm": 512.6203918963799,
+    "agree_default_pm": 160.24576552640318
+  },
+  "char_disagreement": [
+    {
+      "char": "呢",
+      "n": 749,
+      "tj_ne_py": 473,
+      "tj_ne_g2pw": 345,
+      "py_ne_g2pw": 730
+    },
+    {
+      "char": "會",
+      "n": 525,
+      "tj_ne_py": 498,
+      "tj_ne_g2pw": 118,
+      "py_ne_g2pw": 505
+    },
+    {
+      "char": "話",
+      "n": 348,
+      "tj_ne_py": 38,
+      "tj_ne_g2pw": 345,
+      "py_ne_g2pw": 313
+    },
+    {
+      "char": "到",
+      "n": 301,
+      "tj_ne_py": 133,
+      "tj_ne_g2pw": 185,
+      "py_ne_g2pw": 284
+    },
+    {
+      "char": "下",
+      "n": 216,
+      "tj_ne_py": 68,
+      "tj_ne_g2pw": 150,
+      "py_ne_g2pw": 215
+    },
+    {
+      "char": "為",
+      "n": 201,
+      "tj_ne_py": 113,
+      "tj_ne_g2pw": 117,
+      "py_ne_g2pw": 173
+    },
+    {
+      "char": "上",
+      "n": 184,
+      "tj_ne_py": 110,
+      "tj_ne_g2pw": 102,
+      "py_ne_g2pw": 156
+    },
+    {
+      "char": "噶",
+      "n": 183,
+      "tj_ne_py": 183,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 183
+    },
+    {
+      "char": "名",
+      "n": 173,
+      "tj_ne_py": 163,
+      "tj_ne_g2pw": 123,
+      "py_ne_g2pw": 60
+    },
+    {
+      "char": "咪",
+      "n": 168,
+      "tj_ne_py": 165,
+      "tj_ne_g2pw": 85,
+      "py_ne_g2pw": 161
+    },
+    {
+      "char": "啦",
+      "n": 154,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 154,
+      "py_ne_g2pw": 152
+    },
+    {
+      "char": "嚟",
+      "n": 138,
+      "tj_ne_py": 27,
+      "tj_ne_g2pw": 120,
+      "py_ne_g2pw": 129
+    },
+    {
+      "char": "聽",
+      "n": 136,
+      "tj_ne_py": 130,
+      "tj_ne_g2pw": 36,
+      "py_ne_g2pw": 135
+    },
+    {
+      "char": "長",
+      "n": 127,
+      "tj_ne_py": 124,
+      "tj_ne_g2pw": 18,
+      "py_ne_g2pw": 126
+    },
+    {
+      "char": "揾",
+      "n": 125,
+      "tj_ne_py": 108,
+      "tj_ne_g2pw": 125,
+      "py_ne_g2pw": 17
+    },
+    {
+      "char": "當",
+      "n": 124,
+      "tj_ne_py": 110,
+      "tj_ne_g2pw": 90,
+      "py_ne_g2pw": 50
+    },
+    {
+      "char": "間",
+      "n": 121,
+      "tj_ne_py": 116,
+      "tj_ne_g2pw": 17,
+      "py_ne_g2pw": 119
+    },
+    {
+      "char": "咁",
+      "n": 120,
+      "tj_ne_py": 120,
+      "tj_ne_g2pw": 120,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "生",
+      "n": 120,
+      "tj_ne_py": 99,
+      "tj_ne_g2pw": 101,
+      "py_ne_g2pw": 40
+    },
+    {
+      "char": "思",
+      "n": 109,
+      "tj_ne_py": 109,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 109
+    },
+    {
+      "char": "行",
+      "n": 108,
+      "tj_ne_py": 91,
+      "tj_ne_g2pw": 55,
+      "py_ne_g2pw": 102
+    },
+    {
+      "char": "片",
+      "n": 106,
+      "tj_ne_py": 26,
+      "tj_ne_g2pw": 80,
+      "py_ne_g2pw": 106
+    },
+    {
+      "char": "咯",
+      "n": 103,
+      "tj_ne_py": 103,
+      "tj_ne_g2pw": 103,
+      "py_ne_g2pw": 103
+    },
+    {
+      "char": "女",
+      "n": 97,
+      "tj_ne_py": 42,
+      "tj_ne_g2pw": 72,
+      "py_ne_g2pw": 81
+    },
+    {
+      "char": "位",
+      "n": 91,
+      "tj_ne_py": 22,
+      "tj_ne_g2pw": 71,
+      "py_ne_g2pw": 89
+    },
+    {
+      "char": "成",
+      "n": 83,
+      "tj_ne_py": 68,
+      "tj_ne_g2pw": 71,
+      "py_ne_g2pw": 28
+    },
+    {
+      "char": "種",
+      "n": 82,
+      "tj_ne_py": 80,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 82
+    },
+    {
+      "char": "重",
+      "n": 82,
+      "tj_ne_py": 77,
+      "tj_ne_g2pw": 34,
+      "py_ne_g2pw": 73
+    },
+    {
+      "char": "阿",
+      "n": 74,
+      "tj_ne_py": 73,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 73
+    },
+    {
+      "char": "命",
+      "n": 72,
+      "tj_ne_py": 53,
+      "tj_ne_g2pw": 32,
+      "py_ne_g2pw": 59
+    },
+    {
+      "char": "轉",
+      "n": 71,
+      "tj_ne_py": 58,
+      "tj_ne_g2pw": 20,
+      "py_ne_g2pw": 65
+    },
+    {
+      "char": "嗰",
+      "n": 67,
+      "tj_ne_py": 67,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 67
+    },
+    {
+      "char": "文",
+      "n": 67,
+      "tj_ne_py": 63,
+      "tj_ne_g2pw": 20,
+      "py_ne_g2pw": 51
+    },
+    {
+      "char": "面",
+      "n": 67,
+      "tj_ne_py": 49,
+      "tj_ne_g2pw": 43,
+      "py_ne_g2pw": 43
+    },
+    {
+      "char": "咧",
+      "n": 56,
+      "tj_ne_py": 56,
+      "tj_ne_g2pw": 56,
+      "py_ne_g2pw": 56
+    },
+    {
+      "char": "處",
+      "n": 53,
+      "tj_ne_py": 35,
+      "tj_ne_g2pw": 44,
+      "py_ne_g2pw": 32
+    },
+    {
+      "char": "這",
+      "n": 52,
+      "tj_ne_py": 37,
+      "tj_ne_g2pw": 50,
+      "py_ne_g2pw": 52
+    },
+    {
+      "char": "倪",
+      "n": 48,
+      "tj_ne_py": 48,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 48
+    },
+    {
+      "char": "樣",
+      "n": 48,
+      "tj_ne_py": 20,
+      "tj_ne_g2pw": 33,
+      "py_ne_g2pw": 43
+    },
+    {
+      "char": "分",
+      "n": 47,
+      "tj_ne_py": 42,
+      "tj_ne_g2pw": 9,
+      "py_ne_g2pw": 44
+    },
+    {
+      "char": "相",
+      "n": 45,
+      "tj_ne_py": 20,
+      "tj_ne_g2pw": 31,
+      "py_ne_g2pw": 39
+    },
+    {
+      "char": "輕",
+      "n": 45,
+      "tj_ne_py": 40,
+      "tj_ne_g2pw": 37,
+      "py_ne_g2pw": 27
+    },
+    {
+      "char": "道",
+      "n": 43,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 43,
+      "py_ne_g2pw": 43
+    },
+    {
+      "char": "使",
+      "n": 40,
+      "tj_ne_py": 24,
+      "tj_ne_g2pw": 16,
+      "py_ne_g2pw": 40
+    },
+    {
+      "char": "頭",
+      "n": 40,
+      "tj_ne_py": 27,
+      "tj_ne_g2pw": 34,
+      "py_ne_g2pw": 19
+    },
+    {
+      "char": "人",
+      "n": 39,
+      "tj_ne_py": 10,
+      "tj_ne_g2pw": 39,
+      "py_ne_g2pw": 29
+    },
+    {
+      "char": "件",
+      "n": 39,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 39,
+      "py_ne_g2pw": 39
+    },
+    {
+      "char": "只",
+      "n": 38,
+      "tj_ne_py": 18,
+      "tj_ne_g2pw": 38,
+      "py_ne_g2pw": 20
+    },
+    {
+      "char": "稱",
+      "n": 37,
+      "tj_ne_py": 37,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 37
+    },
+    {
+      "char": "妹",
+      "n": 34,
+      "tj_ne_py": 17,
+      "tj_ne_g2pw": 27,
+      "py_ne_g2pw": 25
+    },
+    {
+      "char": "份",
+      "n": 32,
+      "tj_ne_py": 23,
+      "tj_ne_g2pw": 15,
+      "py_ne_g2pw": 26
+    },
+    {
+      "char": "坐",
+      "n": 31,
+      "tj_ne_py": 26,
+      "tj_ne_g2pw": 31,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "聲",
+      "n": 31,
+      "tj_ne_py": 13,
+      "tj_ne_g2pw": 22,
+      "py_ne_g2pw": 27
+    },
+    {
+      "char": "姐",
+      "n": 30,
+      "tj_ne_py": 6,
+      "tj_ne_g2pw": 29,
+      "py_ne_g2pw": 26
+    },
+    {
+      "char": "返",
+      "n": 30,
+      "tj_ne_py": 11,
+      "tj_ne_g2pw": 19,
+      "py_ne_g2pw": 30
+    },
+    {
+      "char": "立",
+      "n": 28,
+      "tj_ne_py": 28,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 27
+    },
+    {
+      "char": "好",
+      "n": 27,
+      "tj_ne_py": 13,
+      "tj_ne_g2pw": 24,
+      "py_ne_g2pw": 17
+    },
+    {
+      "char": "驚",
+      "n": 27,
+      "tj_ne_py": 21,
+      "tj_ne_g2pw": 11,
+      "py_ne_g2pw": 22
+    },
+    {
+      "char": "哦",
+      "n": 26,
+      "tj_ne_py": 26,
+      "tj_ne_g2pw": 26,
+      "py_ne_g2pw": 26
+    },
+    {
+      "char": "應",
+      "n": 26,
+      "tj_ne_py": 7,
+      "tj_ne_g2pw": 19,
+      "py_ne_g2pw": 26
+    },
+    {
+      "char": "著",
+      "n": 26,
+      "tj_ne_py": 22,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 24
+    },
+    {
+      "char": "請",
+      "n": 26,
+      "tj_ne_py": 24,
+      "tj_ne_g2pw": 26,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "弟",
+      "n": 24,
+      "tj_ne_py": 24,
+      "tj_ne_g2pw": 24,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "朝",
+      "n": 24,
+      "tj_ne_py": 23,
+      "tj_ne_g2pw": 15,
+      "py_ne_g2pw": 10
+    },
+    {
+      "char": "彈",
+      "n": 23,
+      "tj_ne_py": 23,
+      "tj_ne_g2pw": 12,
+      "py_ne_g2pw": 16
+    },
+    {
+      "char": "什",
+      "n": 22,
+      "tj_ne_py": 21,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 22
+    },
+    {
+      "char": "散",
+      "n": 22,
+      "tj_ne_py": 10,
+      "tj_ne_g2pw": 15,
+      "py_ne_g2pw": 20
+    },
+    {
+      "char": "魚",
+      "n": 22,
+      "tj_ne_py": 19,
+      "tj_ne_g2pw": 8,
+      "py_ne_g2pw": 17
+    },
+    {
+      "char": "悄",
+      "n": 21,
+      "tj_ne_py": 21,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 17
+    },
+    {
+      "char": "撈",
+      "n": 21,
+      "tj_ne_py": 21,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 21
+    },
+    {
+      "char": "更",
+      "n": 21,
+      "tj_ne_py": 6,
+      "tj_ne_g2pw": 15,
+      "py_ne_g2pw": 21
+    },
+    {
+      "char": "載",
+      "n": 21,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 19,
+      "py_ne_g2pw": 21
+    },
+    {
+      "char": "邊",
+      "n": 21,
+      "tj_ne_py": 8,
+      "tj_ne_g2pw": 18,
+      "py_ne_g2pw": 16
+    },
+    {
+      "char": "劣",
+      "n": 20,
+      "tj_ne_py": 18,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 19
+    },
+    {
+      "char": "唔",
+      "n": 20,
+      "tj_ne_py": 7,
+      "tj_ne_g2pw": 16,
+      "py_ne_g2pw": 17
+    },
+    {
+      "char": "正",
+      "n": 20,
+      "tj_ne_py": 11,
+      "tj_ne_g2pw": 17,
+      "py_ne_g2pw": 12
+    },
+    {
+      "char": "畫",
+      "n": 20,
+      "tj_ne_py": 15,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 20
+    },
+    {
+      "char": "計",
+      "n": 20,
+      "tj_ne_py": 13,
+      "tj_ne_g2pw": 18,
+      "py_ne_g2pw": 9
+    },
+    {
+      "char": "刻",
+      "n": 19,
+      "tj_ne_py": 18,
+      "tj_ne_g2pw": 16,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "啊",
+      "n": 19,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 19,
+      "py_ne_g2pw": 19
+    },
+    {
+      "char": "猛",
+      "n": 19,
+      "tj_ne_py": 19,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 19
+    },
+    {
+      "char": "着",
+      "n": 19,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 15,
+      "py_ne_g2pw": 18
+    },
+    {
+      "char": "青",
+      "n": 19,
+      "tj_ne_py": 8,
+      "tj_ne_g2pw": 17,
+      "py_ne_g2pw": 13
+    },
+    {
+      "char": "冚",
+      "n": 18,
+      "tj_ne_py": 15,
+      "tj_ne_g2pw": 14,
+      "py_ne_g2pw": 7
+    },
+    {
+      "char": "嘅",
+      "n": 18,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 17,
+      "py_ne_g2pw": 14
+    },
+    {
+      "char": "截",
+      "n": 18,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 18,
+      "py_ne_g2pw": 18
+    },
+    {
+      "char": "調",
+      "n": 18,
+      "tj_ne_py": 15,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 17
+    },
+    {
+      "char": "醒",
+      "n": 18,
+      "tj_ne_py": 15,
+      "tj_ne_g2pw": 13,
+      "py_ne_g2pw": 8
+    },
+    {
+      "char": "中",
+      "n": 17,
+      "tj_ne_py": 15,
+      "tj_ne_g2pw": 14,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "傅",
+      "n": 17,
+      "tj_ne_py": 17,
+      "tj_ne_g2pw": 17,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "呀",
+      "n": 17,
+      "tj_ne_py": 17,
+      "tj_ne_g2pw": 17,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "大",
+      "n": 17,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 17,
+      "py_ne_g2pw": 12
+    },
+    {
+      "char": "度",
+      "n": 17,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 17,
+      "py_ne_g2pw": 14
+    },
+    {
+      "char": "粒",
+      "n": 17,
+      "tj_ne_py": 17,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 15
+    },
+    {
+      "char": "嘟",
+      "n": 16,
+      "tj_ne_py": 9,
+      "tj_ne_g2pw": 16,
+      "py_ne_g2pw": 15
+    },
+    {
+      "char": "幾",
+      "n": 16,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 16,
+      "py_ne_g2pw": 14
+    },
+    {
+      "char": "樂",
+      "n": 16,
+      "tj_ne_py": 9,
+      "tj_ne_g2pw": 10,
+      "py_ne_g2pw": 13
+    },
+    {
+      "char": "傳",
+      "n": 15,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 12,
+      "py_ne_g2pw": 14
+    },
+    {
+      "char": "咦",
+      "n": 15,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 15,
+      "py_ne_g2pw": 15
+    },
+    {
+      "char": "爸",
+      "n": 15,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 15,
+      "py_ne_g2pw": 15
+    },
+    {
+      "char": "便",
+      "n": 14,
+      "tj_ne_py": 12,
+      "tj_ne_g2pw": 13,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "哥",
+      "n": 14,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 14,
+      "py_ne_g2pw": 14
+    },
+    {
+      "char": "少",
+      "n": 14,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 12,
+      "py_ne_g2pw": 12
+    },
+    {
+      "char": "料",
+      "n": 14,
+      "tj_ne_py": 13,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 9
+    },
+    {
+      "char": "斷",
+      "n": 14,
+      "tj_ne_py": 10,
+      "tj_ne_g2pw": 14,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "母",
+      "n": 14,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 14,
+      "py_ne_g2pw": 14
+    },
+    {
+      "char": "緩",
+      "n": 14,
+      "tj_ne_py": 12,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 13
+    },
+    {
+      "char": "認",
+      "n": 14,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 14,
+      "py_ne_g2pw": 14
+    },
+    {
+      "char": "錫",
+      "n": 14,
+      "tj_ne_py": 14,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 14
+    },
+    {
+      "char": "冧",
+      "n": 13,
+      "tj_ne_py": 10,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 10
+    },
+    {
+      "char": "尾",
+      "n": 13,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 13,
+      "py_ne_g2pw": 11
+    },
+    {
+      "char": "溜",
+      "n": 13,
+      "tj_ne_py": 13,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 13
+    },
+    {
+      "char": "錢",
+      "n": 13,
+      "tj_ne_py": 10,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 11
+    },
+    {
+      "char": "唉",
+      "n": 12,
+      "tj_ne_py": 12,
+      "tj_ne_g2pw": 12,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "嗯",
+      "n": 12,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 12,
+      "py_ne_g2pw": 12
+    },
+    {
+      "char": "噏",
+      "n": 12,
+      "tj_ne_py": 8,
+      "tj_ne_g2pw": 12,
+      "py_ne_g2pw": 8
+    },
+    {
+      "char": "括",
+      "n": 12,
+      "tj_ne_py": 12,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 12
+    },
+    {
+      "char": "玲",
+      "n": 12,
+      "tj_ne_py": 12,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 12
+    },
+    {
+      "char": "興",
+      "n": 12,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 9,
+      "py_ne_g2pw": 12
+    },
+    {
+      "char": "豆",
+      "n": 12,
+      "tj_ne_py": 12,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 10
+    },
+    {
+      "char": "鋪",
+      "n": 12,
+      "tj_ne_py": 6,
+      "tj_ne_g2pw": 12,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "阱",
+      "n": 12,
+      "tj_ne_py": 12,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 12
+    },
+    {
+      "char": "冇",
+      "n": 11,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 11,
+      "py_ne_g2pw": 8
+    },
+    {
+      "char": "嗒",
+      "n": 11,
+      "tj_ne_py": 7,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 11
+    },
+    {
+      "char": "房",
+      "n": 11,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 11,
+      "py_ne_g2pw": 10
+    },
+    {
+      "char": "油",
+      "n": 11,
+      "tj_ne_py": 11,
+      "tj_ne_g2pw": 10,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "牌",
+      "n": 11,
+      "tj_ne_py": 9,
+      "tj_ne_g2pw": 11,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "嘞",
+      "n": 10,
+      "tj_ne_py": 10,
+      "tj_ne_g2pw": 10,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "地",
+      "n": 10,
+      "tj_ne_py": 9,
+      "tj_ne_g2pw": 9,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "婆",
+      "n": 10,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 10,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "平",
+      "n": 10,
+      "tj_ne_py": 10,
+      "tj_ne_g2pw": 9,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "有",
+      "n": 10,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 10,
+      "py_ne_g2pw": 10
+    },
+    {
+      "char": "淡",
+      "n": 10,
+      "tj_ne_py": 9,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "物",
+      "n": 10,
+      "tj_ne_py": 9,
+      "tj_ne_g2pw": 10,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "誒",
+      "n": 10,
+      "tj_ne_py": 10,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "黑",
+      "n": 10,
+      "tj_ne_py": 9,
+      "tj_ne_g2pw": 10,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "十",
+      "n": 9,
+      "tj_ne_py": 9,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 9
+    },
+    {
+      "char": "將",
+      "n": 9,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 7
+    },
+    {
+      "char": "憑",
+      "n": 9,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 9,
+      "py_ne_g2pw": 9
+    },
+    {
+      "char": "數",
+      "n": 9,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 8
+    },
+    {
+      "char": "樓",
+      "n": 9,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 8,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "爭",
+      "n": 9,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 8,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "父",
+      "n": 9,
+      "tj_ne_py": 9,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "蛋",
+      "n": 9,
+      "tj_ne_py": 7,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "要",
+      "n": 9,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 9,
+      "py_ne_g2pw": 9
+    },
+    {
+      "char": "隊",
+      "n": 9,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 8,
+      "py_ne_g2pw": 9
+    },
+    {
+      "char": "頂",
+      "n": 9,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 8,
+      "py_ne_g2pw": 9
+    },
+    {
+      "char": "龍",
+      "n": 9,
+      "tj_ne_py": 6,
+      "tj_ne_g2pw": 9,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "佢",
+      "n": 8,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 8,
+      "py_ne_g2pw": 8
+    },
+    {
+      "char": "兩",
+      "n": 8,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "右",
+      "n": 8,
+      "tj_ne_py": 8,
+      "tj_ne_g2pw": 8,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "呵",
+      "n": 8,
+      "tj_ne_py": 8,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 8
+    },
+    {
+      "char": "咇",
+      "n": 8,
+      "tj_ne_py": 8,
+      "tj_ne_g2pw": 8,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "坎",
+      "n": 8,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 8
+    },
+    {
+      "char": "抹",
+      "n": 8,
+      "tj_ne_py": 8,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 7
+    },
+    {
+      "char": "窕",
+      "n": 8,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 8,
+      "py_ne_g2pw": 8
+    },
+    {
+      "char": "茄",
+      "n": 8,
+      "tj_ne_py": 7,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "蟄",
+      "n": 8,
+      "tj_ne_py": 6,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 8
+    },
+    {
+      "char": "袋",
+      "n": 8,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 8,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "仗",
+      "n": 7,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "冠",
+      "n": 7,
+      "tj_ne_py": 6,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "呃",
+      "n": 7,
+      "tj_ne_py": 7,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "啫",
+      "n": 7,
+      "tj_ne_py": 6,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "嗎",
+      "n": 7,
+      "tj_ne_py": 7,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 7
+    },
+    {
+      "char": "強",
+      "n": 7,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "愉",
+      "n": 7,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 7
+    },
+    {
+      "char": "撐",
+      "n": 7,
+      "tj_ne_py": 7,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "攬",
+      "n": 7,
+      "tj_ne_py": 7,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "日",
+      "n": 7,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "易",
+      "n": 7,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "果",
+      "n": 7,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 7
+    },
+    {
+      "char": "糊",
+      "n": 7,
+      "tj_ne_py": 6,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "糖",
+      "n": 7,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 7
+    },
+    {
+      "char": "緋",
+      "n": 7,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "覺",
+      "n": 7,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 7
+    },
+    {
+      "char": "鏡",
+      "n": 7,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "門",
+      "n": 7,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "難",
+      "n": 7,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "麟",
+      "n": 7,
+      "tj_ne_py": 7,
+      "tj_ne_g2pw": 7,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "卜",
+      "n": 6,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "士",
+      "n": 6,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "撩",
+      "n": 6,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "歪",
+      "n": 6,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "測",
+      "n": 6,
+      "tj_ne_py": 6,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "爺",
+      "n": 6,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "腸",
+      "n": 6,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "舌",
+      "n": 6,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "荷",
+      "n": 6,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "表",
+      "n": 6,
+      "tj_ne_py": 6,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "跨",
+      "n": 6,
+      "tj_ne_py": 6,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "近",
+      "n": 6,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "過",
+      "n": 6,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "量",
+      "n": 6,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 6,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "鵲",
+      "n": 6,
+      "tj_ne_py": 6,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 6
+    },
+    {
+      "char": "㗎",
+      "n": 5,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "九",
+      "n": 5,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "亂",
+      "n": 5,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "來",
+      "n": 5,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "俾",
+      "n": 5,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "偈",
+      "n": 5,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "加",
+      "n": 5,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "勝",
+      "n": 5,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "卡",
+      "n": 5,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "友",
+      "n": 5,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "哎",
+      "n": 5,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "哩",
+      "n": 5,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "尚",
+      "n": 5,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "帶",
+      "n": 5,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "彷",
+      "n": 5,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "拗",
+      "n": 5,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "捋",
+      "n": 5,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "捷",
+      "n": 5,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "斜",
+      "n": 5,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "檻",
+      "n": 5,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "競",
+      "n": 5,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "籮",
+      "n": 5,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "粹",
+      "n": 5,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "聯",
+      "n": 5,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "肯",
+      "n": 5,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "船",
+      "n": 5,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "華",
+      "n": 5,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "藉",
+      "n": 5,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 5,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "蝕",
+      "n": 5,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "釘",
+      "n": 5,
+      "tj_ne_py": 5,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 5
+    },
+    {
+      "char": "倒",
+      "n": 4,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "剩",
+      "n": 4,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "去",
+      "n": 4,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "吧",
+      "n": 4,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "哋",
+      "n": 4,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "啡",
+      "n": 4,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "喪",
+      "n": 4,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "壺",
+      "n": 4,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "媚",
+      "n": 4,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "巧",
+      "n": 4,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "忌",
+      "n": 4,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "惡",
+      "n": 4,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "慢",
+      "n": 4,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "握",
+      "n": 4,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "擴",
+      "n": 4,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "曝",
+      "n": 4,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "棵",
+      "n": 4,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "橋",
+      "n": 4,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "死",
+      "n": 4,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "玩",
+      "n": 4,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "甸",
+      "n": 4,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "痢",
+      "n": 4,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "睇",
+      "n": 4,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "絡",
+      "n": 4,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "能",
+      "n": 4,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "臉",
+      "n": 4,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "訂",
+      "n": 4,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "踐",
+      "n": 4,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "躍",
+      "n": 4,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "陳",
+      "n": 4,
+      "tj_ne_py": 4,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "食",
+      "n": 4,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "飯",
+      "n": 4,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 4,
+      "py_ne_g2pw": 4
+    },
+    {
+      "char": "仔",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "俠",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "信",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "六",
+      "n": 3,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "其",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "冥",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "匿",
+      "n": 3,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "咕",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "啄",
+      "n": 3,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "坷",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "嬲",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "定",
+      "n": 3,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "年",
+      "n": 3,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "律",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "從",
+      "n": 3,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "惋",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "拔",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "挨",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "挽",
+      "n": 3,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "揼",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "撻",
+      "n": 3,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "撼",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "曳",
+      "n": 3,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "核",
+      "n": 3,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "條",
+      "n": 3,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "棧",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "泛",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "泡",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "派",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "澄",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "犯",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "留",
+      "n": 3,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "略",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "癱",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "監",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "盤",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "瞌",
+      "n": 3,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "知",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "硬",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "索",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "綜",
+      "n": 3,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "翱",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "蓓",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "蔣",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "蔭",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "蜢",
+      "n": 3,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "賣",
+      "n": 3,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "造",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "鍊",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "雀",
+      "n": 3,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "零",
+      "n": 3,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "靚",
+      "n": 3,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "鞋",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 3,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "鳳",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "黯",
+      "n": 3,
+      "tj_ne_py": 3,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 3
+    },
+    {
+      "char": "三",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "何",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "假",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "傍",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "儘",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "先",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "內",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "利",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "剌",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "副",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "勁",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "卅",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "厲",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "叭",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "可",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "台",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "吒",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "告",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "咐",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "啤",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "啱",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "啲",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "喎",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "喳",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "嘛",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "園",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "埲",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "夜",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "娘",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "娣",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "子",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "家",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "廉",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "悒",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "愧",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "扒",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "打",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "抌",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "拉",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "捻",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "掠",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "掹",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "揈",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "揣",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "旦",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "昨",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "時",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "暴",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "查",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "檔",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "淋",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "淨",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "渾",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "瀝",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "瀨",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "無",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "狂",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "王",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "甩",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "瘌",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "癩",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "皇",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "皮",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "砰",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "禁",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "簟",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "精",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "羅",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "習",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "聾",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "脛",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "腳",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "與",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "莫",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "號",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "蝙",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "褪",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "語",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "諗",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "諦",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "讀",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "赤",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "邂",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "酵",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "閒",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "除",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "陷",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "靡",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "頓",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "顆",
+      "n": 2,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "騮",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "魏",
+      "n": 2,
+      "tj_ne_py": 2,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 2
+    },
+    {
+      "char": "鵝",
+      "n": 2,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 2,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "丁",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "乾",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "五",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "仁",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "任",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "估",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "佔",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "佗",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "俞",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "俸",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "兒",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "共",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "凈",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "勒",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "厄",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "參",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "反",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "合",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "味",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "和",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "咳",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "哼",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "唯",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "啉",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "啷",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "喜",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "單",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "喱",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "嗌",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "嗦",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "噓",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "嚮",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "埃",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "塞",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "墩",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "壁",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "多",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "奏",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "奶",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "妻",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "姍",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "姓",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "委",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "娉",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "媒",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "媽",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "嬋",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "孑",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "宜",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "局",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "崎",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "崐",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "嶄",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "差",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "巴",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "底",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "廚",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "張",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "彌",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "影",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "復",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "忘",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "怠",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "悍",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "悵",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "意",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "慷",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "懶",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "戲",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "扮",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "抄",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "抨",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "抱",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "抵",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "拙",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "拳",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "拷",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "挾",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "捍",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "排",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "揤",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "搪",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "撓",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "撞",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "撥",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "操",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "擔",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "擘",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "擾",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "星",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "景",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "曖",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "月",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "望",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "架",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "柩",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "柴",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "棘",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "樹",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "欄",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "次",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "歇",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "比",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "毗",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "沌",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "沒",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "沮",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "泊",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "法",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "浪",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "湖",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "滸",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "漫",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "漸",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "濃",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "濫",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "焯",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "煇",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "熬",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "燉",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "狸",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "率",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "玉",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "現",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "甫",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "由",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "疊",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "疾",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "發",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "皚",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "盒",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "看",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "眼",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "睄",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "睞",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "睺",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "瞭",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "神",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "票",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "竄",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "竇",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "笛",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "筒",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "簷",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "簾",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "簿",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "籠",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "紀",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "約",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "結",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "絕",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "絨",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "綴",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "縫",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "縱",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "而",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "肘",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "背",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "脾",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "腍",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "膜",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "臃",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "菲",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "萬",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "落",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "蓋",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "蓬",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "藥",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "藴",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "蘆",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "蘋",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "蛇",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "蜕",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "蠅",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "褦",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "覆",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "見",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "親",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "解",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "試",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "説",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "論",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "謾",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "谷",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "責",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "賊",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "賴",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "賽",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "趣",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "跌",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "身",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "車",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "輪",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "迎",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "迫",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "逆",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "逾",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "遢",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "適",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "邋",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "銀",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "銘",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "錯",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "鑽",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "降",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "院",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "陣",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "陰",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "離",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "靈",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "靜",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "領",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "願",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "風",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "首",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "骯",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "魅",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "鮑",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "鯪",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 0,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "鯽",
+      "n": 1,
+      "tj_ne_py": 1,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 0
+    },
+    {
+      "char": "鳩",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "麻",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    },
+    {
+      "char": "黃",
+      "n": 1,
+      "tj_ne_py": 0,
+      "tj_ne_g2pw": 1,
+      "py_ne_g2pw": 1
+    }
+  ],
+  "bootstrap_summary": {
+    "master_seed": 20260920,
+    "stratum": "main",
+    "stratum_seed": 2410426915,
+    "B": 2000,
+    "G": 549,
+    "ci_unreliable": 0,
+    "method": "resample video_id with replacement; a cluster drawn k times contributes its main-set rows k times; recompute the global gap",
+    "gaps": {
+      "gap_tj_default_ci": {
+        "point_gap_pm": 121.77985948477752,
+        "point_agree_pm": 544.775287164046,
+        "point_agree_default_pm": 422.9954276792684,
+        "ci95": [
+          108.72629046619275,
+          134.69823322685747
+        ],
+        "point_relative": 0.28789876087529664,
+        "relative_ci95": [
+          0.2529020382484335,
+          0.3250724212387328
+        ],
+        "n_incomparable_rounds": 0,
+        "sign_flip": false,
+        "conclusion_flip": false,
+        "conclusion": "gap_above_0",
+        "ci_unreliable": 0,
+        "G": 549
+      },
+      "gap_py_default_ci": {
+        "point_gap_pm": -92.45009479201516,
+        "point_agree_pm": 330.54533288725327,
+        "point_agree_default_pm": 422.9954276792684,
+        "ci95": [
+          -109.18783875306192,
+          -74.6346313375299
+        ],
+        "point_relative": -0.21856050619562353,
+        "relative_ci95": [
+          -0.25295766536599124,
+          -0.1814620021974534
+        ],
+        "n_incomparable_rounds": 0,
+        "sign_flip": false,
+        "conclusion_flip": false,
+        "conclusion": "gap_below_0",
+        "ci_unreliable": 0,
+        "G": 549
+      },
+      "gap_g2pw_default_ci": {
+        "point_gap_pm": -52.07984833277573,
+        "point_agree_pm": 370.9155793464927,
+        "point_agree_default_pm": 422.9954276792684,
+        "ci95": [
+          -68.29516723387533,
+          -36.079606180346154
+        ],
+        "point_relative": -0.12312153967835487,
+        "relative_ci95": [
+          -0.15790789563540972,
+          -0.08634683637121843
+        ],
+        "n_incomparable_rounds": 0,
+        "sign_flip": false,
+        "conclusion_flip": false,
+        "conclusion": "gap_below_0",
+        "ci_unreliable": 0,
+        "G": 549
+      }
+    }
+  }
+}
