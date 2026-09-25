@@ -1,0 +1,37 @@
+{
+  "name": "gap_agree_ci",
+  "B": 2000,
+  "master_seed": 20260920,
+  "stratum": "diff",
+  "stratum_seeds": {
+    "diff": 4174636591
+  },
+  "seeds_pairwise_distinct": true,
+  "G": 550,
+  "G_h": {
+    "diff": 550
+  },
+  "ci_unreliable": 0,
+  "m": 1,
+  "comparison": "gap_agree_pm",
+  "method": "video_id cluster resample with replacement; a cluster drawn k times contributes its main-set rows k times; global gap_agree_pm is recomputed on that pooled row multiset",
+  "agree_ctx_pm": 620.0597808037197,
+  "agree_default_pm": 160.24576552640318,
+  "gap_agree_pm": 459.8140152773165,
+  "ci95": [
+    434.76390941377906,
+    486.35596541046806
+  ],
+  "includes_0": false,
+  "p_raw": 0.0,
+  "p_BH": 0.0,
+  "share_positive": 1.0,
+  "share_negative": 0.0,
+  "relative_to_agree_default": 2.8694300518134717,
+  "relative_ci95": [
+    2.5340972871842844,
+    3.266008399896326
+  ],
+  "relative_sign_flips": false,
+  "conclusion": "gap_above_0"
+}
