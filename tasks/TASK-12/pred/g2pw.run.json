@@ -1,0 +1,16 @@
+{
+  "script_commit": "d029d3f55a556d00bbbeba963407d600b6560bb4",
+  "model": "Naozumi0512/g2pW-canto-20241206-bert-base",
+  "model_revision": "2f435334357487f85d05429e2da1d6da93aafd2f",
+  "decoding": {
+    "code": "Naozumi520/g2pW-Cantonese",
+    "code_revision": "99f2d29cfd9cdd69c4fba9d8150060d596d3ca0d",
+    "bert": "hon9kon9ize/bert-base-cantonese",
+    "bert_revision": "1d59d6ca8a09a96715f338d10d55bb180f223420",
+    "use_cuda": false,
+    "batch_size": 64,
+    "input": "published window syllable characters in pos order"
+  },
+  "device": "cpu",
+  "dirty": false
+}

@@ -1,0 +1,13 @@
+{
+  "status": "complete",
+  "outputs": {
+    "results.json": "0b53db4ce5fd579b0244308f9d07d70874c6ce357487e7a0d95699f5ea12c058",
+    "manifest.json": "19303d2d3d4505346dea3379674c55c38368475497ffede2b85f2b68b1d7a6fb",
+    "bootstrap.json": "e68ad1617b07b1a64f296d97fe0000d1e49ea85aef93a7ef1b9a3fab7c8a3ae0",
+    "open_analysis.md": "9987af4fef0730816742f344a79ed9d1c0bb6def35be98c11cc4b97f9073a20a",
+    "pycantonese.jsonl": "c7c167d12eda6b03a3712ccc867e7d51f9d0c8b24c27510857f00ed6c07503d7",
+    "g2pw.jsonl": "e0511ec8ab1f2101461537f47d7cc389a8969a8761b7d300f138aba2b784aca2",
+    "pycantonese.run.json": "2eb9ac48a32588ea281f6a2c531602f9d398c4ae3e8fdc6de172af6c68f386dc",
+    "g2pw.run.json": "9b2c4d604ad8262949fe0ac63cc37afe43351af925c337665e7e4e0b36c1f96c"
+  }
+}

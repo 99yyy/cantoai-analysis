@@ -1,0 +1,71 @@
+{
+  "master_seed": 20260920,
+  "stratum": "main",
+  "stratum_seed": 2410426915,
+  "B": 2000,
+  "G": 549,
+  "ci_unreliable": 0,
+  "method": "resample video_id with replacement; a cluster drawn k times contributes its main-set rows k times; recompute the global gap",
+  "gaps": {
+    "gap_tj_default_ci": {
+      "point_gap_pm": 121.77985948477752,
+      "point_agree_pm": 544.775287164046,
+      "point_agree_default_pm": 422.9954276792684,
+      "ci95": [
+        108.72629046619275,
+        134.69823322685747
+      ],
+      "point_relative": 0.28789876087529664,
+      "relative_ci95": [
+        0.2529020382484335,
+        0.3250724212387328
+      ],
+      "n_incomparable_rounds": 0,
+      "sign_flip": false,
+      "conclusion_flip": false,
+      "conclusion": "gap_above_0",
+      "ci_unreliable": 0,
+      "G": 549
+    },
+    "gap_py_default_ci": {
+      "point_gap_pm": -92.45009479201516,
+      "point_agree_pm": 330.54533288725327,
+      "point_agree_default_pm": 422.9954276792684,
+      "ci95": [
+        -109.18783875306192,
+        -74.6346313375299
+      ],
+      "point_relative": -0.21856050619562353,
+      "relative_ci95": [
+        -0.25295766536599124,
+        -0.1814620021974534
+      ],
+      "n_incomparable_rounds": 0,
+      "sign_flip": false,
+      "conclusion_flip": false,
+      "conclusion": "gap_below_0",
+      "ci_unreliable": 0,
+      "G": 549
+    },
+    "gap_g2pw_default_ci": {
+      "point_gap_pm": -52.07984833277573,
+      "point_agree_pm": 370.9155793464927,
+      "point_agree_default_pm": 422.9954276792684,
+      "ci95": [
+        -68.29516723387533,
+        -36.079606180346154
+      ],
+      "point_relative": -0.12312153967835487,
+      "relative_ci95": [
+        -0.15790789563540972,
+        -0.08634683637121843
+      ],
+      "n_incomparable_rounds": 0,
+      "sign_flip": false,
+      "conclusion_flip": false,
+      "conclusion": "gap_below_0",
+      "ci_unreliable": 0,
+      "G": 549
+    }
+  }
+}

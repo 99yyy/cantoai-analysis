@@ -1,0 +1,14 @@
+{
+  "script_commit": "d029d3f55a556d00bbbeba963407d600b6560bb4",
+  "model": "pycantonese",
+  "model_revision": "3d729c01e53f6056cb1c6c527953837e9a106147",
+  "decoding": {
+    "package": "pycantonese",
+    "version": "5.0.0",
+    "function": "characters_to_jyutping",
+    "input": "published window syllable characters in pos order",
+    "device_note": "cpu"
+  },
+  "device": "cpu",
+  "dirty": false
+}
