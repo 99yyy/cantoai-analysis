@@ -1,0 +1,42 @@
+{
+  "task": "TASK-11",
+  "subtype": "success",
+  "verdict": "supported",
+  "hypothesis": "On the published judgeable syllables of this channel where the folded jp_ctx differs from jp_default, jp_ctx agrees with jp_realized more often than jp_default does, so gap_agree_pm sits above 0.",
+  "why": "Machine completion is 7/7 agree on main run 36097379666; the cluster interval for gap_agree_pm lies above 0 and the relative-magnitude sign does not flip, so the brief's negation does not hold.",
+  "numbers": {
+    "n_diff_judgeable": {
+      "value": 6022,
+      "within_tol": true
+    },
+    "n_same_judgeable": {
+      "value": 133340,
+      "within_tol": true
+    },
+    "n_ctx_match": {
+      "value": 3734,
+      "within_tol": true
+    },
+    "n_default_match": {
+      "value": 965,
+      "within_tol": true
+    },
+    "agree_ctx_pm": {
+      "value": 620.0597808037197,
+      "within_tol": true
+    },
+    "agree_default_pm": {
+      "value": 160.24576552640318,
+      "within_tol": true
+    },
+    "gap_agree_pm": {
+      "value": 459.81401527731657,
+      "within_tol": true
+    }
+  },
+  "turns_used": 4,
+  "turn_cap": 3,
+  "corpus_sha": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+  "forked_from": null,
+  "fork_depth": 0
+}
