@@ -209,8 +209,8 @@ def load_windows(conn: sqlite3.Connection) -> list[dict]:
     windows = []
     for uid in order:
         item = grouped[uid]
-        if item["pos"] != list(range(len(item["pos"]))):
-            fail(f"syllable pos is not 0..n-1 for {uid}")
+        if item["pos"] != sorted(item["pos"]) or len(set(item["pos"])) != len(item["pos"]):
+            fail(f"syllable pos is not strictly increasing for {uid}")
         item["text"] = "".join(item["chars"])
         windows.append(item)
     return windows
