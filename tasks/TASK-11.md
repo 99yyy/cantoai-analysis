@@ -1,6 +1,7 @@
 # TASK-11：词典侧 jp_ctx≠jp_default 子集上，jp_ctx 与 jp_default 相对 jp_realized 的一致率及配对差
 
-status: open
+status: closed
+corpus_sha: 2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f
 rung: Autopilot
 
 ## 目标
