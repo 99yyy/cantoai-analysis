@@ -1,0 +1,15 @@
+{
+  "script_commit": "396ba6760552fcaacf97dc64b2e0e8099c6e8009",
+  "model": "jacksonllee/pycantonese",
+  "model_revision": "3d729c01e53f6056cb1c6c527953837e9a106147",
+  "decoding": {
+    "language": "yue",
+    "tool": "characters_to_jyutping",
+    "package": "pycantonese==5.0.0",
+    "unit": "published_window_char_string",
+    "beam": 1,
+    "temperature": 0
+  },
+  "device": "cpu",
+  "dirty": false
+}
