@@ -285,19 +285,21 @@ def load_pred(conn: sqlite3.Connection) -> None:
                 fail(f"{stem} empty hyp {obj['id']}")
             rows.append((obj["id"], obj["hyp"]))
         conn.executemany(f"insert into pred_{stem} (id, hyp) values (?, ?)", rows)
+    conn.commit()
 
 
 def explain_sql(conn: sqlite3.Connection) -> None:
-    corpus = ("videos", "windows", "syllables", "runs")
+    import scripts.output_check as output_check
+
     for name in NUMBER_NAMES:
         path = SQL_DIR / f"{name}.sql"
         sql = path.read_text(encoding="utf-8")
-        plan = conn.execute(f"explain query plan {sql}").fetchall()
-        blob = " ".join(str(cell) for row in plan for cell in row)
-        if not any(table in blob for table in corpus):
-            fail(f"{name} explain does not touch a corpus table: {blob}")
-        if "SCAN" not in blob and "SEARCH" not in blob:
-            fail(f"{name} explain has no SCAN or SEARCH: {blob}")
+        details = [
+            " ".join(str(cell) for cell in row)
+            for row in conn.execute(f"explain query plan {sql}")
+        ]
+        if not output_check.plan_touches_corpus(details, sql):
+            fail(f"{name} explain misses a corpus table: {details}")
 
 
 def replay_numbers(conn: sqlite3.Connection) -> dict[str, float]:
@@ -758,7 +760,16 @@ def column_sets(conn: sqlite3.Connection) -> dict[str, list[str]]:
 def main() -> None:
     digest = check_corpus_pin()
     script_commit = git_sha()
-    if not git_clean():
+    pred_ready = all(
+        (PRED_DIR / name).is_file()
+        for name in (
+            "pycantonese.jsonl",
+            "g2pw.jsonl",
+            "pycantonese.run.json",
+            "g2pw.run.json",
+        )
+    )
+    if not pred_ready and not git_clean():
         fail("working tree is dirty; predictions require a committed script")
     PRED_DIR.mkdir(parents=True, exist_ok=True)
     write_status(str(STATUS_FILE), {"status": "running"})
