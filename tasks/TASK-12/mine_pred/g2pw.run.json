@@ -1,0 +1,18 @@
+{
+  "script_commit": "396ba6760552fcaacf97dc64b2e0e8099c6e8009",
+  "model": "Naozumi0512/g2pW-canto-20241206-bert-base",
+  "model_revision": "2f435334357487f85d05429e2da1d6da93aafd2f",
+  "decoding": {
+    "language": "yue",
+    "tool": "G2PWConverter",
+    "model_source": "hon9kon9ize/bert-base-cantonese",
+    "model_source_revision": "1d59d6ca8a09a96715f338d10d55bb180f223420",
+    "use_cuda": false,
+    "batch_size": 64,
+    "unit": "published_window_char_string",
+    "beam": 1,
+    "temperature": 0
+  },
+  "device": "cpu",
+  "dirty": false
+}

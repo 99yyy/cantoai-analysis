@@ -1,0 +1,80 @@
+[
+  {
+    "name": "n_multi_disagree",
+    "value": 8967,
+    "n": 8967,
+    "query": "tasks/TASK-12/mine_sql/n_multi_disagree.sql"
+  },
+  {
+    "name": "n_tools_agree",
+    "value": 130395,
+    "n": 130395,
+    "query": "tasks/TASK-12/mine_sql/n_tools_agree.sql"
+  },
+  {
+    "name": "n_tj_match",
+    "value": 4885,
+    "n": 8967,
+    "query": "tasks/TASK-12/mine_sql/n_tj_match.sql"
+  },
+  {
+    "name": "n_py_match",
+    "value": 2964,
+    "n": 8967,
+    "query": "tasks/TASK-12/mine_sql/n_py_match.sql"
+  },
+  {
+    "name": "n_g2pw_match",
+    "value": 3326,
+    "n": 8967,
+    "query": "tasks/TASK-12/mine_sql/n_g2pw_match.sql"
+  },
+  {
+    "name": "n_default_match",
+    "value": 3793,
+    "n": 8967,
+    "query": "tasks/TASK-12/mine_sql/n_default_match.sql"
+  },
+  {
+    "name": "agree_tj_pm",
+    "value": 544.775287164046,
+    "n": 8967,
+    "query": "tasks/TASK-12/mine_sql/agree_tj_pm.sql"
+  },
+  {
+    "name": "agree_py_pm",
+    "value": 330.54533288725327,
+    "n": 8967,
+    "query": "tasks/TASK-12/mine_sql/agree_py_pm.sql"
+  },
+  {
+    "name": "agree_g2pw_pm",
+    "value": 370.9155793464927,
+    "n": 8967,
+    "query": "tasks/TASK-12/mine_sql/agree_g2pw_pm.sql"
+  },
+  {
+    "name": "agree_default_pm",
+    "value": 422.9954276792684,
+    "n": 8967,
+    "query": "tasks/TASK-12/mine_sql/agree_default_pm.sql"
+  },
+  {
+    "name": "gap_tj_default_pm",
+    "value": 121.77985948477755,
+    "n": 8967,
+    "query": "tasks/TASK-12/mine_sql/gap_tj_default_pm.sql"
+  },
+  {
+    "name": "gap_py_default_pm",
+    "value": -92.45009479201514,
+    "n": 8967,
+    "query": "tasks/TASK-12/mine_sql/gap_py_default_pm.sql"
+  },
+  {
+    "name": "gap_g2pw_default_pm",
+    "value": -52.079848332775725,
+    "n": 8967,
+    "query": "tasks/TASK-12/mine_sql/gap_g2pw_default_pm.sql"
+  }
+]
