@@ -1,6 +1,6 @@
 # TASK-12：文字侧三工具 + jp_default 基线相对 jp_realized 的一致率（主集=至少两工具读音不同）
 
-status: open
+status: closed
 corpus_sha: 2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f
 rung: Autopilot
 

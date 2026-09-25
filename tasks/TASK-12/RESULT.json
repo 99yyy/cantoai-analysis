@@ -1,0 +1,66 @@
+{
+  "task": "TASK-12",
+  "subtype": "success",
+  "verdict": "supported",
+  "hypothesis": "On this channel's published judgeable main set, each of gap_tj_default_pm, gap_py_default_pm, and gap_g2pw_default_pm is inconsistent with 0, and switching to relative magnitude does not flip the sign or the conclusion.",
+  "why": "Machine completion is 13/13 agree on main run 36129776649; each cluster interval excludes 0 and the relative-magnitude sign does not flip, so the brief's negation does not hold.",
+  "numbers": {
+    "n_multi_disagree": {
+      "value": 8967,
+      "within_tol": true
+    },
+    "n_tools_agree": {
+      "value": 130395,
+      "within_tol": true
+    },
+    "n_tj_match": {
+      "value": 4885,
+      "within_tol": true
+    },
+    "n_py_match": {
+      "value": 2964,
+      "within_tol": true
+    },
+    "n_g2pw_match": {
+      "value": 3326,
+      "within_tol": true
+    },
+    "n_default_match": {
+      "value": 3793,
+      "within_tol": true
+    },
+    "agree_tj_pm": {
+      "value": 544.775287164046,
+      "within_tol": true
+    },
+    "agree_py_pm": {
+      "value": 330.54533288725327,
+      "within_tol": true
+    },
+    "agree_g2pw_pm": {
+      "value": 370.9155793464927,
+      "within_tol": true
+    },
+    "agree_default_pm": {
+      "value": 422.9954276792684,
+      "within_tol": true
+    },
+    "gap_tj_default_pm": {
+      "value": 121.77985948477752,
+      "within_tol": true
+    },
+    "gap_py_default_pm": {
+      "value": -92.45009479201516,
+      "within_tol": true
+    },
+    "gap_g2pw_default_pm": {
+      "value": -52.07984833277573,
+      "within_tol": true
+    }
+  },
+  "turns_used": 3,
+  "turn_cap": 3,
+  "corpus_sha": "2bd618ba8caf334548aab8ad6fcc54fdb899bfa3c09f02a16502e44032824f1f",
+  "forked_from": null,
+  "fork_depth": 0
+}
