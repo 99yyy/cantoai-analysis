@@ -103,6 +103,16 @@ What this enforces, in order:
                tokens. Worker and verifier each run their own script: the two
                prediction files may be neither one path nor byte-identical. The agent's own scorer is never used, and an empty
                reference fails.
+  pred         a fenced ``pred`` block lists one stem per line. Before this
+               script replays a side's SQL it copies the corpus to a temp
+               file (never under ``data/``) and loads that side's
+               ``<stem>.jsonl`` into table ``pred_<stem>`` (``id`` primary
+               key, ``hyp`` column) so the SQL can join ``syllables.syl_id``.
+               Only that side's directory is loaded (``pred/`` or
+               ``mine_pred/``). Each id must occur in ``syllables``, once,
+               with a non-empty ``hyp``. ``<stem>.run.json`` is the same run
+               card a score route requires. Changing or deleting a line of
+               the fence is a bar move.
   replay       every number equals what its own route produces, within tol.
                A SQL route whose plan never SCAN/SEARCHes a corpus table
                fails, so two constant SELECTs cannot certify agreement.
@@ -238,9 +248,11 @@ import ast
 import hashlib
 import json
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import time
 import unicodedata
 from collections.abc import Iterable
@@ -254,6 +266,7 @@ IDENTITIES_FENCE = re.compile(r"^```identities\s*$(.*?)^```\s*$", re.M | re.S)
 EVAL_FENCE = re.compile(r"^```eval\s*$(.*?)^```\s*$", re.M | re.S)
 FIXTURE_FENCE = re.compile(r"^```fixture\s*$(.*?)^```\s*$", re.M | re.S)
 OUTSIDE_FRAME_FENCE = re.compile(r"^```outside_frame\s*$(.*?)^```\s*$", re.M | re.S)
+PRED_FENCE = re.compile(r"^```pred\s*$(.*?)^```\s*$", re.M | re.S)
 # Every declaration fence a gate reads, by kind. history_audit.py and
 # relations.py take their patterns from here, so all gates read one brief the
 # same way: each kind by its own first match.
@@ -265,6 +278,7 @@ DECLARATION_FENCES: dict[str, re.Pattern[str]] = {
     "identities": IDENTITIES_FENCE,
     "outside_frame": OUTSIDE_FRAME_FENCE,
     "eval": EVAL_FENCE,
+    "pred": PRED_FENCE,
 }
 STATUS = re.compile(
     r"^status:[ \t]*(open|closed|escalated|blocked)[ \t]*$", re.M
@@ -374,7 +388,7 @@ FORKED_FROM_RE = re.compile(r"^TASK-\d+(?:-[bc])?$")
 MAX_FORK_DEPTH = 2
 FORK_LETTER = {1: "b", 2: "c"}
 FORK_DEPTH = {"b": 1, "c": 2}
-FORK_FENCES = ("numbers", "n", "frame", "identities", "eval")
+FORK_FENCES = ("numbers", "n", "frame", "identities", "eval", "pred")
 PRIOR_ATTEMPTS_RE = re.compile(r"^## Prior Attempts[ \t]*$", re.M)
 FORK_TRIGGER_VERDICT = "refuted"
 FORK_TRIGGER_SUBTYPE = "out_of_turns"
@@ -1423,13 +1437,7 @@ def fence_interior(text: str, kind: str) -> str | None:
     Byte identity of a fork compares this string, including comments and
     whitespace. The opening fence line's trailing spaces are not part of it.
     """
-    regex = {
-        "numbers": BLOCK,
-        "n": N_FENCE,
-        "frame": FRAME_FENCE,
-        "identities": IDENTITIES_FENCE,
-        "eval": EVAL_FENCE,
-    }.get(kind)
+    regex = DECLARATION_FENCES.get(kind)
     if regex is None:
         raise Fail(f"unknown fence kind {kind!r}")
     m = regex.search(text)
@@ -2364,6 +2372,317 @@ def edit_distance(a: list[str], b: list[str]) -> int:
     return prev[-1]
 
 
+def pred_cfg() -> dict:
+    """Project facts for prediction tables. Read on use, not at import."""
+    cfg = GATE_CONFIG.get("pred")
+    if not isinstance(cfg, dict):
+        raise Fail("gate_config.json: missing key 'pred'")
+    for key in ("dirs", "table_prefix", "join_table", "join_column", "dup_prefix"):
+        if key not in cfg:
+            raise Fail(f"gate_config.json: pred missing {key!r}")
+    return cfg
+
+
+def sql_ident(name: str) -> str:
+    """A table or column name used in generated SQL. Reject anything else."""
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) is None:
+        raise Fail(f"pred table identifier {name!r} is not a simple name")
+    return name
+
+
+def parse_pred_block(label: str, text: str) -> tuple[str, ...] | None:
+    """Stems of prediction tables this brief joins. None when there is no fence.
+
+    One stem per line. The worker file is ``pred/<stem>.jsonl`` and the
+    verifier file is ``mine_pred/<stem>.jsonl``; both become ``pred_<stem>``.
+    """
+    m = PRED_FENCE.search(text)
+    if not m:
+        return None
+    out: list[str] = []
+    for raw in m.group(1).splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if len(line.split()) != 1 or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", line) is None:
+            raise Fail(f"{label}: pred line is not one '<name>': {line!r}")
+        if line in out:
+            raise Fail(f"{label}: pred lists {line} twice")
+        out.append(line)
+    if not out:
+        raise Fail(f"{label}: the pred block is empty")
+    return tuple(out)
+
+
+def pred_side_dir(task_dir: Path, side: str) -> Path:
+    """Directory holding one side's prediction files. ``side`` is the output filename."""
+    dirs = pred_cfg()["dirs"]
+    if not isinstance(dirs, dict) or side not in dirs:
+        raise Fail(f"gate_config.json: pred.dirs has no entry for {side!r}")
+    sub = str(dirs[side])
+    sql_ident(sub)
+    return task_dir / sub
+
+
+def pred_table_name(stem: str) -> str:
+    sql_ident(stem)
+    name = str(pred_cfg()["table_prefix"]) + stem
+    return sql_ident(name)
+
+
+def syllable_ids(conn: sqlite3.Connection) -> set[str]:
+    """Every ``join_column`` value in ``join_table`` (the syllable ids predictions must cite)."""
+    cfg = pred_cfg()
+    table = sql_ident(str(cfg["join_table"]))
+    column = sql_ident(str(cfg["join_column"]))
+    try:
+        rows = conn.execute(f"SELECT {column} FROM {table}").fetchall()
+    except sqlite3.Error as e:
+        raise Fail(f"pred tables: cannot read {table}.{column}: {e}") from e
+    return {str(r[0]) for r in rows}
+
+
+def corpus_file_of(conn: sqlite3.Connection) -> Path:
+    """Path of the ``main`` database, so a temp copy can be taken without writing ``data/``."""
+    rows = conn.execute("PRAGMA database_list").fetchall()
+    if not rows or not rows[0][2]:
+        raise Fail(
+            "output_check: corpus connection has no file path; "
+            "prediction tables cannot be loaded"
+        )
+    return Path(str(rows[0][2]))
+
+
+def refuse_write_under(path: Path, data_dir: Path) -> None:
+    """Temp corpora must not land under ``data/``."""
+    try:
+        path.resolve().relative_to(data_dir.resolve())
+    except ValueError:
+        return
+    raise Fail(f"output_check: refusing to write a temp corpus under {data_dir}")
+
+
+def validate_run_card(root: Path, label: str, pred: Path, head: str | None) -> None:
+    """``<file>.run.json`` beside a prediction file. Same card a score route uses."""
+    card = pred.with_name(pred.name[: -len(".jsonl")] + RUN_CARD_SUFFIX)
+    if not card.is_file():
+        raise Fail(f"{label}: {card.name} is missing; every prediction file needs its run card")
+    try:
+        card.resolve().relative_to(pred.parent.resolve())
+    except ValueError:
+        raise Fail(f"{label}: {card.name} resolves outside the prediction file's directory")
+    try:
+        data = json.loads(card.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise Fail(f"{label}: {card.name} is not valid JSON: {e}")
+    if not isinstance(data, dict):
+        raise Fail(f"{label}: {card.name} must be a JSON object")
+    missing = [k for k in RUN_CARD_KEYS if k not in data]
+    if missing:
+        raise Fail(f"{label}: {card.name} lacks {', '.join(missing)}")
+    for k in ("script_commit", "model_revision"):
+        if not isinstance(data[k], str) or not HEX40.match(data[k]):
+            raise Fail(
+                f"{label}: {card.name} {k} must be a full 40-character hash, "
+                f"got {data[k]!r}"
+            )
+    for k in ("model", "device"):
+        if not isinstance(data[k], str) or not data[k].strip():
+            raise Fail(f"{label}: {card.name} {k} must be a non-empty string")
+    if not isinstance(data["decoding"], dict) or not data["decoding"]:
+        raise Fail(
+            f"{label}: {card.name} decoding must be a non-empty object "
+            f"(language, beam, temperature, chunking, ...)"
+        )
+    if data["dirty"] is not False:
+        raise Fail(
+            f"{label}: {card.name} has dirty={data['dirty']!r}; predictions "
+            f"must come from a committed script (dirty: false)"
+        )
+    if head is not None:
+        try:
+            known = is_ancestor(root, data["script_commit"], head)
+        except Fail:
+            known = False
+        if not known:
+            raise Fail(
+                f"{label}: {card.name} script_commit {data['script_commit'][:12]} is "
+                f"not a commit in this head's history"
+            )
+
+
+def read_pred_rows(path: Path, label: str) -> list[tuple[str, str]]:
+    """``(id, hyp)`` rows. Duplicate ids and empty hyp fail before insert."""
+    rows = read_jsonl(path, label, ("id", "hyp"))
+    seen: set[str] = set()
+    out: list[tuple[str, str]] = []
+    for row in rows:
+        i, hyp = row["id"], row["hyp"]
+        if i in seen:
+            raise Fail(f"{label}: repeats id {i!r}")
+        seen.add(i)
+        if hyp.strip() == "":
+            raise Fail(f"{label}: id {i!r} has an empty hyp")
+        out.append((i, hyp))
+    return out
+
+
+def _reject_unknown_pred_ids(
+    label: str, ids: list[str], known: set[str], table: str, column: str
+) -> None:
+    missing = [i for i in ids if i not in known]
+    if missing:
+        raise Fail(f"{label}: id {missing[0]!r} is not in {table}.{column}")
+
+
+def _on_pred_integrity(label: str, exc: sqlite3.IntegrityError) -> None:
+    """Backstop when a python check is gone: the table constraints still fail the load."""
+    raise Fail(
+        f"{label}: prediction row violated id, hyp, or syllable constraint"
+    ) from exc
+
+
+def _insert_prefixed_copy(
+    conn: sqlite3.Connection, qtable: str, qid: str, qhyp: str, prefix: str
+) -> None:
+    conn.execute(
+        f"INSERT INTO {qtable} ({qid}, {qhyp}) "
+        f"SELECT ? || {qid}, {qhyp} FROM {qtable}",
+        (prefix,),
+    )
+
+
+def _assert_pred_doubled(label: str, conn: sqlite3.Connection, qtable: str, n_before: int) -> None:
+    n_after = int(conn.execute(f"SELECT COUNT(*) FROM {qtable}").fetchone()[0])
+    if n_after != 2 * n_before:
+        raise Fail(
+            f"{label}: {qtable} has {n_after} rows after double; "
+            f"want 2 * {n_before}"
+        )
+
+
+def _permute_pred_table(conn: sqlite3.Connection, qtable: str, qid: str, qhyp: str) -> None:
+    tmp = sql_ident("_perm_" + qtable)
+    conn.execute(f"DROP TABLE IF EXISTS temp.{tmp}")
+    conn.execute(
+        f"CREATE TEMP TABLE {tmp} AS "
+        f"SELECT {qid}, {qhyp} FROM {qtable} ORDER BY random()"
+    )
+    conn.execute(f"DELETE FROM {qtable}")
+    conn.execute(
+        f"INSERT INTO {qtable} ({qid}, {qhyp}) SELECT {qid}, {qhyp} FROM {tmp}"
+    )
+    conn.execute(f"DROP TABLE {tmp}")
+
+
+def _drop_dangling_pred(
+    conn: sqlite3.Connection, qtable: str, qid: str, qjoin: str, qkey: str
+) -> None:
+    conn.execute(
+        f"DELETE FROM {qtable} WHERE NOT EXISTS "
+        f"(SELECT 1 FROM {qjoin} s WHERE s.{qkey} = {qtable}.{qid})"
+    )
+
+
+def open_pred_corpus(
+    src: Path,
+    dest: Path,
+    *,
+    data_dir: Path,
+    pairs: list[tuple[str, Path]],
+    known_ids: set[str],
+    label: str,
+    mode: str,
+) -> sqlite3.Connection:
+    """Copy ``src`` to ``dest`` and load ``pred_<stem>`` tables. Never writes under ``data/``.
+
+    ``mode`` is ``plain`` (load only), ``double`` (also insert ``dup:`` ids),
+    ``permute`` (rebuild each pred table in random order) or ``exclude``
+    (drop pred rows whose syllable was removed). ``known_ids`` is the full
+    syllable set, including rows an exclude copy has already deleted.
+    """
+    if mode not in ("plain", "double", "permute", "exclude"):
+        raise Fail(f"{label}: unknown pred corpus mode {mode!r}")
+    refuse_write_under(dest, data_dir)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest)
+    cfg = pred_cfg()
+    qjoin = sql_ident(str(cfg["join_table"]))
+    qkey = sql_ident(str(cfg["join_column"]))
+    prefix = str(cfg["dup_prefix"])
+    if prefix == "":
+        raise Fail("gate_config.json: pred.dup_prefix is empty")
+    conn = sqlite3.connect(dest)
+    try:
+        conn.execute("PRAGMA foreign_keys = ON")
+        for stem, path in pairs:
+            qtable = pred_table_name(stem)
+            rows = read_pred_rows(path, f"{label}: {path.name}")
+            _reject_unknown_pred_ids(
+                f"{label}: {path.name}",
+                [i for i, _h in rows],
+                known_ids,
+                qjoin,
+                qkey,
+            )
+            qid, qhyp = sql_ident("id"), sql_ident("hyp")
+            # exclude has already dropped syllables, so a foreign key would
+            # reject a prediction of an unpublished syllable before we can
+            # drop that prediction. plain/double/permute still have every id.
+            if mode == "exclude":
+                conn.execute(
+                    f"CREATE TABLE {qtable} ("
+                    f"{qid} TEXT PRIMARY KEY, "
+                    f"{qhyp} TEXT NOT NULL CHECK (length(trim({qhyp})) > 0))"
+                )
+            else:
+                conn.execute(
+                    f"CREATE TABLE {qtable} ("
+                    f"{qid} TEXT PRIMARY KEY, "
+                    f"{qhyp} TEXT NOT NULL CHECK (length(trim({qhyp})) > 0), "
+                    f"FOREIGN KEY ({qid}) REFERENCES {qjoin}({qkey}))"
+                )
+            try:
+                conn.executemany(
+                    f"INSERT INTO {qtable} ({qid}, {qhyp}) VALUES (?, ?)", rows
+                )
+            except sqlite3.IntegrityError as e:
+                _on_pred_integrity(f"{label}: {path.name}", e)
+            if mode == "double":
+                n_before = len(rows)
+                _insert_prefixed_copy(conn, qtable, qid, qhyp, prefix)
+                _assert_pred_doubled(f"{label}: {path.name}", conn, qtable, n_before)
+            elif mode == "permute":
+                _permute_pred_table(conn, qtable, qid, qhyp)
+            elif mode == "exclude":
+                _drop_dangling_pred(conn, qtable, qid, qjoin, qkey)
+        conn.commit()
+    except Exception:
+        conn.close()
+        raise
+    return conn
+
+
+def side_pred_pairs(
+    task_dir: Path, side: str, names: tuple[str, ...] | None, label: str
+) -> list[tuple[str, Path]] | None:
+    """Declared ``(stem, jsonl)`` pairs for one side.
+
+    None means this side has no prediction tables to load. A file that is
+    not declared, or a declared stem with no file, fails.
+    """
+    if names is None:
+        return None
+    directory = pred_side_dir(task_dir, side)
+    missing = [n for n in names if not (directory / f"{n}.jsonl").is_file()]
+    if missing:
+        raise Fail(
+            f"{label}: ```pred declares {', '.join(names)}; "
+            f"missing {', '.join(missing)} under {directory.name}/"
+        )
+    return [(n, directory / f"{n}.jsonl") for n in names]
+
+
 def read_jsonl(path: Path, label: str, keys: tuple[str, ...]) -> list[dict]:
     """JSON objects, one per non-empty line, each with string ``keys``."""
     out: list[dict] = []
@@ -2422,51 +2741,7 @@ class ScoreSet:
         return self._refs
 
     def check_run_card(self, label: str, pred: Path) -> None:
-        card = pred.with_name(pred.name[: -len(".jsonl")] + RUN_CARD_SUFFIX)
-        if not card.is_file():
-            raise Fail(f"{label}: {card.name} is missing; every prediction file needs its run card")
-        try:
-            card.resolve().relative_to(pred.parent.resolve())
-        except ValueError:
-            raise Fail(f"{label}: {card.name} resolves outside the prediction file's directory")
-        try:
-            data = json.loads(card.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as e:
-            raise Fail(f"{label}: {card.name} is not valid JSON: {e}")
-        if not isinstance(data, dict):
-            raise Fail(f"{label}: {card.name} must be a JSON object")
-        missing = [k for k in RUN_CARD_KEYS if k not in data]
-        if missing:
-            raise Fail(f"{label}: {card.name} lacks {', '.join(missing)}")
-        for k in ("script_commit", "model_revision"):
-            if not isinstance(data[k], str) or not HEX40.match(data[k]):
-                raise Fail(
-                    f"{label}: {card.name} {k} must be a full 40-character hash, "
-                    f"got {data[k]!r}"
-                )
-        for k in ("model", "device"):
-            if not isinstance(data[k], str) or not data[k].strip():
-                raise Fail(f"{label}: {card.name} {k} must be a non-empty string")
-        if not isinstance(data["decoding"], dict) or not data["decoding"]:
-            raise Fail(
-                f"{label}: {card.name} decoding must be a non-empty object "
-                f"(language, beam, temperature, chunking, ...)"
-            )
-        if data["dirty"] is not False:
-            raise Fail(
-                f"{label}: {card.name} has dirty={data['dirty']!r}; predictions "
-                f"must come from a committed script (dirty: false)"
-            )
-        if self.head is not None:
-            try:
-                known = is_ancestor(self.root, data["script_commit"], self.head)
-            except Fail:
-                known = False
-            if not known:
-                raise Fail(
-                    f"{label}: {card.name} script_commit {data['script_commit'][:12]} is "
-                    f"not a commit in this head's history"
-                )
+        validate_run_card(self.root, label, pred, self.head)
 
     def score(self, label: str, metric: str, pred: Path) -> tuple[float, int]:
         """Per-mille error rate of ``pred`` against the set, and its token count."""
@@ -3368,31 +3643,81 @@ def check_task(
             fail.append(f"TASK-{n}: status is closed but neither output file exists")
         return
 
+    try:
+        pred_names = parse_pred_block(md.name, md.read_text(encoding="utf-8"))
+    except Fail as e:
+        fail.append(str(e))
+        return
+
     rows: dict[str, dict[str, dict]] = {}
     routes: dict[str, dict[str, tuple[str, object]]] = {}
     replayed_by: dict[str, dict[str, float]] = {}
-    for k, p in present.items():
-        r = parse_rows(p, tol, fail, n, root)
-        if r is None:
-            print(f"  TASK-{n} [{status}]: {k} is malformed")
-            continue
-        rows[k] = r
-        routes[k] = {}
-        for name in sorted(r):
+    pred_tmp: Path | None = None
+    opened: list[sqlite3.Connection] = []
+    try:
+        for k, p in present.items():
+            r = parse_rows(p, tol, fail, n, root)
+            if r is None:
+                print(f"  TASK-{n} [{status}]: {k} is malformed")
+                continue
+            rows[k] = r
+            routes[k] = {}
+            for name in sorted(r):
+                try:
+                    routes[k][name] = route(k, n, name, str(r[name]["query"]).strip(), root)
+                except Fail as e:
+                    fail.append(str(e))
+            replay_conn = conn
             try:
-                routes[k][name] = route(k, n, name, str(r[name]["query"]).strip(), root)
+                pairs = side_pred_pairs(task_dir, k, pred_names, f"TASK-{n}: {k}")
+                if pairs is not None:
+                    for stem, pred_path in pairs:
+                        validate_run_card(
+                            root, f"TASK-{n}: {k}: {pred_path.name}", pred_path, head
+                        )
+                    if pred_tmp is None:
+                        src = corpus_file_of(conn)
+                        pred_tmp = Path(
+                            tempfile.mkdtemp(prefix=f"output-check-pred-{n}-")
+                        )
+                        refuse_write_under(pred_tmp, src.parent)
+                    else:
+                        src = corpus_file_of(conn)
+                    dest = pred_tmp / f"{k}.sqlite"
+                    replay_conn = open_pred_corpus(
+                        src,
+                        dest,
+                        data_dir=src.parent,
+                        pairs=pairs,
+                        known_ids=syllable_ids(conn),
+                        label=f"TASK-{n}: {k}",
+                        mode="plain",
+                    )
+                    opened.append(replay_conn)
+                    loaded = ", ".join(pred_table_name(stem) for stem, _p in pairs)
+                    print(
+                        f"  TASK-{n} [{status}]: {k} loaded {loaded} "
+                        f"into a temp corpus copy"
+                    )
             except Fail as e:
                 fail.append(str(e))
-        replayed = replay(k, r, tol, routes[k], conn, seconds, fail, scores)
-        replayed_by[k] = replayed
-        extra = ""
-        if n_decl is not None:
-            n_ok = check_declared_n(k, r, n_decl, replayed, fail)
-            extra = f", {n_ok}/{len(n_decl)} n declared"
-        print(
-            f"  TASK-{n} [{status}]: {k} {len(r)} row(s), "
-            f"{len(replayed)} replayed{extra}"
-        )
+                print(f"  TASK-{n} [{status}]: {k} prediction tables failed")
+                continue
+            replayed = replay(k, r, tol, routes[k], replay_conn, seconds, fail, scores)
+            replayed_by[k] = replayed
+            extra = ""
+            if n_decl is not None:
+                n_ok = check_declared_n(k, r, n_decl, replayed, fail)
+                extra = f", {n_ok}/{len(n_decl)} n declared"
+            print(
+                f"  TASK-{n} [{status}]: {k} {len(r)} row(s), "
+                f"{len(replayed)} replayed{extra}"
+            )
+    finally:
+        for opened_conn in opened:
+            opened_conn.close()
+        if pred_tmp is not None:
+            shutil.rmtree(pred_tmp, ignore_errors=True)
 
     skipped_by: dict[str, set[str]] = {}
     for k, replayed in replayed_by.items():

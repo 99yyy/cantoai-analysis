@@ -1,0 +1,12 @@
+# kills: prediction row violated id, hyp, or syllable constraint
+--- a/scripts/output_check.py
++++ b/scripts/output_check.py
+@@ -2534,8 +2534,6 @@
+         if i in seen:
+             raise Fail(f"{label}: repeats id {i!r}")
+         seen.add(i)
+-        if hyp.strip() == "":
+-            raise Fail(f"{label}: id {i!r} has an empty hyp")
+         out.append((i, hyp))
+     return out
+ 

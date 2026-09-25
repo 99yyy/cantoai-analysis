@@ -62,6 +62,24 @@
     "runs"
   ],
   "unit_table": "syllables",
+  "pred": {
+    "_about": [
+      "G2P or other tool predictions loaded into a temporary copy of the corpus",
+      "before a side's SQL is replayed. The copy is never written under data/.",
+      "A brief's ```pred fence lists one stem per line; the file is",
+      "<stem>.jsonl under dirs[side] and the table is table_prefix + stem.",
+      "id joins join_table.join_column. dup_prefix is the same prefix relations",
+      "applies to corpus keys when it doubles the corpus."
+    ],
+    "dirs": {
+      "results.json": "pred",
+      "mine.json": "mine_pred"
+    },
+    "table_prefix": "pred_",
+    "join_table": "syllables",
+    "join_column": "syl_id",
+    "dup_prefix": "dup:"
+  },
   "families": {
     "count": {
       "prefix": [

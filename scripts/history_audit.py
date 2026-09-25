@@ -502,6 +502,7 @@ def exempt_bars(path: str, old_text: str, new_text: str) -> list[str]:
 
 FRAME_FENCE = output_check.DECLARATION_FENCES["frame"]
 EVAL_FENCE = output_check.DECLARATION_FENCES["eval"]
+PRED_FENCE = output_check.DECLARATION_FENCES["pred"]
 PREDICATE_LINE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*\s+\S")
 
 
@@ -518,23 +519,36 @@ def _fence_lines(fence: re.Pattern[str], text: str) -> list[str] | None:
     return out
 
 
+def _named_line_bars(
+    path: str, kind: str, fence: re.Pattern[str], old_text: str, new_text: str
+) -> list[str]:
+    """Changing or deleting a line of ``kind``, or deleting the block, is a bar move.
+
+    Adding a line is not. The same rule covers ```eval and ```pred.
+    """
+    old = _fence_lines(fence, old_text)
+    new = _fence_lines(fence, new_text)
+    if not old:
+        return []
+    if new is None:
+        return [f"{path} ```{kind} block deleted"]
+    return [
+        f"{path} ```{kind} {line!r} changed or deleted"
+        for line in old
+        if line not in new
+    ]
+
+
 def text_line_bars(path: str, old_text: str, new_text: str) -> list[str]:
-    """Frame predicates and eval lines: any change or removal is a bar move."""
+    """Frame predicates, eval lines and pred stems: any change or removal is a bar move."""
     hits: list[str] = []
     old_frame = _fence_lines(FRAME_FENCE, old_text) or []
     new_frame = _fence_lines(FRAME_FENCE, new_text) or []
     for line in old_frame:
         if PREDICATE_LINE.match(line) and line not in new_frame:
             hits.append(f"{path} ```frame predicate {line!r} changed or deleted")
-    old_eval = _fence_lines(EVAL_FENCE, old_text)
-    new_eval = _fence_lines(EVAL_FENCE, new_text)
-    if old_eval:
-        if new_eval is None:
-            hits.append(f"{path} ```eval block deleted")
-        else:
-            for line in old_eval:
-                if line not in new_eval:
-                    hits.append(f"{path} ```eval {line!r} changed or deleted")
+    hits.extend(_named_line_bars(path, "eval", EVAL_FENCE, old_text, new_text))
+    hits.extend(_named_line_bars(path, "pred", PRED_FENCE, old_text, new_text))
     return hits
 
 

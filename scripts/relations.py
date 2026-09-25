@@ -56,6 +56,13 @@ a smaller published set. The anchor is checked as soon as the brief exists,
 before either output does, so a wrong count fails on the brief's own pull
 request instead of after two agents have been launched on it.
 
+When the brief has a fenced pred block, each side's prediction files are loaded
+into ``pred_<stem>`` on a temp copy of the corpus before replay, including
+the doubled, permuted and excluded copies. Double prefixes prediction ids
+with the same ``dup:`` prefix as syllable ids. Exclude drops prediction
+rows whose syllable was removed. Permute rebuilds each prediction table in
+random order. A side with no fence keeps the shared corpus connection.
+
 Score routes (``score:<metric>:<file>.jsonl``) do not read the corpus: they
 are scored from prediction files, so their value is the same on every copy.
 They are replayed here too, once, with output-check's scorer, and enter every
@@ -95,6 +102,12 @@ CONFIG = output_check.GATE_CONFIG
 TABLES = tuple(CONFIG["tables"])
 UNIT_TABLE = str(CONFIG["unit_table"])
 DUP_PREFIX = "dup:"
+_PRED = CONFIG.get("pred")
+if not isinstance(_PRED, dict) or str(_PRED.get("dup_prefix")) != DUP_PREFIX:
+    raise Fail(
+        f"relations: gate_config pred.dup_prefix must be {DUP_PREFIX!r} "
+        f"so doubled prediction ids match doubled syllable ids"
+    )
 # Columns namespaced under double: each table's key, every column that refers
 # to another table's key, and the declared ``type_columns`` (a categorical
 # column that a type-frequency cutoff counts over: duplicated tokens must not
@@ -579,6 +592,7 @@ def check_task(
     seconds: float,
     fail: list[str],
     corpus_sha: str,
+    head: str | None = None,
 ) -> None:
     n = md.stem.split("-", 1)[1]
     try:
@@ -592,6 +606,7 @@ def check_task(
         outside_frame = parse_outside_frame_block(md.name, text, tol)
         predicates = output_check.parse_frame_predicates(md.name, text)
         eval_set = output_check.parse_eval_block(md.name, text)
+        pred_names = output_check.parse_pred_block(md.name, text)
     except Fail as e:
         fail.append(str(e))
         return
@@ -658,18 +673,70 @@ def check_task(
                     f"  TASK-{n} [{status}]: {k} {len(scored)} score route(s) replayed "
                     f"from predictions, constant on every copy: {', '.join(scored)}"
                 )
-            orig = replay_values(f"{k}", routes, orig_conn, seconds, fail, scores)
-            doubled_v = replay_values(
-                f"{k}:double", routes, dup_conn, seconds, fail, scores
+            owned: list[sqlite3.Connection] = []
+            corpus_path = output_check.corpus_file_of(orig_conn)
+            data_DIR = corpus_path.parent
+            excluded_path = (
+                Path(str(exc_conn.execute("PRAGMA database_list").fetchone()[2]))
+                if exc_conn is not None
+                else None
             )
-            perm_v = replay_values(
-                f"{k}:permute", routes, perm_conn, seconds, fail, scores
-            )
-            exc_v: dict[str, float] = {}
-            if exc_conn is not None:
-                exc_v = replay_values(
-                    f"{k}:exclude", routes, exc_conn, seconds, fail, scores
+
+            def conn_for(src: Path, shared: sqlite3.Connection, mode: str) -> sqlite3.Connection | None:
+                try:
+                    pairs = output_check.side_pred_pairs(
+                        task_dir, k, pred_names, f"TASK-{n}: {k}"
+                    )
+                    if pairs is None:
+                        return shared
+                    for _stem, pred_path in pairs:
+                        output_check.validate_run_card(
+                            root, f"TASK-{n}: {k}: {pred_path.name}", pred_path, head
+                        )
+                    dest = doubled.parent / f"pred_{n}_{k}_{mode}.sqlite"
+                    loaded = output_check.open_pred_corpus(
+                        src,
+                        dest,
+                        data_dir=data_DIR,
+                        pairs=pairs,
+                        known_ids=output_check.syllable_ids(orig_conn),
+                        label=f"TASK-{n}: {k}:{mode}",
+                        mode=mode,
+                    )
+                except Fail as e:
+                    fail.append(str(e))
+                    return None
+                owned.append(loaded)
+                tables = ", ".join(output_check.pred_table_name(stem) for stem, _p in pairs)
+                print(f"  TASK-{n} [{status}]: {k} {mode} loaded {tables}")
+                return loaded
+
+            try:
+                plain_conn = conn_for(corpus_path, orig_conn, "plain")
+                double_side = conn_for(doubled, dup_conn, "double")
+                perm_side = conn_for(permuted, perm_conn, "permute")
+                exc_side: sqlite3.Connection | None = None
+                if exc_conn is not None and excluded_path is not None:
+                    exc_side = conn_for(excluded_path, exc_conn, "exclude")
+                if plain_conn is None or double_side is None or perm_side is None:
+                    continue
+                if exc_conn is not None and exc_side is None:
+                    continue
+                orig = replay_values(f"{k}", routes, plain_conn, seconds, fail, scores)
+                doubled_v = replay_values(
+                    f"{k}:double", routes, double_side, seconds, fail, scores
                 )
+                perm_v = replay_values(
+                    f"{k}:permute", routes, perm_side, seconds, fail, scores
+                )
+                exc_v: dict[str, float] = {}
+                if exc_side is not None:
+                    exc_v = replay_values(
+                        f"{k}:exclude", routes, exc_side, seconds, fail, scores
+                    )
+            finally:
+                for c in owned:
+                    c.close()
             exempt = outside_frame_closure(outside_frame, routes) if run_exclude else frozenset()
             d_ok = 0
             p_ok = 0
@@ -817,6 +884,7 @@ def main() -> int:
                     args.sql_seconds,
                     fail,
                     sha,
+                    args.head_ref,
                 )
         finally:
             orig_conn.close()
