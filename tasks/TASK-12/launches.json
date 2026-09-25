@@ -13,5 +13,10 @@
     "id": "bc-ad9a82d3-3827-5198-adf5-eee00101b768",
     "role": "verifier",
     "at": "2026-09-25T10:42:23Z"
+  },
+  {
+    "id": "bc-40f2cfde-9412-5eb7-b8ac-158c807e771e",
+    "role": "auditor",
+    "at": "2026-09-25T11:40:00Z"
   }
 ]
