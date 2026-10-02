@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.json
+*.jsonl
+*.wav
+*.flac
+*.zip
