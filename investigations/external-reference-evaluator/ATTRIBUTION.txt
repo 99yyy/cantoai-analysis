@@ -1,0 +1,13 @@
+FLEURS: Few-shot Learning Evaluation of Universal Representations of Speech
+Alexis Conneau, Min Ma, Simran Khanuja, Yu Zhang, Vera Axelrod, Siddharth Dalmia,
+Jason Riesa, Clara Rivera and Ankur Bapna (2022). Published by Google.
+https://arxiv.org/abs/2205.12446
+https://huggingface.co/datasets/google/fleurs
+CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
+Legal code: https://creativecommons.org/licenses/by/4.0/legalcode.en
+
+This software package contains no FLEURS dataset rows or audio. It implements
+schema validation and scoring for separately supplied, authorized local inputs.
+The synthetic test fixtures are invented solely to exercise that schema; they
+are not published examples, actual decoder receipts, or empirical model results.
+The dataset license is not a license grant for this software.
