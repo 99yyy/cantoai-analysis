@@ -6,7 +6,7 @@ import sqlite3
 
 import pandas as pd
 
-from src.joins import bind_frame_counts, checked_merge
+from src.joins import checked_merge
 from src.pins import FrameCounts, load_frame_counts
 from src.tables import load_table
 
@@ -52,7 +52,6 @@ def load_published_frame(
     conn: sqlite3.Connection, brief_PATH: str, readme_PATH: str
 ) -> dict:
     counts = load_frame_counts(brief_PATH, readme_PATH)
-    bind_frame_counts(counts)
     return _assemble_published_frame(conn, counts)
 
 
@@ -91,7 +90,9 @@ def _assemble_published_frame(conn: sqlite3.Connection, counts: FrameCounts) -> 
     ]
 
     win_cols = windows[["uid", "video_id", "tier"]].rename(columns={"tier": "window_tier"})
-    merged = checked_merge(syllables, win_cols, "syllables_windows")
+    merged = checked_merge(
+        syllables, win_cols, "syllables_windows", counts.syllables_expected
+    )
     if "video_id_right" in merged.columns:
         merged = merged.drop(columns=["video_id_right"])
     steps.append(
@@ -122,7 +123,9 @@ def _assemble_published_frame(conn: sqlite3.Connection, counts: FrameCounts) -> 
     )
 
     vid_cols = videos[["video_id", "title", "upload_date"]]
-    published = checked_merge(published, vid_cols, "published_syllables_videos")
+    published = checked_merge(
+        published, vid_cols, "published_syllables_videos", counts.published_expected
+    )
     steps.append(
         {
             "step": "join_published_videos",
