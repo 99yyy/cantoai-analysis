@@ -175,7 +175,10 @@ def n_for(name: str, got: dict[str, float], videos_n: int) -> int:
 
 def json_num(name: str, value: float) -> int | float:
     if name.startswith("n_"):
-        return int(round(value))
+        number = float(value)
+        if not number.is_integer():
+            raise ValueError("count result is not a whole number")
+        return int(number)
     return float(value)
 
 
