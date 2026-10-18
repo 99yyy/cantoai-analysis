@@ -39,6 +39,8 @@ def assert_no_measure_sentinel(
 
 def attach_agreement(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
+    if bool((out["n_match"] > out["n_judgeable"]).any()):
+        raise ValueError("n_match exceeds n_judgeable")
     ensure_unique_columns(out, "agreement")
     ensure_unique_columns(out, "agreement_status")
     n_j = out["n_judgeable"]
