@@ -1,9 +1,8 @@
-"""Open analysis: film-mix decomposition, residual cluster bootstrap, write STATUS."""
-
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import subprocess
 from pathlib import Path
 
@@ -158,6 +157,15 @@ def render_open_analysis(
     return "\n".join(lines)
 
 
+def period_rare_share(flag: pd.Series) -> float:
+    if len(flag) == 0:
+        raise ValueError("rare share period group is empty")
+    share = float(flag.mean())
+    if math.isnan(share):
+        raise ValueError("rare share is NaN")
+    return share
+
+
 def run(
     corpus_PATH: str,
     readme_PATH: str,
@@ -233,8 +241,8 @@ def run(
     counts_post = agreement_counts(published.loc[post_s])
     rare = rare_char_set(loaded["syllables"])
     rare_flag = published["char"].isin(rare)
-    rare_share_pre = float(rare_flag.loc[pre_s].mean())
-    rare_share_post = float(rare_flag.loc[post_s].mean())
+    rare_share_pre = period_rare_share(rare_flag.loc[pre_s])
+    rare_share_post = period_rare_share(rare_flag.loc[post_s])
 
     video_df = video_cells_via_map(published, videos)
     video_df = attach_agreement(video_df)
