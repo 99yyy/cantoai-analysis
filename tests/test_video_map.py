@@ -19,6 +19,15 @@ def test_attach_video_groups_rejects_a_repeated_video_id() -> None:
         attach_video_groups(published, videos)
 
 
+def test_attach_video_groups_rejects_an_unknown_video_id() -> None:
+    videos = pd.DataFrame(
+        {"video_id": ["v1"], "period": ["pre"], "film_group": ["film"]}
+    )
+    published = pd.DataFrame({"video_id": ["missing", "v1"]})
+    with pytest.raises(ValueError, match=r"^syllable video_id is not in the videos frame"):
+        attach_video_groups(published, videos)
+
+
 def test_attach_video_groups_copies_period_and_film_group() -> None:
     videos = pd.DataFrame(
         {
