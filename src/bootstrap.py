@@ -1,5 +1,3 @@
-"""Cluster bootstrap by video_id with per-stratum sha256 seeds."""
-
 from __future__ import annotations
 
 import hashlib
@@ -101,6 +99,8 @@ def bootstrap_residual(
     master_seed: int,
 ) -> dict:
     assert_bootstrap_B(B)
+    if bool(videos["video_id"].duplicated().any()):
+        raise ValueError("bootstrap rows are not one per video_id")
     seeds = make_stratum_seeds(master_seed, list(STRATA))
     G_h: dict[str, int] = {}
     draws: dict[str, np.ndarray] = {}
