@@ -161,6 +161,9 @@ def render_open_analysis(
 def attach_video_groups(published: pd.DataFrame, videos: pd.DataFrame) -> pd.DataFrame:
     if bool(videos["video_id"].duplicated().any()):
         raise ValueError("videos frame has a repeated video_id")
+    known = published["video_id"].isin(videos["video_id"])
+    if not bool(known.all()):
+        raise ValueError("syllable video_id is not in the videos frame")
     out = published.copy()
     period_by_video = videos.set_index("video_id")["period"]
     film_by_video = videos.set_index("video_id")["film_group"]
