@@ -1,5 +1,3 @@
-"""Replay TASK-6 number SQL and write results.json. Hash the corpus first."""
-
 from __future__ import annotations
 
 import argparse
@@ -10,6 +8,7 @@ from pathlib import Path
 
 from src.hashing import verify_corpus_hash
 from src.pins import load_frame_counts
+from src.status_io import write_text_atomic
 
 SQL_NAMES = [
     "n_videos_pre",
@@ -224,10 +223,7 @@ def main() -> None:
     rows = compute_results(
         args.corpus_PATH, args.readme_PATH, args.brief_PATH, args.sql_DIR
     )
-    out_FILE = args.out_FILE
-    tmp_FILE = out_FILE + ".tmp"
-    Path(tmp_FILE).write_text(json.dumps(rows, indent=2) + "\n", encoding="utf-8")
-    Path(tmp_FILE).replace(Path(out_FILE))
+    write_text_atomic(args.out_FILE, json.dumps(rows, indent=2) + "\n")
 
 
 if __name__ == "__main__":

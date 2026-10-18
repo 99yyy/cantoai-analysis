@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import secrets
 from pathlib import Path
 
 
@@ -15,21 +17,34 @@ def sha256_file(path_FILE: str) -> str:
     return digest.hexdigest()
 
 
-def write_json_atomic(path_FILE: str, payload: object) -> None:
+def _write_atomic(path_FILE: str, text: str) -> None:
     target = Path(path_FILE)
-    tmp_FILE = str(target) + ".tmp"
-    Path(tmp_FILE).write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    Path(tmp_FILE).replace(target)
+    tmp_FILE = str(target.parent / f"{target.name}.{secrets.token_hex(8)}.tmp")
+    fd = os.open(tmp_FILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
+    try:
+        handle = os.fdopen(fd, "w", encoding="utf-8")
+    except Exception:
+        os.close(fd)
+        os.unlink(tmp_FILE)
+        raise
+    try:
+        with handle:
+            handle.write(text)
+        os.replace(tmp_FILE, path_FILE)
+    except Exception:
+        try:
+            os.unlink(tmp_FILE)
+        except OSError:
+            pass
+        raise
+
+
+def write_json_atomic(path_FILE: str, payload: object) -> None:
+    _write_atomic(path_FILE, json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
 
 
 def write_text_atomic(path_FILE: str, text: str) -> None:
-    target = Path(path_FILE)
-    tmp_FILE = str(target) + ".tmp"
-    Path(tmp_FILE).write_text(text, encoding="utf-8")
-    Path(tmp_FILE).replace(target)
+    _write_atomic(path_FILE, text)
 
 
 def write_status(status_FILE: str, payload: dict) -> None:
