@@ -54,6 +54,11 @@ def video_stratum(film_group: str, period: str) -> str:
 
 
 def kitagawa_from_stratum_sums(sums: dict[str, tuple[float, float]]) -> dict[str, float]:
+    for h in STRATA:
+        n_j, _n_m = sums[h]
+        if n_j == 0:
+            raise ValueError("kitagawa stratum judgeable count is zero")
+
     def agr(h: str) -> float:
         n_j, n_m = sums[h]
         return n_m / n_j
