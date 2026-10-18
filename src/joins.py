@@ -1,4 +1,4 @@
-"""Every DataFrame join goes through checked_merge with a frame expected count."""
+"""Every DataFrame join goes through checked_merge."""
 
 from __future__ import annotations
 
@@ -30,13 +30,26 @@ def unbind_frame_counts() -> None:
     _BOUND = None
 
 
-def checked_merge(left: pd.DataFrame, right: pd.DataFrame, join_name: str) -> pd.DataFrame:
+def _expected_count(spec: dict, expected_rows: int | None) -> int:
+    if expected_rows is None:
+        if _BOUND is None:
+            raise ValueError("checked_merge expected count is not bound from the frame")
+        return int(getattr(_BOUND, spec["expected_field"]))
+    if type(expected_rows) is not int:
+        raise ValueError("checked_merge expected count is not an int")
+    return expected_rows
+
+
+def checked_merge(
+    left: pd.DataFrame,
+    right: pd.DataFrame,
+    join_name: str,
+    expected_rows: int | None = None,
+) -> pd.DataFrame:
     if join_name not in JOIN_SPEC:
         raise ValueError("checked_merge join_name is not a declared join")
-    if _BOUND is None:
-        raise ValueError("checked_merge expected count is not bound from the frame")
     spec = JOIN_SPEC[join_name]
-    expected = int(getattr(_BOUND, spec["expected_field"]))
+    expected = _expected_count(spec, expected_rows)
     merged = pd.merge(
         left,
         right,
