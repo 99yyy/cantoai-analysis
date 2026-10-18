@@ -1,5 +1,3 @@
-"""Open analysis: film-mix decomposition, residual cluster bootstrap, write STATUS."""
-
 from __future__ import annotations
 
 import argparse
@@ -22,7 +20,7 @@ from src.pins import FrameCounts
 from src.groups import assign_groups
 from src.hashing import verify_corpus_hash
 from src.measures import attach_agreement, flatten_key
-from src.status_io import sha256_file, write_json_atomic, write_status, write_text_atomic
+from src.status_io import output_entries, write_json_atomic, write_status, write_text_atomic
 from src.tables import open_corpus
 
 MASTER_SEED = 20250918
@@ -346,11 +344,9 @@ def run(
         status_FILE,
         {
             "status": "complete",
-            "outputs": {
-                "decomposition.json": sha256_file(decomp_FILE),
-                "manifest.json": sha256_file(manifest_FILE),
-                "open_analysis.md": sha256_file(analysis_FILE),
-            },
+            "outputs": output_entries(
+                status_FILE, [decomp_FILE, manifest_FILE, analysis_FILE]
+            ),
         },
     )
 
