@@ -41,6 +41,9 @@ def git_sha(repo_ROOT: str) -> str:
 
 def year_video_counts(videos: pd.DataFrame) -> list[dict]:
     year = videos["upload_date"].astype(str).str.slice(0, 4)
+    four = year.str.fullmatch(r"[0-9]{4}").fillna(False)
+    if bool((~four).any()):
+        raise ValueError("year cell is not a four-digit year")
     rows = []
     for y, grp in videos.groupby(year, sort=True):
         rows.append({"year": str(y), "n_videos": int(len(grp))})
