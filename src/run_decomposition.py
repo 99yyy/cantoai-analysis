@@ -158,6 +158,17 @@ def render_open_analysis(
     return "\n".join(lines)
 
 
+def attach_video_groups(published: pd.DataFrame, videos: pd.DataFrame) -> pd.DataFrame:
+    if bool(videos["video_id"].duplicated().any()):
+        raise ValueError("videos frame has a repeated video_id")
+    out = published.copy()
+    period_by_video = videos.set_index("video_id")["period"]
+    film_by_video = videos.set_index("video_id")["film_group"]
+    out["period"] = out["video_id"].map(period_by_video)
+    out["film_group"] = out["video_id"].map(film_by_video)
+    return out
+
+
 def run(
     corpus_PATH: str,
     readme_PATH: str,
@@ -178,11 +189,7 @@ def run(
         conn.close()
 
     videos = assign_groups(loaded["videos"])
-    published = loaded["published"].copy()
-    period_by_video = videos.set_index("video_id")["period"]
-    film_by_video = videos.set_index("video_id")["film_group"]
-    published["period"] = published["video_id"].map(period_by_video)
-    published["film_group"] = published["video_id"].map(film_by_video)
+    published = attach_video_groups(loaded["published"], videos)
 
     steps = list(loaded["steps"])
     pre_s = published["period"] == "pre"
