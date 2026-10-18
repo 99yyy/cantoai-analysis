@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from src.agreement import assert_no_null_jp_match
 from src.bootstrap import STRATA, kitagawa_from_stratum_sums, video_stratum
 
 
@@ -16,6 +17,7 @@ def video_cells_via_map(published: pd.DataFrame, videos: pd.DataFrame) -> pd.Dat
     """Aggregate judgeable counts to video_id without a DataFrame join."""
     realized = published["jp_realized"].fillna("").astype(str)
     judgeable = published["jp_realized"].notna() & (realized != "") & (published["dur"] > 0)
+    assert_no_null_jp_match(published, judgeable)
     match = judgeable & published["jp_match"].isin(("exact_default", "exact_alt"))
     n_j = published.loc[judgeable].groupby("video_id").size().to_dict()
     n_m = published.loc[match].groupby("video_id").size().to_dict()
