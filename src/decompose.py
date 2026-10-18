@@ -8,6 +8,8 @@ from src.bootstrap import STRATA, kitagawa_from_stratum_sums, video_stratum
 
 
 def rare_char_set(syllables: pd.DataFrame) -> set[str]:
+    if bool(syllables["char"].isna().any()):
+        raise ValueError("character is missing")
     counts = syllables.groupby("char").size()
     return set(counts[counts < 10].index.tolist())
 
