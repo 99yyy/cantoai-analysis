@@ -139,6 +139,13 @@ def eval_derived(expr: str, known: dict[str, float]) -> float:
     return ev(tree.body)
 
 
+def whole_count(value: float) -> int:
+    number = float(value)
+    if not number.is_integer():
+        raise ValueError("count result is not a whole number")
+    return int(number)
+
+
 def n_for(name: str, got: dict[str, float], videos_n: int) -> int:
     if name in {
         "n_videos_pre",
@@ -148,28 +155,28 @@ def n_for(name: str, got: dict[str, float], videos_n: int) -> int:
     }:
         return videos_n
     if name == "agree_film_pre":
-        return int(got["n_judgeable_film_pre"])
+        return whole_count(got["n_judgeable_film_pre"])
     if name == "agree_film_post":
-        return int(got["n_judgeable_film_post"])
+        return whole_count(got["n_judgeable_film_post"])
     if name == "agree_other_pre":
-        return int(got["n_judgeable_other_pre"])
+        return whole_count(got["n_judgeable_other_pre"])
     if name == "agree_other_post":
-        return int(got["n_judgeable_other_post"])
+        return whole_count(got["n_judgeable_other_post"])
     if name == "gap_contract_pp":
-        return int(got["n_judgeable_pre"] + got["n_judgeable_post"])
+        return whole_count(got["n_judgeable_pre"] + got["n_judgeable_post"])
     if name in ("gap_all_pp", "gap_excl_none_pp", "gap_excl_zerodur_pp"):
-        return int(got["n_total_pre"] + got["n_total_post"])
+        return whole_count(got["n_total_pre"] + got["n_total_post"])
     if name == "did_film_pp":
-        return int(
+        return whole_count(
             got["n_judgeable_film_pre"]
             + got["n_judgeable_film_post"]
             + got["n_judgeable_other_pre"]
             + got["n_judgeable_other_post"]
         )
     if "_post" in name:
-        return int(got["n_total_post"])
+        return whole_count(got["n_total_post"])
     if "_pre" in name:
-        return int(got["n_total_pre"])
+        return whole_count(got["n_total_pre"])
     raise ValueError("n_for received an undeclared number name")
 
 
