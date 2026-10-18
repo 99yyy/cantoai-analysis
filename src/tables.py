@@ -1,9 +1,10 @@
-"""Load sqlite tables. Number-valued SQL lives under tasks/TASK-6/sql/."""
+"""Number-valued SQL lives under tasks/TASK-6/sql/."""
 
 from __future__ import annotations
 
 import re
 import sqlite3
+from pathlib import Path
 
 import pandas as pd
 
@@ -18,7 +19,11 @@ def quote_ident(name: str) -> str:
 
 def load_table(conn: sqlite3.Connection, table: str) -> pd.DataFrame:
     ident = quote_ident(table)
-    cursor = conn.execute("select * from " + ident)
+    statement = (
+        Path(__file__).resolve().with_name("tables_load.sql").read_text(encoding="utf-8")
+        + ident
+    )
+    cursor = conn.execute(statement)
     columns = [d[0] for d in cursor.description]
     return pd.DataFrame(cursor.fetchall(), columns=columns)
 
