@@ -1,5 +1,3 @@
-"""Replay TASK-6 number SQL and write results.json. Hash the corpus first."""
-
 from __future__ import annotations
 
 import argparse
@@ -139,38 +137,61 @@ def eval_derived(expr: str, known: dict[str, float]) -> float:
     return ev(tree.body)
 
 
+N_FOR: dict[str, tuple[str, ...]] = {
+    "n_videos_pre": ("videos",),
+    "n_videos_post": ("videos",),
+    "n_unassigned_period": ("videos",),
+    "n_unassigned_film": ("videos",),
+    "n_total_pre": ("n_total_pre",),
+    "n_total_post": ("n_total_post",),
+    "n_match_pre": ("n_total_pre",),
+    "n_match_post": ("n_total_post",),
+    "n_empty_realized_pre": ("n_total_pre",),
+    "n_empty_realized_post": ("n_total_post",),
+    "n_dur_le_0_pre": ("n_total_pre",),
+    "n_dur_le_0_post": ("n_total_post",),
+    "n_empty_and_zerodur_pre": ("n_total_pre",),
+    "n_empty_and_zerodur_post": ("n_total_post",),
+    "n_judgeable_pre": ("n_total_pre",),
+    "n_judgeable_post": ("n_total_post",),
+    "n_judgeable_film_pre": ("n_total_pre",),
+    "n_judgeable_film_post": ("n_total_post",),
+    "n_judgeable_other_pre": ("n_total_pre",),
+    "n_judgeable_other_post": ("n_total_post",),
+    "gap_contract_pp": ("n_judgeable_pre", "n_judgeable_post"),
+    "gap_all_pp": ("n_total_pre", "n_total_post"),
+    "gap_excl_none_pp": ("n_total_pre", "n_total_post"),
+    "gap_excl_zerodur_pp": ("n_total_pre", "n_total_post"),
+    "agree_film_pre": ("n_judgeable_film_pre",),
+    "agree_film_post": ("n_judgeable_film_post",),
+    "agree_other_pre": ("n_judgeable_other_pre",),
+    "agree_other_post": ("n_judgeable_other_post",),
+    "did_film_pp": (
+        "n_judgeable_film_pre",
+        "n_judgeable_film_post",
+        "n_judgeable_other_pre",
+        "n_judgeable_other_post",
+    ),
+    "rare_share_pre": ("n_total_pre",),
+    "rare_share_post": ("n_total_post",),
+    "rate_tone_pre_pm": ("n_total_pre",),
+    "rate_tone_post_pm": ("n_total_post",),
+    "rate_segment_pre_pm": ("n_total_pre",),
+    "rate_segment_post_pm": ("n_total_post",),
+    "rate_diff_pre_pm": ("n_total_pre",),
+    "rate_diff_post_pm": ("n_total_post",),
+    "rate_none_pre_pm": ("n_total_pre",),
+    "rate_none_post_pm": ("n_total_post",),
+}
+
+
 def n_for(name: str, got: dict[str, float], videos_n: int) -> int:
-    if name in {
-        "n_videos_pre",
-        "n_videos_post",
-        "n_unassigned_period",
-        "n_unassigned_film",
-    }:
+    parts = N_FOR.get(name)
+    if parts is None:
+        raise ValueError("n_for received an undeclared number name")
+    if parts == ("videos",):
         return videos_n
-    if name == "agree_film_pre":
-        return int(got["n_judgeable_film_pre"])
-    if name == "agree_film_post":
-        return int(got["n_judgeable_film_post"])
-    if name == "agree_other_pre":
-        return int(got["n_judgeable_other_pre"])
-    if name == "agree_other_post":
-        return int(got["n_judgeable_other_post"])
-    if name == "gap_contract_pp":
-        return int(got["n_judgeable_pre"] + got["n_judgeable_post"])
-    if name in ("gap_all_pp", "gap_excl_none_pp", "gap_excl_zerodur_pp"):
-        return int(got["n_total_pre"] + got["n_total_post"])
-    if name == "did_film_pp":
-        return int(
-            got["n_judgeable_film_pre"]
-            + got["n_judgeable_film_post"]
-            + got["n_judgeable_other_pre"]
-            + got["n_judgeable_other_post"]
-        )
-    if "_post" in name:
-        return int(got["n_total_post"])
-    if "_pre" in name:
-        return int(got["n_total_pre"])
-    raise ValueError("n_for received an undeclared number name")
+    return int(sum(got[part] for part in parts))
 
 
 def json_num(name: str, value: float) -> int | float:
