@@ -1,5 +1,3 @@
-"""Atomic multi-output writes with STATUS.json running/complete."""
-
 from __future__ import annotations
 
 import hashlib
@@ -36,13 +34,45 @@ def write_status(status_FILE: str, payload: dict) -> None:
     write_json_atomic(status_FILE, payload)
 
 
+def output_key(status_FILE: str, out_FILE: str) -> str:
+    status_dir = Path(status_FILE).resolve().parent
+    target = Path(out_FILE).resolve()
+    try:
+        relative = target.relative_to(status_dir)
+    except ValueError:
+        return target.as_posix()
+    return relative.as_posix()
+
+
+def output_entries(status_FILE: str, output_FILES: list[str]) -> dict[str, str]:
+    entries: dict[str, str] = {}
+    for out_FILE in output_FILES:
+        key = output_key(status_FILE, out_FILE)
+        if key in entries:
+            raise ValueError("STATUS.json output name is ambiguous")
+        entries[key] = sha256_file(out_FILE)
+    return entries
+
+
+def _expected_hash(outputs: dict, status_FILE: str, out_FILE: str):
+    qualified = output_key(status_FILE, out_FILE)
+    if qualified in outputs:
+        return outputs[qualified]
+    base = Path(out_FILE).name
+    same = [key for key in outputs if Path(str(key)).name == base]
+    if same == [base]:
+        return outputs[base]
+    if same:
+        raise ValueError("STATUS.json output name is ambiguous")
+    return None
+
+
 def read_completed_output(status_FILE: str, out_FILE: str) -> bytes:
     payload = json.loads(Path(status_FILE).read_text(encoding="utf-8"))
     if payload.get("status") != "complete":
         raise ValueError("STATUS.json is not complete")
     outputs = payload.get("outputs") or {}
-    name = Path(out_FILE).name
-    expected = outputs.get(name)
+    expected = _expected_hash(outputs, status_FILE, out_FILE)
     got = sha256_file(out_FILE)
     if expected != got:
         print(got, expected)
