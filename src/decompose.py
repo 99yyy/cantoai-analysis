@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from src.agreement import assert_duration_present
 from src.bootstrap import STRATA, kitagawa_from_stratum_sums, video_stratum
 
 
@@ -14,6 +15,7 @@ def rare_char_set(syllables: pd.DataFrame) -> set[str]:
 
 def video_cells_via_map(published: pd.DataFrame, videos: pd.DataFrame) -> pd.DataFrame:
     """Aggregate judgeable counts to video_id without a DataFrame join."""
+    assert_duration_present(published["dur"])
     realized = published["jp_realized"].fillna("").astype(str)
     judgeable = published["jp_realized"].notna() & (realized != "") & (published["dur"] > 0)
     match = judgeable & published["jp_match"].isin(("exact_default", "exact_alt"))
