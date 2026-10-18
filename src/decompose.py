@@ -16,6 +16,10 @@ def video_cells_via_map(published: pd.DataFrame, videos: pd.DataFrame) -> pd.Dat
     """Aggregate judgeable counts to video_id without a DataFrame join."""
     realized = published["jp_realized"].fillna("").astype(str)
     judgeable = published["jp_realized"].notna() & (realized != "") & (published["dur"] > 0)
+    ids = published.loc[judgeable, "video_id"]
+    absent = ids.notna() & ~ids.isin(videos["video_id"])
+    if bool(absent.any()):
+        raise ValueError("judgeable syllable video_id is not in the videos frame")
     match = judgeable & published["jp_match"].isin(("exact_default", "exact_alt"))
     n_j = published.loc[judgeable].groupby("video_id").size().to_dict()
     n_m = published.loc[match].groupby("video_id").size().to_dict()
