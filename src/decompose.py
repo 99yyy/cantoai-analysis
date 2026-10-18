@@ -23,6 +23,8 @@ def video_cells_via_map(published: pd.DataFrame, videos: pd.DataFrame) -> pd.Dat
         ("film", "other")
     )
     base = videos.loc[assigned, ["video_id", "period", "film_group"]].copy()
+    if bool(base["video_id"].duplicated().any()):
+        raise ValueError("video cells repeat a video_id")
     video_ids = base["video_id"].tolist()
     base["n_judgeable"] = [int(n_j[v]) if v in n_j else 0 for v in video_ids]
     base["n_match"] = [int(n_m[v]) if v in n_m else 0 for v in video_ids]
