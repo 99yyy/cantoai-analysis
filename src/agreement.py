@@ -20,7 +20,13 @@ def assert_no_null_jp_match(df: pd.DataFrame, judgeable: pd.Series) -> None:
         raise ValueError("judgeable syllable has NULL jp_match")
 
 
+def assert_duration_present(dur: pd.Series) -> None:
+    if bool(dur.isna().any()):
+        raise ValueError("syllable duration is missing")
+
+
 def agreement_counts(df: pd.DataFrame) -> dict[str, int]:
+    assert_duration_present(df["dur"])
     empty = df["jp_realized"].isna() | (df["jp_realized"].fillna("").astype(str) == "")
     dur_le_0 = df["dur"] <= 0
     judgeable = judgeable_mask(df)
